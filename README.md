@@ -4,6 +4,9 @@ Agente de IA local desenvolvido com **Google ADK**, **LiteLLM**, **Ollama** e **
 
 O projeto utiliza o Google ADK para criar e executar o agente, enquanto o Ollama executa o modelo localmente.
 
+## Base de dados
+https://www.kaggle.com/datasets/rafatrindade/brazilian-kaggle-datahub/data
+
 ## 🛠️ Tecnologias
 
 - Python 3.13+
