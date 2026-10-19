@@ -10,10 +10,18 @@ requires-python = ">=3.13"
 dependencies = [
     "google-adk>=2.11.0",
     "litellm>=1.104.0",
+    "chromadb>=0.5.0",
+    "pytest>=8.0.0",
+    "duckduckgo-search>=6.0.0",
+    "beautifulsoup4>=4.12.0",
+    "streamlit>=1.30.0",
+    "pandas>=2.1.0",
+    "pyspark>=3.5.0",
+    "sqlglot>=30.21.0",
 ]
 
 [project.scripts]
-agent-fiap = "agent_fiap:main"
+agent-fiap = "agent_fiap.agent:main"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]
