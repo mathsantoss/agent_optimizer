@@ -1,7 +1,4 @@
 import os
-import pandas as pd
-import os
-
 
 
 def ler_arquivo(caminho_arquivo: str) -> str:
