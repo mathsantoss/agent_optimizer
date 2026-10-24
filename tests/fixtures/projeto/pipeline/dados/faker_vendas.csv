@@ -1,0 +1,19 @@
+name,sale_id,product_id,product,price_y,quantity,price_x,created_at,updated_at,email
+Ana Lima,a3752958-c2fe-5681-a36d-1c6b824db785,1,Lang Club,10.0,1,12.5,2001-01-10 10:00:00+00:00,2000-01-01 00:00:00+00:00,ana@example.com
+Ana Lima,a3752958-c2fe-5681-a36d-1c6b824db785,2,Mouse Pad,20.0,2,45.0,2001-01-10 10:00:00+00:00,2000-01-01 00:00:00+00:00,ana@example.com
+Ana Lima,a3752958-c2fe-5681-a36d-1c6b824db785,3,Teclado,30.0,3,95.0,2001-01-10 10:00:00+00:00,2000-01-01 00:00:00+00:00,ana@example.com
+Bruno Reis,9b9fd2e0-50ef-5070-a285-1a667dd7dfcc,1,Lang Club,10.0,2,22.0,2001-03-05 11:30:00+00:00,2000-01-01 00:00:00+00:00,bruno@example.com
+Bruno Reis,9b9fd2e0-50ef-5070-a285-1a667dd7dfcc,2,Mouse Pad,20.0,2,41.0,2001-03-05 11:30:00+00:00,2000-01-01 00:00:00+00:00,bruno@example.com
+Bruno Reis,9b9fd2e0-50ef-5070-a285-1a667dd7dfcc,3,Teclado,30.0,1,33.0,2001-03-05 11:30:00+00:00,2000-01-01 00:00:00+00:00,bruno@example.com
+Carla Dias,a140c691-c584-5aed-a6d4-f80b9168ecf4,1,Lang Club,10.0,4,39.0,2002-01-20 09:15:00+00:00,2000-01-01 00:00:00+00:00,carla@example.com
+Carla Dias,a140c691-c584-5aed-a6d4-f80b9168ecf4,2,Mouse Pad,20.0,1,18.0,2002-01-20 09:15:00+00:00,2000-01-01 00:00:00+00:00,carla@example.com
+Carla Dias,a140c691-c584-5aed-a6d4-f80b9168ecf4,3,Teclado,30.0,1,29.0,2002-01-20 09:15:00+00:00,2000-01-01 00:00:00+00:00,carla@example.com
+Ana Lima,0b311c3e-172b-5d53-b05a-d21ea80a327f,1,Lang Club,10.0,3,31.0,2002-03-15 18:45:00+00:00,2000-01-01 00:00:00+00:00,ana@example.com
+Ana Lima,0b311c3e-172b-5d53-b05a-d21ea80a327f,2,Mouse Pad,20.0,3,64.0,2002-03-15 18:45:00+00:00,2000-01-01 00:00:00+00:00,ana@example.com
+Ana Lima,0b311c3e-172b-5d53-b05a-d21ea80a327f,3,Teclado,30.0,2,59.0,2002-03-15 18:45:00+00:00,2000-01-01 00:00:00+00:00,ana@example.com
+Bruno Reis,191f7d1a-93fb-5953-8fc0-bbe12210fd98,1,Lang Club,10.0,1,9.0,2001-01-25 23:59:59+00:00,2000-01-01 00:00:00+00:00,bruno@example.com
+Bruno Reis,191f7d1a-93fb-5953-8fc0-bbe12210fd98,2,Mouse Pad,20.0,1,21.0,2001-01-25 23:59:59+00:00,2000-01-01 00:00:00+00:00,bruno@example.com
+Bruno Reis,191f7d1a-93fb-5953-8fc0-bbe12210fd98,3,Teclado,30.0,2,61.0,2001-01-25 23:59:59+00:00,2000-01-01 00:00:00+00:00,bruno@example.com
+Carla Dias,f4194614-5a55-591d-8a14-53158889faca,1,Lang Club,10.0,2,19.0,2001-03-31 23:59:59+00:00,2000-01-01 00:00:00+00:00,carla@example.com
+Carla Dias,f4194614-5a55-591d-8a14-53158889faca,2,Mouse Pad,20.0,4,83.0,2001-03-31 23:59:59+00:00,2000-01-01 00:00:00+00:00,carla@example.com
+Carla Dias,f4194614-5a55-591d-8a14-53158889faca,3,Teclado,30.0,4,125.0,2001-03-31 23:59:59+00:00,2000-01-01 00:00:00+00:00,carla@example.com

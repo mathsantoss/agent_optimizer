@@ -1,40 +1,43 @@
-
 import pandas as pd
-import os
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import FunctionTransformer
 
-# Ler arquivo
-df = pd.read_csv('pipeline/dados/dados_vendas.csv')
+# Função para converter a coluna de data em características numéricas
+converter_data = FunctionTransformer(lambda df: pd.to_datetime(df['created_at']).astype(int) / 10 ** 9, validate=True)
 
-# Calcular algumas informações dos clientes
-df['media_vendas_cliente'] = df.groupby('id_cliente')['quantidade'].transform('mean')
-df['freq_compras_cliente'] = df.groupby('id_cliente')['data_venda'].transform('count')
+# Função para extrair características de texto
+extrair_caracteristicas_texto = FunctionTransformer(lambda df: df['name'].str.lower().str.get_dummies(), validate=True)
 
-# Calcular total de produtos
-df['total_produtos_cliente'] = df.groupby('id_cliente')['id_produto'].transform('nunique')
+# Carregar os dados
+def carregar_dados():
+    return pd.read_csv('pipeline/dados/dados_vendas.csv')
 
-# Calcular desconto e preço
-df['desconto_medio'] = df['desconto'] / df['preco_unitario']
-df['preco_medio'] = df['preco_unitario'] - df['desconto']
+# Criar o pipeline
+pipeline = Pipeline(
+    [
+        ('converter_data', converter_data),
+        ('extrair_caracteristicas_texto', extrair_caracteristicas_texto),
+        ('imputer', SimpleImputer(strategy='mean')),  # Substitui valores ausentes por média
+        ('scaler', StandardScaler()),  # Normaliza características numéricas
+        ('one_hot', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))  # One-Hot Encoding para colunas categóricas
+    ]
+)
 
-# Converter datas várias vezes
-df['dia_semana'] = pd.to_datetime(df['data_venda']).dt.dayofweek
-df['mes_do_ano'] = pd.to_datetime(df['data_venda']).dt.month
+# Transformador final que ajusta e transforma os dados de entrada
+preprocessor = ColumnTransformer(
+    [('numeric_features', StandardScaler(), ['quantity', 'price_x']),
+     ('categorical_features', OneHotEncoder(), ['product', 'email'])],
+    remainder='drop',  # Descarta colunas não transformadas
+    sparse_threshold=0  # Retorna uma matriz densa
+)
 
-# Calcular algumas métricas novamente sem necessidade
-df['media_auxiliar'] = df.groupby('id_cliente')['quantidade'].transform('mean')
-df['produtos_auxiliar'] = df.groupby('id_cliente')['id_produto'].transform('nunique')
-
-df['media_vendas_cliente'] = df.groupby('id_cliente')['quantidade'].transform('mean')
-df['freq_compras_cliente'] = df.groupby('id_cliente')['data_venda'].transform('count')
-
-# Remover colunas que não serão utilizadas
-df.drop(['data_venda', 'desconto', 'preco_unitario'], axis=1, inplace=True)
-
-# Remover colunas auxiliares
-df.drop(['media_auxiliar', 'produtos_auxiliar'], axis=1, inplace=True)
-
-# Salvar resultado
-if not os.path.exists('pipeline/features'):
-    os.makedirs('pipeline/features')
-
-df.to_csv('pipeline/features/features_credit.csv', index=False)
+# Definir o pipeline final
+pipeline_final = Pipeline([
+    ('load_data', FunctionTransformer(carregar_dados)),
+    ('preprocessor', preprocessor),
+    ('model', None)  # Placeholder para um modelo de regressão posteriormente
+])

@@ -41,3 +41,22 @@ flowchart TD
     class J,K,L,M tools
     class N,O output
 :::
+--
+::: mermaid
+flowchart LR
+  subgraph config
+    W[WorkspaceConfig]
+  end
+  W --> Root[Agent orchestrator]
+  Root --> O[Optimizer subagent]
+  Root --> F[Feature engineer subagent]
+  Root --> V[Validator subagent]
+  O --> T[Tools]
+  F --> T
+  V --> T
+  T --> FS[filesystem sandbox]
+  T --> DS[data profile]
+  T --> EX[execute pipeline]
+  T --> CMP[compare outputs]
+
+:::

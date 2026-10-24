@@ -16,12 +16,11 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "streamlit>=1.30.0",
     "pandas>=2.1.0",
+    "scikit-learn>=1.4.0",
+    "tabulate>=0.9.0",
     "pyspark>=3.5.0",
     "sqlglot>=30.21.0",
 ]
-
-[project.scripts]
-agent-fiap = "agent_fiap.agent:main"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

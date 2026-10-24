@@ -1,161 +1,85 @@
 # 🤖 Agent FIAP
 
-Agente de IA local desenvolvido com **Google ADK**, **LiteLLM**, **Ollama** e **Qwen 2.5 14B**.
+Assistente Inteligente e Unificado de Ciência de Dados, Analytics e Engenharia de Pipelines inspirado conceitualmente no **Databricks Genie Code**. Desenvolvido com **Google ADK**, **LiteLLM**, **Ollama** e **Qwen 2.5 14B**.
 
-O projeto utiliza o Google ADK para criar e executar o agente, enquanto o Ollama executa o modelo localmente.
+O **`agent_fiap`** é um agente autônomo e genérico capaz de raciocinar sobre qualquer conjunto de dados (.csv e .parquet) colocado em `pipeline/dados/`, responder perguntas analíticas em linguagem natural, executar consultas SQL, recuperar regras de negócio via RAG, e criar, refatorar, salvar e validar fisicamente pipelines em `pipeline/pipeline_prep.py`.
 
-## Base de dados
-https://www.kaggle.com/datasets/rafatrindade/brazilian-kaggle-datahub/data
+---
 
 ## 🛠️ Tecnologias
 
 - Python 3.13+
-- Google ADK
+- Google ADK (Agent Development Kit)
 - LiteLLM
-- Ollama
-- Qwen 2.5 14B
-- UV
-- Conda
+- Ollama (`qwen2.5:14b`)
+- ChromaDB (RAG para documentação e regras de negócio em `docs/`)
+- Pandas & PyArrow (Exploração agnóstica de CSV e Parquet)
+- Scikit-Learn (Pipelines de Feature Engineering e Modelos)
+- SQLite em memória (Execução analítica SQL somente leitura com suporte a `GREATEST`, `LEAST`, `CONCAT`, `YEAR`, `MONTH`)
+- Pytest (Validação e testes automatizados)
+
+---
 
 ## 📋 Pré-requisitos
 
-Antes de executar o projeto, tenha instalado:
-
 - Git
-- Conda
-- Ollama
+- Conda (ambiente `fiap` com Python 3.13)
+- Ollama instalado com o modelo `qwen2.5:14b`
 
-O projeto foi desenvolvido utilizando WSL2.
+---
 
-## 🚀 Instalação
+## 🚀 Como Executar
 
-### 1. Clone o repositório
-
+### 1. Inicie o Ollama
+Certifique-se de que o Ollama está rodando e com o modelo disponível:
 ```bash
-git clone <URL_DO_REPOSITORIO>
-cd agent-fiap
+ollama serve
+ollama list  # deve listar qwen2.5:14b
 ```
 
-### 2. Crie o ambiente Python
-
+### 2. Ative o ambiente e instale dependências
 ```bash
-conda create -n fiap python=3.13
 conda activate fiap
+uv sync --active
 ```
 
-### 3. Instale as dependências
-
-Instale o UV:
-
+### 3. Inicie a interface Web do Google ADK
+Navegue até a pasta `src` e execute o ADK Web:
 ```bash
-pip install uv
-```
-
-Depois execute:
-
-```bash
-uv sync
-```
-
-Isso instalará as dependências definidas no `pyproject.toml`.
-
-### 4. Configure o Ollama
-
-Instale o Ollama:
-
-https://ollama.com/
-
-Baixe o modelo utilizado pelo projeto:
-
-```bash
-ollama pull qwen2.5:14b
-```
-
-Verifique se o modelo está disponível:
-
-```bash
-ollama list
-```
-
-Você deverá encontrar:
-
-```text
-qwen2.5:14b
-```
-
-## ▶️ Executando o agente
-
-Entre no diretório do agente:
-
-```bash
-cd agent_optimizer
-```
-
-Execute:
-
-```bash
+cd src
 adk web
 ```
 
-O ADK Web estará disponível em:
-
+Acesse no navegador:
 ```text
 http://localhost:8000
 ```
+Selecione o agente: **`agent_fiap`**.
 
-Abra o endereço no navegador e selecione o agente:
+---
 
-```text
-agent_optimizer
-```
+## 🧰 Ferramentas Disponíveis ao Agente
 
-## 🧪 Testando
+O agente possui 9 ferramentas nativas e coordenadas:
 
-Após abrir o ADK Web, envie uma mensagem para o agente, por exemplo:
+### Análise e Exploração de Dados (Genie Analytics)
+- **`listar_datasets`**: Descobre dinamicamente os datasets disponíveis em `pipeline/dados/`, tabelas SQL e tamanhos.
+- **`explorar_dataset`**: Obtém contagem de linhas, colunas, tipos, nulos, valores únicos, período de datas e amostra real.
+- **`resumo_estatistico`**: Gera resumo descritivo (médias, desvios, mínimos, percentis e máximos).
+- **`consultar_sql`**: Executa queries SQL (apenas `SELECT`) sobre os datasets carregados em memória via SQLite.
+- **`buscar_conhecimento`**: Busca semântica (RAG) em documentos e regras de negócio na pasta `docs/`.
 
-```text
-Olá
-```
+### Engenharia de Código e Pipelines (Genie Code)
+- **`ler_arquivo`**: Lê scripts, pipelines e documentação dentro do projeto (informa se o arquivo estiver vazio).
+- **`salvar_arquivo`**: Salva ou atualiza código no projeto (padrão: `pipeline/pipeline_prep.py`) com validação de sintaxe Python e backup automático `.bak`.
+- **`executar_pipeline`**: Executa o script do pipeline via Python em subprocesso e retorna a saída ou eventuais erros de execução.
+- **`executar_testes`**: Roda a suíte de testes automatizados com `pytest`.
 
-Para testar a Tool disponível no projeto:
+---
 
-```text
-Que horas são?
-```
+## 🧪 Testes Automatizados
 
-O agente poderá utilizar a função `pegar_horas()` para consultar a hora atual.
-
-## 📁 Estrutura
-
-```text
-agent-fiap/
-│
-├── agent_optimizer/
-│   ├── __init__.py
-│   └── agent.py
-│
-├── .gitignore
-├── README.md
-├── pyproject.toml
-└── uv.lock
-```
-
-## 🔧 Configuração
-
-O agente utiliza o Ollama em:
-
-```text
-http://localhost:11434
-```
-
-E o modelo:
-
-```text
-qwen2.5:14b
-```
-
-Caso o agente não responda, verifique se o Ollama está funcionando:
-
+Para executar os testes automatizados:
 ```bash
-curl http://localhost:11434/api/tags
+conda run -n fiap python -m pytest tests -v
 ```
