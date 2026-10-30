@@ -1,8 +1,14 @@
-"""Caminhos do projeto e regras de acesso a arquivos."""
+"""Configurações centralizadas do projeto e variáveis de ambiente (.env)."""
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(os.getenv("AGENT_FIAP_ROOT", Path(__file__).resolve().parents[2])).resolve()
+# Carrega variáveis do arquivo .env na raiz do repositório
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(_REPO_ROOT / ".env", override=False)
+
+# Diretórios do projeto
+PROJECT_ROOT = Path(os.getenv("AGENT_FIAP_ROOT", _REPO_ROOT)).resolve()
 DATA_DIR = (PROJECT_ROOT / os.getenv("AGENT_FIAP_DATA_DIR", "pipeline/dados")).resolve()
 KNOWLEDGE_DIR = PROJECT_ROOT / "docs" / "conhecimento"  # documentos opcionais para o RAG
 
@@ -10,13 +16,7 @@ KNOWLEDGE_DIR = PROJECT_ROOT / "docs" / "conhecimento"  # documentos opcionais p
 READ_DIRS = [PROJECT_ROOT / d for d in ("pipeline", "src", "tests", "docs")]
 WRITE_DIRS = [PROJECT_ROOT / d for d in ("pipeline", "tests")]
 
-
-def safe_path(path: str, write: bool = False) -> Path:
-    """Resolve `path` e garante que está numa pasta permitida (bloqueia '..' e symlinks)."""
-    p = Path(path).expanduser()
-    p = (p if p.is_absolute() else PROJECT_ROOT / p).resolve()
-    allowed = WRITE_DIRS if write else READ_DIRS
-    if not any(p == d or d in p.parents for d in allowed):
-        nomes = ", ".join(d.name + "/" for d in allowed)
-        raise PermissionError(f"Acesso negado: '{path}' fora das pastas permitidas ({nomes}).")
-    return p
+# Configuração do Modelo via LiteLLM (lida diretamente do .env)
+LLM_MODEL = os.getenv("LLM_MODEL", "ollama_chat/qwen3.6:35b-a3b")
+LLM_API_KEY = os.getenv("LLM_API_KEY") or None
+LLM_API_BASE = os.getenv("LLM_API_BASE") or None

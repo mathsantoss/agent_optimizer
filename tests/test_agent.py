@@ -1,29 +1,40 @@
-"""Testes automatizados para o Agent FIAP unificado e suas ferramentas."""
+"""Testes automatizados para o Agent FIAP (Orquestrador, Agente Analista e Agente Otimizador) e suas ferramentas."""
 import json
 import pytest
-from agent_fiap.agent import root_agent
+from agent_fiap.agent import root_agent, agente_analista, agente_otimizador
 from agent_fiap.tools import data_tools, code_tools, rag
 
 
-def test_estrutura_agente_unificado():
-    """Valida se o agente unificado foi configurado com todas as 9 ferramentas essenciais."""
+def test_estrutura_multi_agentes():
+    """Valida a separação entre o Orquestrador, o Agente Analista e o Agente Otimizador sem perda de funcionalidades."""
     assert root_agent.name == "agent_fiap"
-    assert root_agent.sub_agents == [] or root_agent.sub_agents is None
+    nomes_subagentes = [ag.name for ag in root_agent.sub_agents]
+    assert "agente_analista" in nomes_subagentes
+    assert "agente_otimizador" in nomes_subagentes
 
-    ferramentas = [t.__name__ for t in root_agent.tools]
-    esperadas = [
+    # Ferramentas do Agente Analista de Dados
+    tools_analista = [t.__name__ for t in agente_analista.tools]
+    for esp in [
         "listar_datasets",
         "explorar_dataset",
         "resumo_estatistico",
         "consultar_sql",
         "buscar_conhecimento",
+    ]:
+        assert esp in tools_analista, f"Ferramenta {esp} não encontrada no agente_analista."
+
+    # Ferramentas do Agente Especialista em Otimização e Criação de Código
+    tools_otimizador = [t.__name__ for t in agente_otimizador.tools]
+    for esp in [
         "ler_arquivo",
         "salvar_arquivo",
         "executar_pipeline",
         "executar_testes",
-    ]
-    for esp in esperadas:
-        assert esp in ferramentas, f"Ferramenta {esp} não encontrada no agente."
+        "listar_datasets",
+        "explorar_dataset",
+        "buscar_conhecimento",
+    ]:
+        assert esp in tools_otimizador, f"Ferramenta {esp} não encontrada no agente_otimizador."
 
 
 def test_listar_datasets():
@@ -123,3 +134,5 @@ def test_rag_busca():
     """Testa funcionamento do RAG com ChromaDB."""
     resultado = data_tools.buscar_conhecimento("regras de negócio e métricas")
     assert isinstance(resultado, str)
+
+

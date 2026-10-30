@@ -3,6 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 from .. import config
+from ..utils import safe_path
 
 
 def _resolver_arquivo(caminho_arquivo: str, write: bool = False) -> Path:
@@ -10,7 +11,7 @@ def _resolver_arquivo(caminho_arquivo: str, write: bool = False) -> Path:
     caminho = caminho_arquivo.strip()
     if caminho == "pipeline_prep.py":
         caminho = "pipeline/pipeline_prep.py"
-    return config.safe_path(caminho, write=write)
+    return safe_path(caminho, write=write)
 
 
 def ler_arquivo(caminho_arquivo: str = "pipeline/pipeline_prep.py") -> str:
@@ -103,7 +104,7 @@ def executar_testes(alvo: str = "tests") -> str:
     Executa a suíte de testes automatizados com pytest.
     """
     try:
-        p = config.safe_path(alvo, write=False)
+        p = safe_path(alvo, write=False)
         res = subprocess.run(
             [sys.executable, "-m", "pytest", str(p), "-q", "--no-header"],
             cwd=config.PROJECT_ROOT,
