@@ -1,0 +1,100 @@
+{
+  "metadata": {
+    "category": "dicionario_dados",
+    "table": "dados_vendas",
+    "source_file": "pipeline/dados/dados_vendas.csv",
+    "version": "1.2",
+    "updated_at": "2026-10-30"
+  },
+  "description": "Tabela transacional de vendas de produtos com histórico de preços praticados, preços de referência, quantidades e identificação de clientes.",
+  "primary_key_candidates": [
+    "sale_id"
+  ],
+  "columns": [
+    {
+      "name": "name",
+      "data_type": "string",
+      "nullable": false,
+      "description": "Nome completo do cliente comprador."
+    },
+    {
+      "name": "sale_id",
+      "data_type": "integer",
+      "nullable": false,
+      "description": "Identificador único da venda ou pedido."
+    },
+    {
+      "name": "product_id",
+      "data_type": "integer",
+      "nullable": false,
+      "description": "Identificador único do produto no catálogo."
+    },
+    {
+      "name": "product",
+      "data_type": "string",
+      "nullable": false,
+      "description": "Nome comercial do produto vendido."
+    },
+    {
+      "name": "price_y",
+      "data_type": "float",
+      "nullable": false,
+      "unit": "BRL",
+      "description": "Preço de tabela ou preço de referência do produto em reais (R$)."
+    },
+    {
+      "name": "price_x",
+      "data_type": "float",
+      "nullable": false,
+      "unit": "BRL",
+      "description": "Preço efetivamente praticado na transação comercial em reais (R$)."
+    },
+    {
+      "name": "quantity",
+      "data_type": "integer",
+      "nullable": false,
+      "description": "Quantidade de unidades adquiridas do produto na venda."
+    },
+    {
+      "name": "created_at",
+      "data_type": "datetime",
+      "nullable": false,
+      "description": "Data e hora de criação do registro da venda."
+    },
+    {
+      "name": "updated_at",
+      "data_type": "datetime",
+      "nullable": false,
+      "description": "Data e hora da última atualização do registro da venda."
+    },
+    {
+      "name": "email",
+      "data_type": "string",
+      "nullable": false,
+      "description": "Endereço de e-mail de contato do cliente comprador."
+    }
+  ],
+  "derived_metrics_and_conventions": [
+    {
+      "name": "total_value_x",
+      "formula": "quantity * price_x",
+      "description": "Faturamento bruto calculado pelo preço praticado na transação."
+    },
+    {
+      "name": "total_value_y",
+      "formula": "quantity * price_y",
+      "description": "Valor total estimado pelo preço de referência do catálogo."
+    },
+    {
+      "name": "price_diff",
+      "formula": "price_x - price_y",
+      "description": "Diferença unitária entre o preço praticado e o preço de referência."
+    },
+    {
+      "name": "highest_unit_price",
+      "formula": "GREATEST(price_y, price_x)",
+      "description": "Maior valor unitário entre o preço de referência e o preço praticado."
+    }
+  ]
+}
+

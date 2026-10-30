@@ -10,7 +10,7 @@ load_dotenv(REPOSITORY_ROOT / ".env", override=False)
 # Diretórios do projeto
 PROJECT_ROOT = Path(os.getenv("AGENT_FIAP_ROOT", REPOSITORY_ROOT)).resolve()
 DATA_DIR = (PROJECT_ROOT / os.getenv("AGENT_FIAP_DATA_DIR", "pipeline/dados")).resolve()
-KNOWLEDGE_DIR = PROJECT_ROOT / "docs" / "conhecimento"
+KNOWLEDGE_DIR = DATA_DIR / "conhecimento"
 
 # Diretórios autorizados para leitura e escrita pelo agente
 READ_DIRS = [PROJECT_ROOT / directory for directory in ("pipeline", "src", "tests", "docs")]

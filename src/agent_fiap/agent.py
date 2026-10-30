@@ -1,6 +1,6 @@
 """Definição do Agent FIAP (Orquestrador) e seus 2 sub-agentes especialistas:
-- data_analyst_agent: Especialista em Análise de Dados, Estatística, SQL e Insights.
-- code_optimizer_agent: Especialista em Otimização, Criação de Código, Pipelines e Feature Engineering.
+- data_analyst_agent: Especialista em Análise de Dados, Estatística, SQL e Investigação de Insights.
+- code_optimizer_agent: Especialista em Diagnóstico AST, Benchmark, Otimização, Criação de Código e Feature Engineering.
 """
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
@@ -12,10 +12,13 @@ from .prompts import (
     CODE_OPTIMIZER_AGENT_INSTRUCTION,
 )
 from .tools import (
+    analyze_pipeline_code,
+    compare_pipeline_runs,
     execute_sql_query,
     explore_dataset,
     generate_statistical_summary,
     list_datasets,
+    profile_pipeline,
     read_file,
     run_pipeline,
     run_tests,
@@ -36,8 +39,8 @@ data_analyst_agent = Agent(
     model=language_model,
     description=(
         "Agente Analista de Dados especialista em explorar datasets em pipeline/dados/, "
-        "gerar resumos estatísticos, executar consultas SQL analíticas, recuperar regras "
-        "de negócio via RAG e investigar insights, métricas e anomalias."
+        "gerar resumos estatísticos, executar consultas SQL analíticas, consultar o Dicionário de Dados "
+        "e investigar insights, métricas e anomalias."
     ),
     static_instruction=ANALYST_AGENT_INSTRUCTION,
     tools=[
@@ -54,15 +57,18 @@ code_optimizer_agent = Agent(
     name="code_optimizer_agent",
     model=language_model,
     description=(
-        "Agente especialista em otimização, criação e alteração de código e pipelines (pipeline/pipeline_prep.py), "
-        "engenharia de features (Feature Engineering), refatoração em Python/Pandas/PySpark/Scikit-Learn, "
-        "gravação física no disco e validação via execução do pipeline e testes automatizados."
+        "Agente especialista em diagnóstico estático (AST), profiling e benchmark comparativo antes/depois "
+        "(profile_pipeline e compare_pipeline_runs), otimização, criação e alteração de código e pipelines "
+        "(pipeline/pipeline_prep.py), conversão SQL/Pandas/PySpark e Feature Engineering."
     ),
     static_instruction=CODE_OPTIMIZER_AGENT_INSTRUCTION,
     tools=[
         read_file,
+        analyze_pipeline_code,
+        profile_pipeline,
         save_file,
         run_pipeline,
+        compare_pipeline_runs,
         run_tests,
         list_datasets,
         explore_dataset,

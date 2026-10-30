@@ -1,0 +1,73 @@
+{
+  "metadata": {
+    "category": "dicionario_dados",
+    "table": "dados_vendas",
+    "source_file": "pipeline/dados/dados_vendas.csv",
+    "version": "1.2",
+    "updated_at": "2026-10-30"
+  },
+  "description": "Tabela transacional de vendas de produtos com preços, descontos e status.",
+  "primary_key_candidates": [
+    "id_venda"
+  ],
+  "columns": [
+    {
+      "name": "id_venda",
+      "data_type": "integer",
+      "nullable": false,
+      "description": "Identificador único da venda."
+    },
+    {
+      "name": "id_cliente",
+      "data_type": "integer",
+      "nullable": false,
+      "description": "Identificador do cliente que realizou a compra."
+    },
+    {
+      "name": "id_produto",
+      "data_type": "integer",
+      "nullable": false,
+      "description": "Identificador do produto vendido."
+    },
+    {
+      "name": "data_venda",
+      "data_type": "date",
+      "nullable": false,
+      "description": "Data da venda no formato YYYY-MM-DD."
+    },
+    {
+      "name": "quantidade",
+      "data_type": "integer",
+      "nullable": false,
+      "description": "Unidades vendidas na transação."
+    },
+    {
+      "name": "preco_unitario",
+      "data_type": "float",
+      "nullable": false,
+      "unit": "BRL",
+      "description": "Preço de tabela unitário em reais."
+    },
+    {
+      "name": "desconto",
+      "data_type": "float",
+      "nullable": false,
+      "unit": "BRL",
+      "description": "Valor absoluto de desconto concedido."
+    },
+    {
+      "name": "status",
+      "data_type": "string",
+      "nullable": false,
+      "description": "Status do pedido: concluida ou cancelada."
+    }
+  ],
+  "derived_metrics_and_conventions": [
+    {
+      "name": "faturamento_liquido",
+      "formula": "quantidade * preco_unitario - desconto",
+      "description": "Faturamento líquido das vendas com status concluida."
+    }
+  ]
+}
+

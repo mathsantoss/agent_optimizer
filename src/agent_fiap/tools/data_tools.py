@@ -4,8 +4,11 @@ from pathlib import Path
 import sqlite3
 import pandas as pd
 import pyarrow.parquet as parquet
+import sqlglot
+from sqlglot import exp as sql_expressions
 
 from .. import config
+from ..schemas import ColumnProfile, DateRangeSummary
 
 FORBIDDEN_SQL_COMMANDS = (
     "drop",
@@ -16,17 +19,32 @@ FORBIDDEN_SQL_COMMANDS = (
     "create",
     "truncate",
     "replace",
+    "attach",
+    "detach",
+    "pragma",
+)
+
+FORBIDDEN_AST_EXPRESSIONS = (
+    sql_expressions.Drop,
+    sql_expressions.Delete,
+    sql_expressions.Insert,
+    sql_expressions.Update,
+    sql_expressions.Create,
+    sql_expressions.Alter,
+    sql_expressions.Command,
 )
 
 
 def _list_dataset_files() -> list[Path]:
-    """Retorna todos os arquivos .csv e .parquet disponíveis no diretório de dados."""
+    """Retorna todos os arquivos .csv e .parquet disponíveis no diretório de dados (ignorando a subpasta conhecimento)."""
     if not config.DATA_DIR.exists():
         return []
     return [
         file_path
         for file_path in sorted(config.DATA_DIR.rglob("*"))
-        if file_path.is_file() and file_path.suffix in (".csv", ".parquet")
+        if file_path.is_file()
+        and file_path.suffix in (".csv", ".parquet")
+        and not file_path.is_relative_to(config.KNOWLEDGE_DIR)
     ]
 
 
@@ -102,6 +120,38 @@ def _sql_least(*values):
         return min(valid_values)
 
 
+def _validate_readonly_sql(query: str) -> str | None:
+    """
+    Valida se a consulta SQL é estritamente de leitura (SELECT) utilizando análise léxica
+    e árvore sintática abstrata (AST) via SQLGlot. Retorna mensagem de erro ou None se válida.
+    """
+    normalized_query = query.strip().lower()
+    if not normalized_query:
+        return "Erro: a consulta SQL não pode ser vazia."
+
+    for forbidden_command in FORBIDDEN_SQL_COMMANDS:
+        if normalized_query.startswith(forbidden_command) or f" {forbidden_command} " in f" {normalized_query} ":
+            return f"Erro: comando '{forbidden_command.upper()}' proibido. Apenas consultas SELECT são permitidas."
+
+    try:
+        parsed_statements = sqlglot.parse(query)
+    except Exception as parse_error:
+        return f"Erro de sintaxe SQL detectado pelo validador AST: {str(parse_error)}"
+
+    if not parsed_statements or any(statement is None for statement in parsed_statements):
+        return "Erro: consulta SQL inválida ou vazia."
+
+    for statement in parsed_statements:
+        if isinstance(statement, FORBIDDEN_AST_EXPRESSIONS):
+            return f"Erro: operação '{statement.key.upper()}' proibida pela política somente-leitura."
+        for forbidden_node in statement.find_all(*FORBIDDEN_AST_EXPRESSIONS):
+            return f"Erro: cláusula '{forbidden_node.key.upper()}' proibida. Apenas consultas SELECT são permitidas."
+        if not isinstance(statement, (sql_expressions.Select, sql_expressions.Union, sql_expressions.Subquery)):
+            return "Erro: apenas instruções SELECT de leitura são permitidas."
+
+    return None
+
+
 def list_datasets() -> str:
     """
     Lista todos os datasets (.csv e .parquet) disponíveis em pipeline/dados/.
@@ -126,8 +176,8 @@ def list_datasets() -> str:
 def explore_dataset(dataset_name: str) -> str:
     """
     Inspeciona um dataset gerando um perfil completo: total de linhas amostradas,
-    colunas, tipos de dados, contagem de valores únicos e nulos, intervalo temporal
-    e amostra real das primeiras 3 linhas.
+    quantidade de duplicatas, chaves candidatas, colunas com tipos de dados,
+    contagem e percentual de nulos, intervalo temporal e amostra real das primeiras 3 linhas.
     """
     file_path = _find_dataset_file(dataset_name)
     if not file_path:
@@ -136,22 +186,52 @@ def explore_dataset(dataset_name: str) -> str:
 
     try:
         sample_dataframe = _read_dataframe(file_path, max_rows=10_000)
-        columns_metadata = {}
-        date_ranges = {}
+        total_rows = len(sample_dataframe)
+        duplicate_row_count = int(sample_dataframe.duplicated().sum())
+        columns_metadata: dict[str, dict] = {}
+        date_ranges: dict[str, dict] = {}
+        candidate_keys: list[str] = []
 
         for column_name in sample_dataframe.columns:
+            column_series = sample_dataframe[column_name]
+            unique_count = int(column_series.nunique(dropna=True))
+            null_count = int(column_series.isna().sum())
+            null_percentage = round((null_count / total_rows) * 100, 2) if total_rows > 0 else 0.0
+
+            column_profile = ColumnProfile(
+                data_type=str(column_series.dtype),
+                unique_values=unique_count,
+                null_count=null_count,
+                null_percentage=null_percentage,
+            )
             columns_metadata[column_name] = {
-                "tipo": str(sample_dataframe[column_name].dtype),
-                "valores_unicos": int(sample_dataframe[column_name].nunique()),
-                "nulos": int(sample_dataframe[column_name].isna().sum()),
+                "tipo": column_profile.data_type,
+                "valores_unicos": column_profile.unique_values,
+                "nulos": column_profile.null_count,
+                "percentual_nulos": column_profile.null_percentage,
             }
-            if any(keyword in column_name.lower() for keyword in ("date", "data", "created", "updated")):
+
+            normalized_column_name = column_name.lower()
+            is_unique_not_null = total_rows > 0 and null_count == 0 and unique_count == total_rows
+            is_identifier_column = (
+                normalized_column_name == "id"
+                or normalized_column_name.startswith("id_")
+                or normalized_column_name.endswith("_id")
+            )
+            if is_unique_not_null or (is_identifier_column and null_count == 0):
+                candidate_keys.append(column_name)
+
+            if any(keyword in normalized_column_name for keyword in ("date", "data", "created", "updated")):
                 try:
-                    datetime_series = pd.to_datetime(sample_dataframe[column_name], errors="coerce")
+                    datetime_series = pd.to_datetime(column_series, errors="coerce")
                     if datetime_series.notna().sum() > 0:
+                        date_summary = DateRangeSummary(
+                            start_date=str(datetime_series.min()),
+                            end_date=str(datetime_series.max()),
+                        )
                         date_ranges[column_name] = {
-                            "inicio": str(datetime_series.min()),
-                            "fim": str(datetime_series.max()),
+                            "inicio": date_summary.start_date,
+                            "fim": date_summary.end_date,
                         }
                 except Exception:
                     pass
@@ -159,7 +239,9 @@ def explore_dataset(dataset_name: str) -> str:
         profile_result = {
             "arquivo": str(file_path.relative_to(config.PROJECT_ROOT)),
             "tabela_sql": file_path.stem.replace("-", "_"),
-            "total_linhas_amostradas": len(sample_dataframe),
+            "total_linhas_amostradas": total_rows,
+            "linhas_duplicadas": duplicate_row_count,
+            "chaves_candidatas": candidate_keys,
             "periodo_temporal": date_ranges if date_ranges else "Nenhuma coluna de data detectada",
             "colunas": columns_metadata,
             "amostra_3_linhas": sample_dataframe.head(3).to_dict(orient="records"),
@@ -172,7 +254,8 @@ def explore_dataset(dataset_name: str) -> str:
 def generate_statistical_summary(dataset_name: str) -> str:
     """
     Gera um resumo estatístico descritivo (contagem, média, desvio padrão, mínimo,
-    mediana e máximo) das colunas numéricas do dataset informado.
+    percentis 25%/50%/75%, máximo, contagem de nulos e quantidade de outliers via IQR)
+    das colunas numéricas do dataset informado.
     """
     file_path = _find_dataset_file(dataset_name)
     if not file_path:
@@ -181,8 +264,37 @@ def generate_statistical_summary(dataset_name: str) -> str:
 
     try:
         dataframe = _read_dataframe(file_path, max_rows=20_000)
-        statistics_table = dataframe.describe().transpose()
-        statistics_table = statistics_table[["count", "mean", "std", "min", "50%", "max"]].dropna(how="all")
+        numeric_dataframe = dataframe.select_dtypes(include="number")
+        if numeric_dataframe.empty:
+            return f"O dataset '{dataset_name}' não possui colunas numéricas para resumo estatístico."
+
+        statistics_table = numeric_dataframe.describe().transpose()
+        selected_columns = [
+            column for column in ("count", "mean", "std", "min", "25%", "50%", "75%", "max")
+            if column in statistics_table.columns
+        ]
+        statistics_table = statistics_table[selected_columns].dropna(how="all")
+
+        # Adiciona contagem de nulos e detecção de outliers pelo critério de Tukey (1.5 * IQR)
+        null_counts = []
+        outlier_counts = []
+        for column_name in statistics_table.index:
+            column_series = numeric_dataframe[column_name].dropna()
+            null_counts.append(int(numeric_dataframe[column_name].isna().sum()))
+            if len(column_series) > 0:
+                first_quartile = column_series.quantile(0.25)
+                third_quartile = column_series.quantile(0.75)
+                interquartile_range = third_quartile - first_quartile
+                lower_bound = first_quartile - 1.5 * interquartile_range
+                upper_bound = third_quartile + 1.5 * interquartile_range
+                outliers_mask = (column_series < lower_bound) | (column_series > upper_bound)
+                outlier_counts.append(int(outliers_mask.sum()))
+            else:
+                outlier_counts.append(0)
+
+        statistics_table["nulos"] = null_counts
+        statistics_table["outliers_iqr"] = outlier_counts
+
         try:
             return statistics_table.round(2).to_markdown()
         except Exception:
@@ -193,15 +305,16 @@ def generate_statistical_summary(dataset_name: str) -> str:
 
 def execute_sql_query(query: str) -> str:
     """
-    Executa uma consulta SQL (somente SELECT) sobre os datasets disponíveis.
+    Valida a sintaxe SQL via SQLGlot e executa uma consulta somente-leitura (SELECT)
+    sobre os datasets disponíveis em pipeline/dados/.
     O nome de cada tabela corresponde ao nome do arquivo sem extensão (exibido em list_datasets).
     Suporta funções analíticas como GREATEST, LEAST, CONCAT, YEAR e MONTH.
     """
-    normalized_query = query.strip().lower()
-    for forbidden_command in FORBIDDEN_SQL_COMMANDS:
-        if normalized_query.startswith(forbidden_command) or f" {forbidden_command} " in f" {normalized_query} ":
-            return f"Erro: comando '{forbidden_command.upper()}' proibido. Apenas consultas SELECT são permitidas."
+    validation_error = _validate_readonly_sql(query)
+    if validation_error:
+        return validation_error
 
+    normalized_query = query.strip().lower()
     dataset_files = _list_dataset_files()
     connection = sqlite3.connect(":memory:")
 
