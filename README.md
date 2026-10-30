@@ -18,8 +18,8 @@ flowchart TB
 ```
 
 - **Orquestrador (`agent_fiap`)**: Recebe o pedido em linguagem natural e direciona o fluxo para o especialista ideal.
-- **Agente Analista (`agente_analista`)**: Explora os datasets da pasta `pipeline/dados/`, gera estatísticas descritivas, consulta regras de negócio via RAG e executa queries SQL analíticas.
-- **Agente Otimizador (`agente_otimizador`)**: Lê, cria e otimiza pipelines em `pipeline/pipeline_prep.py`, desenvolve novas features para Machine Learning, salva as alterações no disco com backup automático e valida a execução real do script e dos testes.
+- **Agente Analista (`data_analyst_agent`)**: Explora os datasets da pasta `pipeline/dados/`, gera estatísticas descritivas, consulta regras de negócio via RAG e executa queries SQL analíticas.
+- **Agente Otimizador (`code_optimizer_agent`)**: Lê, cria e otimiza pipelines em `pipeline/pipeline_prep.py`, desenvolve novas features para Machine Learning, salva as alterações no disco com backup automático e valida a execução real do script e dos testes.
 
 ---
 

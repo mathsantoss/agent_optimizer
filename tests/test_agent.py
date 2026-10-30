@@ -1,138 +1,140 @@
 """Testes automatizados para o Agent FIAP (Orquestrador, Agente Analista e Agente Otimizador) e suas ferramentas."""
 import json
-import pytest
-from agent_fiap.agent import root_agent, agente_analista, agente_otimizador
-from agent_fiap.tools import data_tools, code_tools, rag
+from agent_fiap.agent import code_optimizer_agent, data_analyst_agent, root_agent
+from agent_fiap.tools import code_tools, data_tools, knowledge_tools
 
 
-def test_estrutura_multi_agentes():
-    """Valida a separação entre o Orquestrador, o Agente Analista e o Agente Otimizador sem perda de funcionalidades."""
+def test_multi_agent_structure():
+    """Valida a separação entre o Orquestrador, o Agente Analista e o Agente Otimizador."""
     assert root_agent.name == "agent_fiap"
-    nomes_subagentes = [ag.name for ag in root_agent.sub_agents]
-    assert "agente_analista" in nomes_subagentes
-    assert "agente_otimizador" in nomes_subagentes
+    sub_agent_names = [agent.name for agent in root_agent.sub_agents]
+    assert "data_analyst_agent" in sub_agent_names
+    assert "code_optimizer_agent" in sub_agent_names
 
     # Ferramentas do Agente Analista de Dados
-    tools_analista = [t.__name__ for t in agente_analista.tools]
-    for esp in [
-        "listar_datasets",
-        "explorar_dataset",
-        "resumo_estatistico",
-        "consultar_sql",
-        "buscar_conhecimento",
+    analyst_tools = [tool.__name__ for tool in data_analyst_agent.tools]
+    for expected_tool in [
+        "list_datasets",
+        "explore_dataset",
+        "generate_statistical_summary",
+        "execute_sql_query",
+        "search_knowledge_base",
     ]:
-        assert esp in tools_analista, f"Ferramenta {esp} não encontrada no agente_analista."
+        assert expected_tool in analyst_tools, f"Ferramenta {expected_tool} não encontrada no data_analyst_agent."
 
     # Ferramentas do Agente Especialista em Otimização e Criação de Código
-    tools_otimizador = [t.__name__ for t in agente_otimizador.tools]
-    for esp in [
-        "ler_arquivo",
-        "salvar_arquivo",
-        "executar_pipeline",
-        "executar_testes",
-        "listar_datasets",
-        "explorar_dataset",
-        "buscar_conhecimento",
+    optimizer_tools = [tool.__name__ for tool in code_optimizer_agent.tools]
+    for expected_tool in [
+        "read_file",
+        "save_file",
+        "run_pipeline",
+        "run_tests",
+        "list_datasets",
+        "explore_dataset",
+        "search_knowledge_base",
     ]:
-        assert esp in tools_otimizador, f"Ferramenta {esp} não encontrada no agente_otimizador."
+        assert expected_tool in optimizer_tools, f"Ferramenta {expected_tool} não encontrada no code_optimizer_agent."
 
 
-def test_listar_datasets():
+def test_list_datasets():
     """Testa a descoberta dinâmica de datasets."""
-    res = data_tools.listar_datasets()
-    assert "tabela_sql" in res
+    result = data_tools.list_datasets()
+    assert "tabela_sql" in result
 
 
-def test_explorar_dataset():
-    """Testa a inspeção de esquema e amostra de dados genéricos."""
-    res = data_tools.explorar_dataset("dados_vendas")
-    dados = json.loads(res)
-    assert "colunas" in dados
-    assert "amostra_3_linhas" in dados
+def test_explore_dataset():
+    """Testa a inspeção de esquema e amostra de dados."""
+    result = data_tools.explore_dataset("dados_vendas")
+    parsed_data = json.loads(result)
+    assert "colunas" in parsed_data
+    assert "amostra_3_linhas" in parsed_data
 
 
-def test_resumo_estatistico():
+def test_generate_statistical_summary():
     """Testa a geração de resumo estatístico do dataset."""
-    res = data_tools.resumo_estatistico("dados_vendas")
-    assert "mean" in res.lower()
-    assert "max" in res.lower()
+    result = data_tools.generate_statistical_summary("dados_vendas")
+    assert "mean" in result.lower()
+    assert "max" in result.lower()
 
 
-def test_consultar_sql_leitura_e_greatest():
+def test_execute_sql_query_read_and_greatest():
     """Testa execução de consulta SQL com GREATEST entre duas colunas."""
-    res = data_tools.consultar_sql("SELECT product, GREATEST(price_y, price_x) as maior_preco FROM dados_vendas LIMIT 3")
-    assert "maior_preco" in res
+    result = data_tools.execute_sql_query(
+        "SELECT product, GREATEST(price_y, price_x) as maior_preco FROM dados_vendas LIMIT 3"
+    )
+    assert "maior_preco" in result
 
 
-def test_consultar_sql_bloqueio_escrita():
+def test_execute_sql_query_blocks_write_operations():
     """Garante que comandos de escrita/DDL são bloqueados."""
-    res = data_tools.consultar_sql("DROP TABLE dados_vendas")
-    assert "proibido" in res.lower()
+    drop_result = data_tools.execute_sql_query("DROP TABLE dados_vendas")
+    assert "proibido" in drop_result.lower()
 
-    res2 = data_tools.consultar_sql("DELETE FROM dados_vendas")
-    assert "proibido" in res2.lower()
+    delete_result = data_tools.execute_sql_query("DELETE FROM dados_vendas")
+    assert "proibido" in delete_result.lower()
 
 
-def test_ler_e_salvar_arquivo(tmp_path, monkeypatch):
-    """Testa leitura, escrita segura e backup automático via salvar_arquivo."""
+def test_read_and_save_file(tmp_path, monkeypatch):
+    """Testa leitura, escrita segura e backup automático via save_file."""
     from agent_fiap import config
+
     monkeypatch.setattr(config, "WRITE_DIRS", [tmp_path])
     monkeypatch.setattr(config, "READ_DIRS", [tmp_path])
     monkeypatch.setattr(config, "PROJECT_ROOT", tmp_path)
 
-    alvo = tmp_path / "teste_script.py"
-    
+    target_file = tmp_path / "teste_script.py"
+
     # Arquivo vazio retorna aviso amigável
-    alvo.touch()
-    res_vazio = code_tools.ler_arquivo(str(alvo))
-    assert "vazio" in res_vazio.lower()
+    target_file.touch()
+    empty_result = code_tools.read_file(str(target_file))
+    assert "vazio" in empty_result.lower()
 
     # Validação de sintaxe Python
-    res_erro = code_tools.salvar_arquivo(str(alvo), "def invalido(:\n   pass")
-    assert "erro de sintaxe" in res_erro.lower()
+    syntax_error_result = code_tools.save_file(str(target_file), "def invalido(:\n   pass")
+    assert "erro de sintaxe" in syntax_error_result.lower()
 
     # Escrita válida
-    res_escrita = code_tools.salvar_arquivo(str(alvo), "print('versao_1')")
-    assert "sucesso" in res_escrita.lower()
+    write_result = code_tools.save_file(str(target_file), "print('versao_1')")
+    assert "sucesso" in write_result.lower()
 
     # Leitura com conteúdo gravado
-    res_leitura = code_tools.ler_arquivo(str(alvo))
-    assert res_leitura == "print('versao_1')"
+    read_result = code_tools.read_file(str(target_file))
+    assert read_result == "print('versao_1')"
 
     # Backup automático ao sobrescrever
-    code_tools.salvar_arquivo(str(alvo), "print('versao_2')")
+    code_tools.save_file(str(target_file), "print('versao_2')")
     assert (tmp_path / "teste_script.py.bak").read_text() == "print('versao_1')"
     assert (tmp_path / "teste_script.py").read_text() == "print('versao_2')"
 
 
-def test_executar_pipeline(tmp_path, monkeypatch):
+def test_run_pipeline(tmp_path, monkeypatch):
     """Testa a execução de pipeline com retorno de sucesso."""
     from agent_fiap import config
+
     monkeypatch.setattr(config, "READ_DIRS", [tmp_path])
     monkeypatch.setattr(config, "PROJECT_ROOT", tmp_path)
 
-    script = tmp_path / "script_ok.py"
-    script.write_text("print('EXECUTOU_COM_SUCESSO')")
-    res = code_tools.executar_pipeline(str(script))
-    assert "SUCESSO" in res
-    assert "EXECUTOU_COM_SUCESSO" in res
+    script_file = tmp_path / "script_ok.py"
+    script_file.write_text("print('EXECUTOU_COM_SUCESSO')")
+    result = code_tools.run_pipeline(str(script_file))
+    assert "SUCESSO" in result
+    assert "EXECUTOU_COM_SUCESSO" in result
 
 
-def test_executar_pipeline_vazio(tmp_path, monkeypatch):
+def test_run_empty_pipeline(tmp_path, monkeypatch):
     """Testa execução de arquivo vazio retornando aviso claro."""
     from agent_fiap import config
+
     monkeypatch.setattr(config, "READ_DIRS", [tmp_path])
     monkeypatch.setattr(config, "PROJECT_ROOT", tmp_path)
 
-    script = tmp_path / "vazio.py"
-    script.touch()
-    res = code_tools.executar_pipeline(str(script))
-    assert "vazio ou não existe" in res.lower()
+    script_file = tmp_path / "vazio.py"
+    script_file.touch()
+    result = code_tools.run_pipeline(str(script_file))
+    assert "vazio ou não existe" in result.lower()
 
 
-def test_rag_busca():
+def test_search_knowledge_base():
     """Testa funcionamento do RAG com ChromaDB."""
-    resultado = data_tools.buscar_conhecimento("regras de negócio e métricas")
-    assert isinstance(resultado, str)
-
-
+    result = knowledge_tools.search_knowledge_base("regras de negócio e métricas")
+    assert isinstance(result, str)

@@ -1,119 +1,121 @@
-"""Ferramentas para leitura, escrita, execução e teste de pipelines e código."""
+"""Ferramentas de engenharia de código: leitura, gravação segura, execução de pipelines e testes."""
 import subprocess
 import sys
 from pathlib import Path
+
 from .. import config
-from ..utils import safe_path
+from ..utils import resolve_safe_path
 
 
-def _resolver_arquivo(caminho_arquivo: str, write: bool = False) -> Path:
-    """Resolve caminhos relativos facilitando se o usuário passar apenas 'pipeline_prep.py'."""
-    caminho = caminho_arquivo.strip()
-    if caminho == "pipeline_prep.py":
-        caminho = "pipeline/pipeline_prep.py"
-    return safe_path(caminho, write=write)
+def _resolve_project_file(file_path: str, allow_write: bool = False) -> Path:
+    """Resolve caminhos relativos do projeto, aceitando 'pipeline_prep.py' como atalho para 'pipeline/pipeline_prep.py'."""
+    normalized_path = file_path.strip()
+    if normalized_path == "pipeline_prep.py":
+        normalized_path = "pipeline/pipeline_prep.py"
+    return resolve_safe_path(normalized_path, allow_write=allow_write)
 
 
-def ler_arquivo(caminho_arquivo: str = "pipeline/pipeline_prep.py") -> str:
+def read_file(file_path: str = "pipeline/pipeline_prep.py") -> str:
     """
-    Lê o conteúdo de um arquivo do projeto (como o pipeline ativo pipeline/pipeline_prep.py).
-    Se o arquivo estiver vazio, retorna que está pronto para receber código via salvar_arquivo.
+    Lê o conteúdo de um arquivo do projeto (padrão: 'pipeline/pipeline_prep.py').
+    Se o arquivo estiver vazio, informa que está pronto para receber código via save_file.
     """
     try:
-        p = _resolver_arquivo(caminho_arquivo, write=False)
-        if not p.is_file():
-            return f"Arquivo não encontrado: {caminho_arquivo}"
-        conteudo = p.read_text(encoding="utf-8")
-        if not conteudo.strip():
-            return f"O arquivo '{p.relative_to(config.PROJECT_ROOT)}' existe e está atualmente vazio (0 bytes). Pronto para receber a implementação via 'salvar_arquivo'."
-        return conteudo
-    except Exception as e:
-        return f"Erro ao ler arquivo: {str(e)}"
+        resolved_path = _resolve_project_file(file_path, allow_write=False)
+        if not resolved_path.is_file():
+            return f"Arquivo não encontrado: {file_path}"
+
+        file_content = resolved_path.read_text(encoding="utf-8")
+        if not file_content.strip():
+            relative_path = resolved_path.relative_to(config.PROJECT_ROOT)
+            return (
+                f"O arquivo '{relative_path}' existe e está atualmente vazio (0 bytes). "
+                "Pronto para receber a implementação via 'save_file'."
+            )
+        return file_content
+    except Exception as error:
+        return f"Erro ao ler arquivo: {str(error)}"
 
 
-def salvar_arquivo(caminho_arquivo: str = "pipeline/pipeline_prep.py", conteudo: str = "") -> str:
+def save_file(file_path: str = "pipeline/pipeline_prep.py", content: str = "") -> str:
     """
-    Salva ou atualiza código diretamente em um arquivo do projeto (padrão: 'pipeline/pipeline_prep.py').
-    Valida a sintaxe Python (.py) antes de salvar e cria backup (.bak) se o arquivo já tiver conteúdo.
-    SEMPRE invoque esta ferramenta quando criar, otimizar ou modificar código ou pipelines.
+    Salva ou atualiza código em um arquivo permitido do projeto (padrão: 'pipeline/pipeline_prep.py').
+    Valida a sintaxe Python (.py) antes de gravar e cria backup automático (.bak) se o arquivo já possuir conteúdo.
     """
-    if not conteudo.strip():
+    if not content.strip():
         return "Erro: o conteúdo do arquivo a ser salvo não pode ser vazio."
 
     try:
-        p = _resolver_arquivo(caminho_arquivo, write=True)
+        resolved_path = _resolve_project_file(file_path, allow_write=True)
 
-        # Validação de sintaxe Python para evitar gravação de scripts inválidos
-        if p.suffix == ".py":
+        # Valida a sintaxe Python antes de persistir no disco
+        if resolved_path.suffix == ".py":
             try:
-                compile(conteudo, p.name, "exec")
-            except SyntaxError as e:
-                return f"ERRO DE SINTAXE Python na linha {e.lineno}: {e.msg}. O arquivo NÃO foi salvo. Corrija o código."
+                compile(content, resolved_path.name, "exec")
+            except SyntaxError as syntax_error:
+                return (
+                    f"ERRO DE SINTAXE Python na linha {syntax_error.lineno}: {syntax_error.msg}. "
+                    "O arquivo NÃO foi salvo. Corrija o código."
+                )
 
-        p.parent.mkdir(parents=True, exist_ok=True)
-        if p.exists() and p.stat().st_size > 0:
-            bak = p.with_suffix(p.suffix + ".bak")
-            bak.write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        if resolved_path.exists() and resolved_path.stat().st_size > 0:
+            backup_path = resolved_path.with_suffix(resolved_path.suffix + ".bak")
+            backup_path.write_text(resolved_path.read_text(encoding="utf-8"), encoding="utf-8")
 
-        p.write_text(conteudo, encoding="utf-8")
-        linhas = len(conteudo.splitlines())
-        return f"Arquivo '{p.relative_to(config.PROJECT_ROOT)}' salvo com SUCESSO com {linhas} linhas gravadas no disco."
-    except Exception as e:
-        return f"Erro ao salvar arquivo: {str(e)}"
-
-
-def salvar_pipeline(conteudo: str) -> str:
-    """Compatibilidade retroativa: salva no pipeline ativo."""
-    return salvar_arquivo("pipeline/pipeline_prep.py", conteudo)
-
-
-def escrever_arquivo(caminho_arquivo: str, conteudo: str) -> str:
-    """Compatibilidade retroativa: salva no caminho especificado."""
-    return salvar_arquivo(caminho_arquivo, conteudo)
+        resolved_path.write_text(content, encoding="utf-8")
+        line_count = len(content.splitlines())
+        relative_path = resolved_path.relative_to(config.PROJECT_ROOT)
+        return f"Arquivo '{relative_path}' salvo com SUCESSO com {line_count} linhas gravadas no disco."
+    except Exception as error:
+        return f"Erro ao salvar arquivo: {str(error)}"
 
 
-def executar_pipeline(caminho_arquivo: str = "pipeline/pipeline_prep.py") -> str:
+def run_pipeline(file_path: str = "pipeline/pipeline_prep.py") -> str:
     """
-    Executa o script do pipeline com Python para validar se roda sem erros de execução ou sintaxe.
+    Executa o script do pipeline com Python em subprocesso para validar seu funcionamento.
     """
     try:
-        p = _resolver_arquivo(caminho_arquivo, write=False)
-        if not p.is_file() or p.stat().st_size == 0:
-            return f"Não é possível executar: o arquivo '{caminho_arquivo}' está vazio ou não existe. Use a ferramenta 'salvar_arquivo' para gravar o código antes de executar."
+        resolved_path = _resolve_project_file(file_path, allow_write=False)
+        if not resolved_path.is_file() or resolved_path.stat().st_size == 0:
+            return (
+                f"Não é possível executar: o arquivo '{file_path}' está vazio ou não existe. "
+                "Use a ferramenta 'save_file' para gravar o código antes de executar."
+            )
 
-        res = subprocess.run(
-            [sys.executable, str(p)],
+        completed_process = subprocess.run(
+            [sys.executable, str(resolved_path)],
             cwd=config.PROJECT_ROOT,
             capture_output=True,
             text=True,
             timeout=45,
         )
-        if res.returncode == 0:
-            saida = res.stdout.strip()
-            return f"Pipeline executado com SUCESSO!\nSaída:\n{saida if saida else '(executou sem erros de terminal)'}"
-        else:
-            return f"Erro na execução do pipeline (exit code {res.returncode}):\n{res.stderr.strip()}"
+        if completed_process.returncode == 0:
+            standard_output = completed_process.stdout.strip()
+            output_message = standard_output if standard_output else "(executou sem erros de terminal)"
+            return f"Pipeline executado com SUCESSO!\nSaída:\n{output_message}"
+        return f"Erro na execução do pipeline (exit code {completed_process.returncode}):\n{completed_process.stderr.strip()}"
     except subprocess.TimeoutExpired:
         return "Execução do pipeline interrompida: excedeu o tempo limite de 45 segundos."
-    except Exception as e:
-        return f"Erro ao executar pipeline: {str(e)}"
+    except Exception as error:
+        return f"Erro ao executar pipeline: {str(error)}"
 
 
-def executar_testes(alvo: str = "tests") -> str:
+def run_tests(target_path: str = "tests") -> str:
     """
-    Executa a suíte de testes automatizados com pytest.
+    Executa a suíte de testes automatizados do projeto com pytest.
     """
     try:
-        p = safe_path(alvo, write=False)
-        res = subprocess.run(
-            [sys.executable, "-m", "pytest", str(p), "-q", "--no-header"],
+        resolved_path = resolve_safe_path(target_path, allow_write=False)
+        completed_process = subprocess.run(
+            [sys.executable, "-m", "pytest", str(resolved_path), "-q", "--no-header"],
             cwd=config.PROJECT_ROOT,
             capture_output=True,
             text=True,
             timeout=60,
         )
-        saida = (res.stdout + res.stderr).strip()
-        status = "SUCESSO" if res.returncode == 0 else "FALHA"
-        return f"Resultado dos testes [{status}]:\n{saida}"
-    except Exception as e:
-        return f"Erro ao executar testes: {str(e)}"
+        combined_output = (completed_process.stdout + completed_process.stderr).strip()
+        execution_status = "SUCESSO" if completed_process.returncode == 0 else "FALHA"
+        return f"Resultado dos testes [{execution_status}]:\n{combined_output}"
+    except Exception as error:
+        return f"Erro ao executar testes: {str(error)}"

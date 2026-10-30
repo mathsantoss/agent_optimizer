@@ -1,6 +1,6 @@
 """Definição do Agent FIAP (Orquestrador) e seus 2 sub-agentes especialistas:
-- agente_analista: Especialista em Análise de Dados, Estatística, SQL e Insights.
-- agente_otimizador: Especialista em Otimização, Criação de Código, Pipelines e Feature Engineering.
+- data_analyst_agent: Especialista em Análise de Dados, Estatística, SQL e Insights.
+- code_optimizer_agent: Especialista em Otimização, Criação de Código, Pipelines e Feature Engineering.
 """
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
@@ -11,31 +11,29 @@ from .prompts import (
     ANALYST_AGENT_INSTRUCTION,
     CODE_OPTIMIZER_AGENT_INSTRUCTION,
 )
-from .tools.data_tools import (
-    listar_datasets,
-    explorar_dataset,
-    resumo_estatistico,
-    consultar_sql,
-    buscar_conhecimento,
-)
-from .tools.code_tools import (
-    ler_arquivo,
-    salvar_arquivo,
-    executar_pipeline,
-    executar_testes,
+from .tools import (
+    execute_sql_query,
+    explore_dataset,
+    generate_statistical_summary,
+    list_datasets,
+    read_file,
+    run_pipeline,
+    run_tests,
+    save_file,
+    search_knowledge_base,
 )
 
 # Instancia o modelo via LiteLLM diretamente com as variáveis do config.py (.env)
-llm_model = LiteLlm(
+language_model = LiteLlm(
     model=LLM_MODEL,
     api_key=LLM_API_KEY,
     api_base=LLM_API_BASE,
 )
 
 # 1. Agente Analista de Dados
-agente_analista = Agent(
-    name="agente_analista",
-    model=llm_model,
+data_analyst_agent = Agent(
+    name="data_analyst_agent",
+    model=language_model,
     description=(
         "Agente Analista de Dados especialista em explorar datasets em pipeline/dados/, "
         "gerar resumos estatísticos, executar consultas SQL analíticas, recuperar regras "
@@ -43,18 +41,18 @@ agente_analista = Agent(
     ),
     static_instruction=ANALYST_AGENT_INSTRUCTION,
     tools=[
-        listar_datasets,
-        explorar_dataset,
-        resumo_estatistico,
-        consultar_sql,
-        buscar_conhecimento,
+        list_datasets,
+        explore_dataset,
+        generate_statistical_summary,
+        execute_sql_query,
+        search_knowledge_base,
     ],
 )
 
 # 2. Agente Especialista em Otimização e Criação de Código / Feature Engineering
-agente_otimizador = Agent(
-    name="agente_otimizador",
-    model=llm_model,
+code_optimizer_agent = Agent(
+    name="code_optimizer_agent",
+    model=language_model,
     description=(
         "Agente especialista em otimização, criação e alteração de código e pipelines (pipeline/pipeline_prep.py), "
         "engenharia de features (Feature Engineering), refatoração em Python/Pandas/PySpark/Scikit-Learn, "
@@ -62,27 +60,27 @@ agente_otimizador = Agent(
     ),
     static_instruction=CODE_OPTIMIZER_AGENT_INSTRUCTION,
     tools=[
-        ler_arquivo,
-        salvar_arquivo,
-        executar_pipeline,
-        executar_testes,
-        listar_datasets,
-        explorar_dataset,
-        buscar_conhecimento,
+        read_file,
+        save_file,
+        run_pipeline,
+        run_tests,
+        list_datasets,
+        explore_dataset,
+        search_knowledge_base,
     ],
 )
 
 # Agente Principal Orquestrador
 root_agent = Agent(
     name="agent_fiap",
-    model=llm_model,
+    model=language_model,
     description=(
         "Assistente inteligente de Ciência de Dados, Analytics e Engenharia de Pipelines inspirado no Databricks Genie Code. "
-        "Orquestra o Agente Analista de Dados (agente_analista) e o Agente Especialista em Otimização e Criação de Código (agente_otimizador)."
+        "Orquestra o Agente Analista de Dados (data_analyst_agent) e o Agente Especialista em Otimização e Criação de Código (code_optimizer_agent)."
     ),
     static_instruction=AGENT_FIAP_INSTRUCTION,
     sub_agents=[
-        agente_analista,
-        agente_otimizador,
+        data_analyst_agent,
+        code_optimizer_agent,
     ],
 )

@@ -1,9 +1,3 @@
-"""
-Pipeline de Engenharia de Features para Machine Learning
-Dataset: dados_vendas.csv
-Autor: Agente Otimizador (Agent FIAP)
-"""
-
 import pandas as pd
 import numpy as np
 import os
@@ -15,69 +9,59 @@ def carregar_dados(caminho="pipeline/dados/dados_vendas.csv"):
     df = pd.read_csv(caminho)
     return df
 
-def criar_features(df: pd.DataFrame) -> pd.DataFrame:
+def engenharia_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Realiza a limpeza, tratamento e engenharia de features (Feature Engineering)
-    para preparação de inputs de Machine Learning.
+    Cria features para Machine Learning a partir do dataset dados_vendas:
+    - total_value_x: quantidade * price_x
+    - total_value_y: quantidade * price_y
+    - price_diff: price_x - price_y
+    - created_year, created_month, created_dayofweek: features temporais de created_at
+    - client_order_count: número de transações por cliente (name)
+    - product_avg_price: preço médio por produto (price_y)
     """
     df = df.copy()
     
-    # 1. Tratamento de Datas e Extração Temporal
+    # Garantir conversão de datas
     df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
     df['updated_at'] = pd.to_datetime(df['updated_at'], errors='coerce')
     
+    # 1. Features financeiras e transacionais
+    df['total_value_x'] = df['quantity'] * df['price_x']
+    df['total_value_y'] = df['quantity'] * df['price_y']
+    df['price_diff'] = df['price_x'] - df['price_y']
+    
+    # 2. Features temporais
     df['created_year'] = df['created_at'].dt.year
     df['created_month'] = df['created_at'].dt.month
-    df['created_day'] = df['created_at'].dt.day
     df['created_dayofweek'] = df['created_at'].dt.dayofweek
+    df['created_hour'] = df['created_at'].dt.hour
     
-    # 2. Features Financeiras e de Comércio (Vetorizadas)
-    # Total da Venda = Preço unitário (price_x) * Quantidade
-    df['total_sale_amount'] = df['price_x'] * df['quantity']
+    # 3. Features agregadas por cliente (Frequência de compras)
+    client_counts = df.groupby('name')['sale_id'].nunique().reset_index(name='client_transaction_count')
+    df = df.merge(client_counts, on='name', how='left')
     
-    # Razão de Preço (price_x / price_y) para identificar desvios em relação à referência do produto
-    df['price_ratio'] = df['price_x'] / (df['price_y'] + 1e-5)
+    client_spend = df.groupby('name')['total_value_x'].sum().reset_index(name='client_total_spent')
+    df = df.merge(client_spend, on='name', how='left')
     
-    # 3. Agregações por Cliente (Comportamento de Compra)
-    if 'email' in df.columns:
-        client_stats = df.groupby('email').agg(
-            client_total_spent=('total_sale_amount', 'sum'),
-            client_avg_quantity=('quantity', 'mean'),
-            client_purchase_count=('sale_id', 'nunique')
-        ).reset_index()
-        
-        df = df.merge(client_stats, on='email', how='left')
+    # 4. Features agregadas por produto
+    product_mean_price = df.groupby('product')['price_y'].mean().reset_index(name='product_mean_price')
+    df = df.merge(product_mean_price, on='product', how='left')
     
-    # 4. Agregações por Produto (Popularidade e Média de Preço)
-    if 'product_id' in df.columns:
-        product_stats = df.groupby('product_id').agg(
-            product_avg_price=('price_x', 'mean'),
-            product_total_sold=('quantity', 'sum')
-        ).reset_index()
-        
-        df = df.merge(product_stats, on='product_id', how='left')
-        
-    # 5. Tratamento de Valores Ausentes / Infinitos
-    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    # Preencher eventuais nulos decorrentes de conversões
     df.fillna(0, inplace=True)
     
     return df
 
-def executar_pipeline_prep(caminho_entrada="pipeline/dados/dados_vendas.csv", caminho_saida="pipeline/dados/dados_vendas_features.csv"):
-    """Executa o pipeline completo de ponta a ponta."""
+def executar_pipeline():
     print("Iniciando pipeline de engenharia de features...")
-    df = carregar_dados(caminho_entrada)
-    print(f"Dados carregados. Linhas: {df.shape[0]}, Colunas: {df.shape[1]}")
+    df = carregar_dados()
+    print(f"Dados carregados com sucesso. Linhas: {len(df)}, Colunas: {len(df.columns)}")
     
-    df_features = criar_features(df)
-    print(f"Features criadas com sucesso. Novas colunas: {df_features.shape[1] - df.shape[0] if False else df_features.shape[1]}")
-    
-    # Salva o dataset processado opcionalmente
-    os.makedirs(os.path.dirname(caminho_saida), exist_ok=True)
-    df_features.to_csv(caminho_saida, index=False)
-    print(f"Dataset processado salvo em: {caminho_saida}")
+    df_features = engenharia_features(df)
+    print("Engenharia de features concluída com sucesso!")
+    print(f"Colunas geradas ({len(df_features.columns)}): {list(df_features.columns)}")
     
     return df_features
 
 if __name__ == "__main__":
-    executar_pipeline_prep()
+    executar_pipeline()
