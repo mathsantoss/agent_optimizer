@@ -1,20 +1,23 @@
 [project]
 name = "agent-fiap"
 version = "0.1.0"
-description = "Add your description here"
+description = "Assistente inteligente de Ciência de Dados, Analytics e Engenharia de Pipelines com Google ADK e LiteLLM"
 readme = "README.md"
 authors = [
-    { name = "Matheus Santos", email = "matheus.h.s.santos@hotmail.com" }
+    { name = "Matheus Santos", email = "matheus.h.s.santos@hotmail.com" },
+    { name = "Andre Yai", email = "yai.andre@gmail.com" },
+    { name = "Leo Takahara", email = "takahara.leo@gmail.com" },
+    { name = "Vinicius Alencar", email = "viniciusalencaroliveira@gmail.com" },
+    { name = "Hugo Martins", email = "hmartins19@gmail.com" },
+    { name = "Tiago Alvarenga", email = "tiago.aalvarenga@gmail.com" },
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "google-adk>=2.11.0",
-    "litellm>=1.104.0",
+    "google-adk>=2.12.0",
+    "litellm>=1.106.6",
+    "python-dotenv>=1.0.0",
     "chromadb>=0.5.0",
     "pytest>=8.0.0",
-    "duckduckgo-search>=6.0.0",
-    "beautifulsoup4>=4.12.0",
-    "streamlit>=1.30.0",
     "pandas>=2.1.0",
     "scikit-learn>=1.4.0",
     "tabulate>=0.9.0",
