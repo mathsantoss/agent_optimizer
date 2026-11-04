@@ -1,38 +1,22 @@
-"""Exportação centralizada das ferramentas do Agent FIAP."""
-from .code_tools import (
-    analyze_pipeline_code,
-    compare_pipeline_runs,
-    profile_pipeline,
-    read_file,
-    run_pipeline,
-    run_tests,
-    save_file,
-)
-from .data_tools import (
-    execute_sql_query,
-    explore_dataset,
-    generate_statistical_summary,
-    list_datasets,
-)
-from .knowledge_tools import (
-    index_knowledge_documents,
-    search_knowledge_base,
-    synchronize_knowledge_index,
-)
+"""Exportação centralizada das ferramentas públicas do Agent FIAP.
 
-__all__ = [
-    "list_datasets",
-    "explore_dataset",
-    "generate_statistical_summary",
-    "execute_sql_query",
-    "synchronize_knowledge_index",
-    "index_knowledge_documents",
-    "search_knowledge_base",
-    "read_file",
-    "analyze_pipeline_code",
-    "save_file",
-    "run_pipeline",
-    "profile_pipeline",
-    "compare_pipeline_runs",
-    "run_tests",
-]
+Arquitetura em dois especialistas com 3 ferramentas cada:
+1. data_analyst_agent:
+   - analyze_dataset
+   - query_dataset
+   - search_knowledge_base
+2. code_optimizer_agent:
+   - inspect_pipeline
+   - optimize_pipeline
+   - validate_pipeline
+"""
+from agent_fiap.tools.code_optimizer import (
+    inspect_pipeline,
+    optimize_pipeline,
+    validate_pipeline,
+)
+from agent_fiap.tools.data_analyst import (
+    analyze_dataset,
+    query_dataset,
+    search_knowledge_base,
+)

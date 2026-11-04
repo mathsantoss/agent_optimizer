@@ -14,5 +14,6 @@ wheels/
 *.bak
 pipeline/features/
 tests/fixtures/projeto/.rag/
+tests/fixtures/projeto/logs/
 .scratch/
 .pytest_cache/

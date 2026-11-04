@@ -1,3 +1,6 @@
-from . import agent
+from agent_fiap import agent
+from agent_fiap.observability import flush_observability, setup_observability
 
-__all__ = ["agent"]
+setup_observability(agent.root_agent)
+
+

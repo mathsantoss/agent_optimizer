@@ -1,0 +1,15 @@
+apiVersion: 1
+
+providers:
+  - name: "Agent FIAP Observability"
+    orgId: 1
+    folder: "Agent FIAP"
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/agent-fiap
+      foldersFromFilesStructure: false
+

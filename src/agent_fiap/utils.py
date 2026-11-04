@@ -1,6 +1,6 @@
 """Funções utilitárias para validação e resolução segura de caminhos de arquivos."""
 from pathlib import Path
-from . import config
+from agent_fiap import config
 
 
 def resolve_safe_path(file_path: str, allow_write: bool = False) -> Path:

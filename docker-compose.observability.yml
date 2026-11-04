@@ -1,0 +1,24 @@
+services:
+  otel-lgtm:
+    image: grafana/otel-lgtm:latest
+    container_name: agent-fiap-otel-lgtm
+    ports:
+      - "3000:3000"   # Grafana UI (admin / admin)
+      - "4317:4317"   # OpenTelemetry OTLP gRPC receiver
+      - "4318:4318"   # OpenTelemetry OTLP HTTP receiver
+      - "9090:9090"   # Prometheus UI / API
+      - "3100:3100"   # Loki API
+      - "3200:3200"   # Tempo API
+    environment:
+      - GF_PATHS_DATA=/data/grafana
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./observability/grafana/provisioning/dashboards/agent-fiap-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/agent-fiap-dashboards.yaml:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards/agent-fiap:ro
+      - lgtm_data:/data
+    restart: unless-stopped
+
+volumes:
+  lgtm_data:
+

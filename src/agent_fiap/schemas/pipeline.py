@@ -1,40 +1,5 @@
-"""Contratos de dados estruturados (Pydantic) para perfilamento de datasets, análise de código, benchmark e RAG."""
-from typing import Any
+"""Contratos de dados estruturados para análise estática AST, perfilamento e benchmark de pipelines."""
 from pydantic import BaseModel, Field
-
-
-class ColumnProfile(BaseModel):
-    """Perfil estrutural e de qualidade de uma coluna de dataset."""
-
-    data_type: str = Field(description="Tipo de dado inferido pelo Pandas/Arrow")
-    unique_values: int = Field(description="Quantidade de valores distintos na coluna")
-    null_count: int = Field(description="Quantidade de valores ausentes (nulos)")
-    null_percentage: float = Field(description="Percentual de valores ausentes (0 a 100)")
-
-
-class DateRangeSummary(BaseModel):
-    """Intervalo temporal mínimo e máximo identificado em uma coluna de data."""
-
-    start_date: str = Field(description="Menor data válida encontrada na coluna")
-    end_date: str = Field(description="Maior data válida encontrada na coluna")
-
-
-class DatasetProfile(BaseModel):
-    """Perfil completo de inspeção de um dataset."""
-
-    file_path: str = Field(description="Caminho relativo do arquivo no projeto")
-    sql_table_name: str = Field(description="Nome da tabela correspondente para consultas SQL")
-    sampled_row_count: int = Field(description="Total de linhas consideradas na amostra")
-    duplicate_row_count: int = Field(description="Quantidade de linhas duplicadas detectadas")
-    candidate_key_columns: list[str] = Field(
-        default_factory=list,
-        description="Colunas candidatas a chave primária ou identificador único",
-    )
-    temporal_ranges: dict[str, DateRangeSummary] | str = Field(
-        description="Intervalos temporais detectados por coluna de data"
-    )
-    columns: dict[str, ColumnProfile] = Field(description="Metadados detalhados por coluna")
-    sample_rows: list[dict[str, Any]] = Field(description="Amostra real das primeiras linhas")
 
 
 class CodeDiagnosticIssue(BaseModel):
@@ -83,6 +48,10 @@ class PipelineProfileResult(BaseModel):
         default=None,
         description="Hash determinístico dos dados de saída para verificação de equivalência",
     )
+    column_hashes: dict[str, str] = Field(
+        default_factory=dict,
+        description="Hashes determinísticos individuais por coluna para verificação estrita de equivalência",
+    )
     standard_output: str = Field(default="", description="Saída padrão capturada na execução")
     standard_error: str = Field(default="", description="Erros ou avisos capturados na execução")
     profiled_at: str = Field(description="Timestamp ISO-8601 da coleta de métricas")
@@ -102,28 +71,5 @@ class PipelineBenchmarkComparison(BaseModel):
     baseline_rows: int | None = Field(default=None, description="Linhas processadas na versão original")
     candidate_rows: int | None = Field(default=None, description="Linhas processadas na versão otimizada")
     results_equivalent: bool = Field(description="Indica se a saída preservou a equivalência esperada")
-    equivalence_details: str = Field(description="Explicação sobre a comparação dos resultados de saída")
+    equivalence_details: str = Field(description="Explicação amigável sobre a equivalência dos dados de saída")
 
-
-class KnowledgeChunkMetadata(BaseModel):
-    """Metadados enriquecidos de um trecho indexado na base de conhecimento (RAG)."""
-
-    source_path: str = Field(description="Caminho relativo do arquivo de origem")
-    file_name: str = Field(description="Nome do arquivo de origem")
-    section_title: str = Field(default="Geral", description="Título da seção ou bloco do documento")
-    category: str = Field(default="dicionario_dados", description="Categoria do documento")
-    related_table: str = Field(default="", description="Tabela de dados relacionada")
-    language: str = Field(default="json", description="Formato ou linguagem do conteúdo")
-    updated_at: str = Field(default="", description="Data de atualização informada no documento")
-    content_hash: str = Field(description="Hash SHA-256 do conteúdo do chunk para atualização incremental")
-    indexed_at: str = Field(description="Timestamp ISO-8601 da última indexação do chunk")
-
-
-class KnowledgeIndexSyncReport(BaseModel):
-    """Relatório de sincronização incremental do índice RAG."""
-
-    last_indexed_at: str = Field(description="Data e hora ISO-8601 da sincronização")
-    total_active_chunks: int = Field(description="Total de chunks ativos na coleção após sincronização")
-    added_or_updated_chunks: int = Field(description="Quantidade de chunks novos ou alterados reindexados")
-    unchanged_chunks: int = Field(description="Quantidade de chunks sem alteração reaproveitados")
-    removed_chunks: int = Field(description="Quantidade de chunks órfãos removidos da coleção")

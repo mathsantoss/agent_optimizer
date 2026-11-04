@@ -1,137 +1,67 @@
-
 import pandas as pd
 import numpy as np
 import os
 import time
-import random
-
 
 def carregar_dados(caminho="pipeline/dados/dados_vendas.csv"):
-    """Carrega o dataset de vendas."""
+    """Carrega o dataset de vendas otimizado."""
     if not os.path.exists(caminho):
         print("Arquivo não encontrado!")
         return pd.DataFrame()
 
-    df = pd.read_csv(caminho)
-
-    # Conversões desnecessárias e repetidas
-    for coluna in df.columns:
-        if coluna == "created_at":
-            df[coluna] = pd.to_datetime(df[coluna], errors="coerce")
-        if coluna == "updated_at":
-            df[coluna] = pd.to_datetime(df[coluna], errors="coerce")
-
+    # Carrega colunas de data diretamente com parse_dates para máxima eficiência
+    df = pd.read_csv(caminho, parse_dates=["created_at", "updated_at"])
     return df
 
 
 def engenharia_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Engenharia de features para vendas.
+    Engenharia de features vetorizada e otimizada para vendas.
     """
-
-    # Cópias desnecessárias
     df = df.copy()
-    df_temp = df.copy()
-    df_auxiliar = df.copy()
 
-    # Conversões repetidas
-    df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
-    df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+    # Tratamento de nulos vetorizado por tipo de dado
+    cols_obj = df.select_dtypes(include=["object"]).columns
+    cols_num = df.select_dtypes(include=[np.number]).columns
+    
+    if len(cols_obj) > 0:
+        df[cols_obj] = df[cols_obj].fillna("DESCONHECIDO")
+    if len(cols_num) > 0:
+        df[cols_num] = df[cols_num].fillna(0)
 
-    df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
-    df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
+    # Operações aritméticas vetorizadas
+    df["total_value_x"] = df["quantity"] * df["price_x"]
+    df["total_value_y"] = df["quantity"] * df["price_y"]
+    df["price_diff"] = df["price_x"] - df["price_y"]
+    
+    # Divisão segura vetorizada para evitar divisão por zero
+    df["price_ratio"] = np.where(df["price_y"] == 0, 0, df["price_x"] / df["price_y"])
 
-    # Cálculos linha a linha desnecessários
-    total_value_x = []
-    total_value_y = []
-    price_diff = []
-    price_ratio = []
+    # Extração de datas vetorizada usando o acessor .dt
+    if "created_at" in df.columns and pd.api.types.is_datetime64_any_dtype(df["created_at"]):
+        dt_col = df["created_at"].dt
+        df["created_year"] = dt_col.year.fillna(0).astype(int)
+        df["created_month"] = dt_col.month.fillna(0).astype(int)
+        df["created_dayofweek"] = dt_col.dayofweek.fillna(0).astype(int)
+        df["created_hour"] = dt_col.hour.fillna(0).astype(int)
+    else:
+        df["created_year"] = 0
+        df["created_month"] = 0
+        df["created_dayofweek"] = 0
+        df["created_hour"] = 0
 
-    for index, row in df.iterrows():
-        total_value_x.append(row["quantity"] * row["price_x"])
-        total_value_y.append(row["quantity"] * row["price_y"])
-        price_diff.append(row["price_x"] - row["price_y"])
+    # Agregações por cliente vetorizadas com transform
+    df["client_transaction_count"] = df.groupby("name")["sale_id"].transform("nunique")
+    df["client_total_spent"] = df.groupby("name")["total_value_x"].transform("sum")
 
-        if row["price_y"] == 0:
-            price_ratio.append(0)
-        else:
-            price_ratio.append(row["price_x"] / row["price_y"])
-
-    df["total_value_x"] = total_value_x
-    df["total_value_y"] = total_value_y
-    df["price_diff"] = price_diff
-    df["price_ratio"] = price_ratio
-
-    # Uso de apply para operações que poderiam ser vetorizadas
-    df["created_year"] = df["created_at"].apply(
-        lambda x: x.year if pd.notnull(x) else 0
-    )
-
-    df["created_month"] = df["created_at"].apply(
-        lambda x: x.month if pd.notnull(x) else 0
-    )
-
-    df["created_dayofweek"] = df["created_at"].apply(
-        lambda x: x.dayofweek if pd.notnull(x) else 0
-    )
-
-    df["created_hour"] = df["created_at"].apply(
-        lambda x: x.hour if pd.notnull(x) else 0
-    )
-
-    # Groupby repetido para calcular informações do cliente
-    df["client_transaction_count"] = df["name"].apply(
-        lambda nome: df[df["name"] == nome]["sale_id"].nunique()
-    )
-
-    df["client_total_spent"] = df["name"].apply(
-        lambda nome: df[df["name"] == nome]["total_value_x"].sum()
-    )
-
-    # Agregação de produto com filtragem repetida
-    df["product_mean_price"] = df["product"].apply(
-        lambda produto: df[df["product"] == produto]["price_y"].mean()
-    )
-
-    # Loop adicional sem necessidade
-    for coluna in df.columns:
-        if df[coluna].dtype == "object":
-            df[coluna] = df[coluna].fillna("DESCONHECIDO")
-        else:
-            df[coluna] = df[coluna].fillna(0)
-
-    # Cálculos repetidos sem utilização
-    for i in range(3):
-        df_temp = df.copy()
-        df_temp["temporary_calculation"] = (
-            df_temp["quantity"] * df_temp["price_x"]
-        )
-
-    # Criação de colunas desnecessárias
-    df["temporary_column_1"] = 0
-    df["temporary_column_2"] = ""
-    df["temporary_column_3"] = np.random.random(len(df))
-
-    # Remoção posterior das colunas
-    df = df.drop(
-        columns=[
-            "temporary_column_1",
-            "temporary_column_2",
-            "temporary_column_3"
-        ]
-    )
-
-    # Operação desnecessária
-    df_auxiliar = df_auxiliar.sort_values(by="sale_id")
-
-    # Processamento artificial
-    time.sleep(2)
+    # Agregação por produto vetorizada com transform
+    df["product_mean_price"] = df.groupby("product")["price_y"].transform("mean")
 
     return df
 
 
 def executar_pipeline():
-    print("Iniciando pipeline de engenharia de features...")
+    print("Iniciando pipeline de engenharia de features otimizado...")
 
     inicio = time.time()
 
@@ -147,11 +77,7 @@ def executar_pipeline():
     )
 
     df_features = engenharia_features(df)
-
-    # Operações redundantes após a engenharia
-    df_features = df_features.copy()
     df_features = df_features.reset_index(drop=True)
-    df_features = df_features.copy()
 
     fim = time.time()
 
