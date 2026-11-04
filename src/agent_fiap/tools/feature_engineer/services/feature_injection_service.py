@@ -30,40 +30,57 @@ def inject_feature_into_pipeline_code(
     if not clean_name or not clean_expr:
         return original_code, "Nome da feature e expressão não podem ser vazios."
 
-    # Prepara o comando de cálculo conforme framework
-    comment_line = f"    # Nova Feature: {description}" if description else "    # Nova Feature gerada"
-    if fw == "pyspark":
-        code_line = f"    df = df.withColumn('{clean_name}', {clean_expr})"
-    else:
-        code_line = f"    df['{clean_name}'] = {clean_expr}"
+    # Prioridade de funções de transformação para injeção da feature
+    target_prefixes = (
+        "def engenharia_features(",
+        "def criar_features(",
+        "def transform(",
+        "def run(",
+        "def executar_pipeline(",
+    )
 
-    feature_block = f"\n{comment_line}\n{code_line}\n"
-
-    # Localiza o ponto de retorno na função run()
     lines = original_code.splitlines()
     return_index = -1
-    in_run_func = False
+    return_line = ""
 
-    for idx, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("def run(") or stripped.startswith("def executar_pipeline("):
-            in_run_func = True
-        elif in_run_func and (stripped.startswith("def ") or (line and not line.startswith(" ") and not line.startswith("\t"))):
-            in_run_func = False
+    # 1. Procura na função de engenharia ou execução principal
+    for prefix in target_prefixes:
+        in_target_func = False
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith(prefix):
+                in_target_func = True
+            elif in_target_func and (stripped.startswith("def ") or (line and not line.startswith(" ") and not line.startswith("\t"))):
+                in_target_func = False
 
-        if in_run_func and stripped.startswith("return "):
-            return_index = idx
+            if in_target_func and stripped.startswith("return "):
+                return_index = idx
+                return_line = line
+                break
+        if return_index != -1:
+            break
 
+    # 2. Fallback: insere antes do primeiro return no arquivo
     if return_index == -1:
-        # Fallback: insere antes do primeiro return no arquivo
         for idx, line in enumerate(lines):
             if line.strip().startswith("return "):
                 return_index = idx
+                return_line = line
                 break
 
     if return_index == -1:
         return original_code, "Não foi possível localizar o ponto de retorno ('return df') no pipeline."
 
+    # Detecta a indentação exata da linha de retorno para manter a formatação do código original
+    indent = return_line[: len(return_line) - len(return_line.lstrip())] or "    "
+
+    comment_line = f"{indent}# Nova Feature: {description}" if description else f"{indent}# Nova Feature gerada"
+    if fw == "pyspark":
+        code_line = f"{indent}df = df.withColumn('{clean_name}', {clean_expr})"
+    else:
+        code_line = f"{indent}df['{clean_name}'] = {clean_expr}"
+
+    feature_block = f"\n{comment_line}\n{code_line}"
     lines.insert(return_index, feature_block)
     updated_code = "\n".join(lines) + "\n"
 

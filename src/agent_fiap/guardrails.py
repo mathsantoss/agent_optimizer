@@ -163,8 +163,15 @@ def before_model_guardrail(
 ) -> Any:
     """
     Callback executado antes de enviar a requisição ao LLM (`before_model_callback`).
-    Inspeciona a última mensagem do usuário para bloquear tentativas de Prompt Injection.
+    Inspeciona a última mensagem do usuário para bloquear tentativas de Prompt Injection
+    e renova o orçamento de operações para o novo turno de interação.
     """
+    # Renova contadores de sessão a cada nova intervenção do usuário para permitir edições manuais e iterativas
+    context = callback_context or kwargs.get("callback_context")
+    if context is not None and hasattr(context, "state") and isinstance(context.state, dict):
+        context.state["save_file_attempts"] = 0
+        context.state["agent_transfer_count"] = 0
+
     request = llm_request or kwargs.get("llm_request")
     if request is None or not getattr(request, "contents", None):
         return None
@@ -263,20 +270,31 @@ def before_tool_guardrail(
         return None
 
     # 1. Circuit Breaker de escritas repetidas em disco sem validação
-    if tool_name in ("save_file", "optimize_pipeline"):
+    # Discrimina propostas (sem gravação) de gravações efetivas autorizadas no disco
+    is_write_intent = False
+    if tool_name in ("save_file",):
+        is_write_intent = True
+    elif tool_name in ("optimize_pipeline", "add_feature_to_pipeline"):
+        if args and args.get("confirmed_by_user") is True:
+            is_write_intent = True
+    elif tool_name == "generate_feature_pipeline":
+        if args and args.get("save_to_disk") is True:
+            is_write_intent = True
+
+    if is_write_intent:
         attempts = int(state.get("save_file_attempts", 0))
         if attempts >= MAX_SAVE_FILE_ATTEMPTS:
             msg = (
                 f"GUARDRAIL DE CIRCUIT BREAKER ATIVADO: O limite de {MAX_SAVE_FILE_ATTEMPTS} "
-                f"tentativas de alteração ({tool_name}) na mesma sessão foi atingido. "
+                f"tentativas de alteração em disco ({tool_name}) na mesma sessão foi atingido. "
                 "Use 'validate_pipeline' para verificar o estado atual e apresente o diagnóstico ao usuário."
             )
             record_guardrail_event("CIRCUIT_BREAKER", tool_name, "BLOQUEADO", msg)
             return {"result": msg}
         state["save_file_attempts"] = attempts + 1
 
-    elif tool_name in ("rollback_pipeline", "validate_pipeline", "compare_pipeline_runs"):
-        # Reseta contador após validação ou rollback explícito
+    elif tool_name in ("rollback_pipeline", "validate_pipeline", "inspect_pipeline", "preview_features", "compare_pipeline_runs"):
+        # Reseta contador após qualquer etapa de inspeção, preview ou validação
         state["save_file_attempts"] = 0
 
     # 2. Limite de handoffs consecutivos entre agentes especialistas

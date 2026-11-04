@@ -3,6 +3,15 @@
 - feature_engineer_agent: Engenharia de features para ML em Pandas e PySpark, pipelines e transformações.
 - code_optimizer_agent: Diagnóstico estático AST, otimização, benchmark (Antes vs Depois) e validação.
 """
+import sys
+from pathlib import Path
+
+# Assegura que o diretório 'src' esteja sempre presente no sys.path
+_current_file = Path(__file__).resolve()
+_src_dir = str(_current_file.parents[1])
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 

@@ -99,10 +99,10 @@ def generate_feature_pipeline(
         data_payload["backup_criado"] = write_res.get("backup_created")
 
         record_code_validation_event(
-            pipeline_name=clean_target,
-            status="SUCESSO",
-            issues_found=[],
             action="generate_feature_pipeline",
+            file_path=clean_target,
+            status="SUCESSO",
+            details=f"{len(plan.features)} features geradas",
         )
 
         summary_msg = (
@@ -208,10 +208,10 @@ def add_feature_to_pipeline(
         ).to_json()
 
     record_code_validation_event(
-        pipeline_name=clean_target,
-        status="SUCESSO",
-        issues_found=[],
         action=f"add_feature:{clean_name}",
+        file_path=clean_target,
+        status="SUCESSO",
+        details=f"Feature {clean_name} adicionada ao pipeline",
     )
 
     return ToolResult.ok(

@@ -19,7 +19,7 @@ from agent_fiap.tools import (
     validate_pipeline,
 )
 from agent_fiap.tools.code_optimizer.services.benchmark_service import run_pipeline_benchmark
-from agent_fiap.tools.code_optimizer.services.file_service import save_file_service
+from agent_fiap.tools.code_optimizer.services.file_service import write_source_file
 from agent_fiap.tools.code_optimizer.services.profiling_service import profile_pipeline_service
 from agent_fiap.tools.data_analyst.services.dataset_service import get_available_datasets_catalog
 
@@ -452,7 +452,7 @@ def test_service_profile_and_compare_pipeline_runs(tmp_path, monkeypatch):
     )
 
     pipeline_file = tmp_path / "pipeline_prep.py"
-    save_file_service(pipeline_file, baseline_code)
+    write_source_file(pipeline_file, baseline_code)
 
     profile_res = profile_pipeline_service(pipeline_file)
     assert profile_res.execution_status == "success"
@@ -461,7 +461,7 @@ def test_service_profile_and_compare_pipeline_runs(tmp_path, monkeypatch):
     # Grava versão otimizada gerando backup da anterior
     backup_file = tmp_path / "pipeline_prep.py.bak"
     backup_file.write_text(baseline_code, encoding="utf-8")
-    save_file_service(pipeline_file, optimized_code)
+    write_source_file(pipeline_file, optimized_code)
 
     bench_res = run_pipeline_benchmark(
         baseline_file_path=str(backup_file),
@@ -494,8 +494,16 @@ def test_guardrails_callbacks_and_sanitization():
 
     ctx = DummyContext()
     for _ in range(guardrails.MAX_SAVE_FILE_ATTEMPTS):
-        assert guardrails.before_tool_guardrail(tool=DummyOptimizeTool(), args={}, tool_context=ctx) is None
+        assert guardrails.before_tool_guardrail(
+            tool=DummyOptimizeTool(),
+            args={"confirmed_by_user": True},
+            tool_context=ctx,
+        ) is None
 
-    blocked = guardrails.before_tool_guardrail(tool=DummyOptimizeTool(), args={}, tool_context=ctx)
+    blocked = guardrails.before_tool_guardrail(
+        tool=DummyOptimizeTool(),
+        args={"confirmed_by_user": True},
+        tool_context=ctx,
+    )
     assert blocked is not None
     assert "CIRCUIT BREAKER" in blocked["result"]

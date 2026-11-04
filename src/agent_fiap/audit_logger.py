@@ -60,19 +60,25 @@ def record_pipeline_profile(profile_data: dict[str, Any]) -> None:
 
 
 def record_code_validation_event(
-    action: str,
-    file_path: str,
-    status: str,
-    details: dict[str, Any] | str,
+    action: str = "validate_pipeline",
+    file_path: str = "",
+    status: str = "SUCESSO",
+    details: dict[str, Any] | str = "",
+    **kwargs: Any,
 ) -> None:
     """Encaminha etapas de engenharia e validação de código para o OpenTelemetry."""
+    actual_file_path = file_path or kwargs.get("pipeline_name", "")
+    actual_action = action or kwargs.get("action", "validate_pipeline")
+    actual_status = status or kwargs.get("status", "SUCESSO")
+    actual_details = details or kwargs.get("issues_found") or kwargs.get("details", "")
+
     emit_telemetry_log(
         "code_validation",
         level=logging.INFO,
-        action=action,
-        file_path=file_path,
-        status=status,
-        summary=str(details)[:240],
+        action=actual_action,
+        file_path=str(actual_file_path),
+        status=str(actual_status),
+        summary=str(actual_details)[:240],
     )
 
 

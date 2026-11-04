@@ -70,8 +70,8 @@ def preview_features_on_sample(
     nulls_dict: dict[str, int] = {}
 
     # 3. Avaliação segura em escopo restrito
-    safe_globals = {"__builtins__": {}}
-    safe_locals = {"df": df, "pd": pd, "np": np}
+    safe_globals = {"pd": pd, "np": np}
+    safe_locals = {"df": df}
 
     for feat_name, expr in expressions.items():
         try:

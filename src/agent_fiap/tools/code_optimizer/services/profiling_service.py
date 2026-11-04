@@ -204,3 +204,12 @@ def execute_and_profile_pipeline(
         profiled_at=now_iso,
     )
 
+
+def profile_pipeline_service(
+    file_path: str = "pipeline/pipeline_prep.py",
+    timeout_seconds: int = PROFILING_DEFAULT_TIMEOUT_SECONDS,
+) -> PipelineProfileResult:
+    """Perfilamento seguro de pipeline resolvendo o caminho relativo."""
+    resolved_path = resolve_pipeline_path(file_path, allow_write=False)
+    return execute_and_profile_pipeline(resolved_path, timeout_seconds=timeout_seconds)
+
