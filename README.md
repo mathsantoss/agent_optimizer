@@ -8,18 +8,20 @@ Ele permite que cientistas, engenheiros e analistas interajam em linguagem natur
 
 ## 🏗️ Arquitetura
 
-O produto opera em uma arquitetura multi-agentes composta por **3 blocos principais**: um orquestrador central que interpreta a intenção do usuário e dois agentes especialistas que atuam sobre os dados e sobre o código.
+O produto opera em uma arquitetura multi-agentes composta pelo **Orquestrador Central** e **3 Especialistas**:
 
 ```mermaid
 flowchart TB
     U(["👤 Usuário"]) --> O["🧠 Agent FIAP (Orquestrador)"]
-    O -->|Análise, SQL e Insights| A["📊 Agente Analista de Dados"]
-    O -->|Criação, Refatoração e Features| C["⚙️ Agente Otimizador de Código"]
+    O -->|Análise, Estatística e SQL| A["📊 Agente Analista de Dados"]
+    O -->|Engenharia de Features Pandas/PySpark| F["🔬 Agente Feature Engineer"]
+    O -->|Diagnóstico AST, Otimização e Benchmark| C["⚙️ Agente Otimizador de Código"]
 ```
 
-- **Orquestrador (`agent_fiap`)**: Recebe o pedido em linguagem natural e direciona o fluxo para o especialista ideal.
-- **Agente Analista (`data_analyst_agent`)**: Explora os datasets da pasta `pipeline/dados/`, gera estatísticas descritivas, consulta regras de negócio via RAG e executa queries SQL analíticas.
-- **Agente Otimizador (`code_optimizer_agent`)**: Lê, cria e otimiza pipelines em `pipeline/pipeline_prep.py`, desenvolve novas features para Machine Learning, salva as alterações no disco com backup automático e valida a execução real do script e dos testes.
+- **Orquestrador (`agent_fiap`)**: Interpreta a intenção em linguagem natural e direciona as tarefas para o especialista correto.
+- **Agente Analista (`data_analyst_agent`)**: Explora os datasets em `pipeline/dados/`, gera diagnósticos de qualidade, estatística descritiva, consulta o Dicionário de Dados e executa queries SQL analíticas em memória (`analyze_dataset`, `query_dataset`, `search_knowledge_base`).
+- **Agente Feature Engineer (`feature_engineer_agent`)**: Projeta pipelines completos e adiciona novas features para Machine Learning agnósticas a qualquer dataset, suportando nativamente Pandas e PySpark (`generate_feature_pipeline`, `add_feature_to_pipeline`, `preview_features`).
+- **Agente Otimizador (`code_optimizer_agent`)**: Realiza diagnóstico estático AST, propõe e aplica otimizações sob autorização explícita, gera backups automáticos e executa benchmarks comparativos de Antes vs Depois em tempo e memória (`inspect_pipeline`, `optimize_pipeline`, `validate_pipeline`).
 
 ---
 
@@ -68,30 +70,62 @@ Edite o `.env` conforme o modelo que deseja utilizar:
   LLM_API_BASE=http://localhost:11434
   ```
 
-- **Para usar Google Gemini (Nuvem / Free Tier):**
+- **Para usar Google Cloud Vertex AI (Recomendado / Nuvem):**
   ```env
+  GOOGLE_CLOUD_PROJECT=spartan-setting-485114-e3
+  GOOGLE_CLOUD_LOCATION=global
+  GOOGLE_GENAI_USE_VERTEXAI=True
+  LLM_MODEL=gemini-2.5-flash
+  LLM_API_KEY=
+  LLM_API_BASE=
+  ```
+  *(Veja a seção abaixo para autenticar o ADC com `gcloud`).*
+
+- **Para usar Google Gemini (Google AI Studio / API Key):**
+  ```env
+  GOOGLE_GENAI_USE_VERTEXAI=False
   LLM_MODEL=gemini/gemini-2.5-flash
   LLM_API_KEY=SUA_API_KEY_AQUI
+  GEMINI_API_KEY=SUA_API_KEY_AQUI
   LLM_API_BASE=
   ```
 
-### 3. Instale as dependências
+### 3. Autenticação no Google Cloud / Vertex AI (Application Default Credentials - ADC)
+
+Caso utilize o **Google Cloud Vertex AI** (Opção 1), as bibliotecas Python necessitam das credenciais locais do ADC. Execute no seu terminal (WSL):
+
+```bash
+# 1. Ative seu ambiente conda (se aplicável)
+conda activate fiap
+
+# 2. Autentique as credenciais padrão de aplicação (ADC)
+gcloud auth application-default login
+
+# 3. Defina o projeto de cota do Google Cloud
+gcloud auth application-default set-quota-project spartan-setting-485114-e3
+```
+
+> [!NOTE]
+> O comando `gcloud auth application-default login` abrirá seu navegador para você conceder acesso à sua conta Google vinculada ao projeto. O arquivo de credenciais será gerado automaticamente em `~/.config/gcloud/application_default_credentials.json`. Se suas credenciais expirarem no futuro, basta reexecutar esses comandos.
+
+### 4. Instale as dependências
 Com **uv**:
 ```bash
 uv sync --active
 ```
 
-Ou com **pip**:
+Ou com **pip** / **conda**:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Inicie a Interface Web
-Acesse a pasta `src` e suba o servidor do Google ADK:
+### 5. Inicie a Interface Web
+Suba o servidor do Google ADK:
 ```bash
-cd src
-adk web
+# A partir da raiz do repositório:
+adk web src
 ```
+*(Ou `cd src && adk web`)*
 
 Abra no navegador em **`http://localhost:8000`** e selecione **`agent_fiap`**.
 
