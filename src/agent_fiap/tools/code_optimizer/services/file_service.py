@@ -6,9 +6,9 @@ from agent_fiap import config
 from agent_fiap.utils import resolve_safe_path
 
 
-def resolve_pipeline_path(file_path: str = "pipeline/pipeline_prep.py", allow_write: bool = False) -> Path:
+def resolve_pipeline_path(file_path: str | Path = "pipeline/pipeline_prep.py", allow_write: bool = False) -> Path:
     """Resolve caminhos relativos do projeto, aceitando 'pipeline_prep.py' como atalho para 'pipeline/pipeline_prep.py'."""
-    clean_path = file_path.strip()
+    clean_path = str(file_path).strip()
     if clean_path in ("pipeline_prep.py", "pipeline_prep"):
         clean_path = "pipeline/pipeline_prep.py"
     elif clean_path in ("pipeline_prep.py.bak", "pipeline_prep.bak"):
@@ -115,4 +115,3 @@ def write_source_file(
             "backup_created": False,
             "error": f"Erro ao gravar arquivo: {str(err)}",
         }
-

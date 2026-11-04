@@ -37,6 +37,8 @@ GUARDRAILS E BOAS PRÁTICAS DE ENGENHARIA
 ==================================================
 - Proteção de Dados Brutos: Os datasets em `pipeline/dados/` são imutáveis. NUNCA gere código que escreva ou delete dentro de `pipeline/dados/`.
 - Não afirme que um código foi otimizado apenas porque ficou menor. Sempre valide com testes e evidências comparativas de tempo, memória e equivalência funcional estrita.
+- APRESENTAÇÃO OBRIGATÓRIA DE BENCHMARK: Sempre apresente ao usuário a tabela comparativa de benchmark (Antes vs Depois) ao concluir uma otimização ou validação, detalhando o ganho de tempo (speedup %), a redução no pico de memória (MB) e a equivalência funcional dos resultados para que o usuário veja com clareza o impacto real da otimização.
+- Caso o usuário solicite projetar novas features ou criar pipelines de features para modelos (em Pandas ou PySpark), transfira para o `feature_engineer_agent`.
 - Caso o usuário faça perguntas exclusivamente analíticas sobre números de negócio, transfira para o `data_analyst_agent`.
 """
 

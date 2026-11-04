@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from agent_fiap.audit_logger import record_data_analysis_event
+from agent_fiap.schemas import ToolResult
 from agent_fiap.tools.data_analyst.services.dataset_service import (
     get_available_datasets_catalog,
     resolve_dataset_file,
@@ -51,27 +52,20 @@ def analyze_dataset(
             status="SUCESSO",
             summary_metrics={"total_datasets": len(catalog)},
         )
-        payload = {
-            "success": True,
-            "operation": "analyze_dataset:catalog",
-            "summary": f"{len(catalog)} dataset(s) disponível(is) em pipeline/dados/.",
-            "data": {"datasets": catalog},
-            "warnings": [],
-            "errors": [],
-        }
-        return json.dumps(payload, ensure_ascii=False, indent=2)
+        return ToolResult.ok(
+            summary=f"{len(catalog)} dataset(s) disponível(is) em pipeline/dados/.",
+            operation="analyze_dataset:catalog",
+            data={"datasets": catalog},
+        ).to_json()
 
     file_path, resolution_error = resolve_dataset_file(clean_target)
     if resolution_error or file_path is None:
-        payload = {
-            "success": False,
-            "operation": f"analyze_dataset:{norm_op}",
-            "summary": resolution_error or "Dataset não encontrado.",
-            "data": {"dataset_solicitado": dataset_name},
-            "warnings": [],
-            "errors": [resolution_error or "Dataset não encontrado."],
-        }
-        return json.dumps(payload, ensure_ascii=False, indent=2)
+        return ToolResult.fail(
+            summary=resolution_error or "Dataset não encontrado.",
+            operation=f"analyze_dataset:{norm_op}",
+            errors=resolution_error or "Dataset não encontrado.",
+            data={"dataset_solicitado": dataset_name},
+        ).to_json()
 
     # Executa os serviços internos conforme a operação desejada
     structure_info: dict[str, Any] | None = None
@@ -117,15 +111,12 @@ def analyze_dataset(
     )
 
     summary_msg = f"Análise '{norm_op}' do dataset '{file_path.stem}' concluída com sucesso."
-    payload = {
-        "success": True,
-        "operation": f"analyze_dataset:{norm_op}",
-        "summary": summary_msg,
-        "data": consolidated_data,
-        "warnings": warnings,
-        "errors": [],
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+    return ToolResult.ok(
+        summary=summary_msg,
+        operation=f"analyze_dataset:{norm_op}",
+        data=consolidated_data,
+        warnings=warnings,
+    ).to_json()
 
 
 def query_dataset(

@@ -28,8 +28,9 @@ FERRAMENTAS PÚBLICAS EXPOSTAS (USE EXCLUSIVAMENTE ESTAS)
    - Utilize para esclarecer dúvidas conceituais sobre tabelas e regras de negócio antes de interpretar dados complexos.
 
 ==================================================
-TRANSIÇÃO PARA ENGENHARIA DE CÓDIGO
+TRANSIÇÃO PARA ENGENHARIA DE FEATURES OU CÓDIGO
 ==================================================
-Caso o usuário solicite alterar, criar, refatorar, rodar testes ou otimizar o código do pipeline (`pipeline/pipeline_prep.py`), transfira para o `code_optimizer_agent`.
+- Caso o usuário solicite criar features, enriquecer datasets com variáveis para modelos (em Pandas ou PySpark) ou criar pipelines de features, transfira para o `feature_engineer_agent`.
+- Caso o usuário solicite alterar, refatorar, rodar testes, perfilar ou otimizar pipelines existentes (`pipeline/pipeline_prep.py`), transfira para o `code_optimizer_agent`.
 """
 

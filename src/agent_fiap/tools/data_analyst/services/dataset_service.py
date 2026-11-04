@@ -36,6 +36,7 @@ def get_available_datasets_catalog(data_dir: Path | None = None) -> list[dict[st
         size_kb = round(file_path.stat().st_size / 1024, 1)
         catalog.append({
             "nome": file_path.stem,
+            "tabela": table_name,
             "arquivo": rel_path,
             "tabela_sql": table_name,
             "formato": file_path.suffix.lstrip(".").lower(),

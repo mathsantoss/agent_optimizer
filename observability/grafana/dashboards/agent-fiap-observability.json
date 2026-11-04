@@ -382,6 +382,9 @@
       },
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "spanNulls": true
+          },
           "unit": "ms"
         },
         "overrides": []
@@ -397,7 +400,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum by (model) (rate({__name__=~\"agent_fiap_llm_duration.*_sum\"}[5m])) / clamp_min(sum by (model) (rate({__name__=~\"agent_fiap_llm_duration.*_count\"}[5m])), 0.001) or (sum by (model) ({__name__=~\"agent_fiap_llm_duration.*_sum\"}) / clamp_min(sum by (model) ({__name__=~\"agent_fiap_llm_duration.*_count\"}), 1))",
+          "expr": "(sum by (model) (increase({__name__=~\"agent_fiap_llm_duration.*_sum\"}[15m])) / clamp_min(sum by (model) (increase({__name__=~\"agent_fiap_llm_duration.*_count\"}[15m])), 1)) > 0 or (sum by (model) ({__name__=~\"agent_fiap_llm_duration.*_sum\"}) / clamp_min(sum by (model) ({__name__=~\"agent_fiap_llm_duration.*_count\"}), 1)) or (sum by (model) (rate({__name__=~\"agent_fiap_llm_duration.*_sum\"}[5m])) / clamp_min(sum by (model) (rate({__name__=~\"agent_fiap_llm_duration.*_count\"}[5m])), 0.001))",
           "legendFormat": "{{model}}",
           "refId": "A"
         }
@@ -466,6 +469,9 @@
       },
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "spanNulls": true
+          },
           "unit": "ms"
         },
         "overrides": []
@@ -481,7 +487,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum by (tool_name) (rate({__name__=~\"agent_fiap_tool_duration.*_sum\"}[5m])) / clamp_min(sum by (tool_name) (rate({__name__=~\"agent_fiap_tool_duration.*_count\"}[5m])), 0.001) or (sum by (tool_name) ({__name__=~\"agent_fiap_tool_duration.*_sum\"}) / clamp_min(sum by (tool_name) ({__name__=~\"agent_fiap_tool_duration.*_count\"}), 1))",
+          "expr": "(sum by (tool_name) (increase({__name__=~\"agent_fiap_tool_duration.*_sum\"}[15m])) / clamp_min(sum by (tool_name) (increase({__name__=~\"agent_fiap_tool_duration.*_count\"}[15m])), 1)) > 0 or (sum by (tool_name) ({__name__=~\"agent_fiap_tool_duration.*_sum\"}) / clamp_min(sum by (tool_name) ({__name__=~\"agent_fiap_tool_duration.*_count\"}), 1)) or (sum by (tool_name) (rate({__name__=~\"agent_fiap_tool_duration.*_sum\"}[5m])) / clamp_min(sum by (tool_name) (rate({__name__=~\"agent_fiap_tool_duration.*_count\"}[5m])), 0.001))",
           "legendFormat": "{{tool_name}}",
           "refId": "A"
         }

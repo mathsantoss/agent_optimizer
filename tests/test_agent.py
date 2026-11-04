@@ -1,11 +1,19 @@
 """Testes automatizados para o Agent FIAP e a nova arquitetura de ferramentas (3 por especialista)."""
 import json
 from pathlib import Path
-from agent_fiap.agent import code_optimizer_agent, data_analyst_agent, root_agent
+from agent_fiap.agent import (
+    code_optimizer_agent,
+    data_analyst_agent,
+    feature_engineer_agent,
+    root_agent,
+)
 from agent_fiap.tools import (
+    add_feature_to_pipeline,
     analyze_dataset,
+    generate_feature_pipeline,
     inspect_pipeline,
     optimize_pipeline,
+    preview_features,
     query_dataset,
     search_knowledge_base,
     validate_pipeline,
@@ -17,10 +25,11 @@ from agent_fiap.tools.data_analyst.services.dataset_service import get_available
 
 
 def test_multi_agent_structure():
-    """Valida a separação entre o Orquestrador e os 2 Subagentes com exatamente 3 ferramentas cada."""
+    """Valida a separação entre o Orquestrador e os 3 Subagentes com exatamente 3 ferramentas cada."""
     assert root_agent.name == "agent_fiap"
     sub_agent_names = [agent.name for agent in root_agent.sub_agents]
     assert "data_analyst_agent" in sub_agent_names
+    assert "feature_engineer_agent" in sub_agent_names
     assert "code_optimizer_agent" in sub_agent_names
     assert len(root_agent.tools) == 0, "O orquestrador não deve possuir ferramentas diretas de baixo nível."
 
@@ -29,6 +38,13 @@ def test_multi_agent_structure():
     expected_analyst_tools = sorted(["analyze_dataset", "query_dataset", "search_knowledge_base"])
     assert analyst_tool_names == expected_analyst_tools, (
         f"data_analyst_agent deve expor exatamente {expected_analyst_tools}, obteve {analyst_tool_names}"
+    )
+
+    # Ferramentas públicas do Agente Engenheiro de Features (exatamente 3)
+    feature_tool_names = sorted(tool.__name__ for tool in feature_engineer_agent.tools)
+    expected_feature_tools = sorted(["add_feature_to_pipeline", "generate_feature_pipeline", "preview_features"])
+    assert feature_tool_names == expected_feature_tools, (
+        f"feature_engineer_agent deve expor exatamente {expected_feature_tools}, obteve {feature_tool_names}"
     )
 
     # Ferramentas públicas do Agente Especialista em Otimização de Código (exatamente 3)
@@ -107,6 +123,155 @@ def test_public_tool_search_knowledge_base():
     data = json.loads(res)
     assert data["success"] is True
     assert "resultados" in data["data"]
+
+
+# ==============================================================================
+# Testes das 3 Ferramentas Públicas do Feature Engineer Agent (Pandas & PySpark)
+# ==============================================================================
+
+def test_public_tool_generate_feature_pipeline_pandas(tmp_path, monkeypatch):
+    """Valida generate_feature_pipeline em Pandas: suporte a qualquer dataset e features customizadas."""
+    from agent_fiap import config
+    monkeypatch.setattr(config, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(config, "READ_DIRS", [tmp_path])
+    monkeypatch.setattr(config, "WRITE_DIRS", [tmp_path])
+
+    custom_features = [
+        {
+            "name": "razao_mensal_tempo",
+            "category": "ratio",
+            "expression": "df['mensalidade'] / (df['tempo_meses'] + 1)",
+            "description": "Razão entre mensalidade e tempo de contrato",
+        },
+        {
+            "name": "log_mensalidade",
+            "category": "transform",
+            "expression": "np.log1p(df['mensalidade'])",
+            "description": "Log1p da mensalidade para normalização",
+        },
+    ]
+
+    # 1. Proposta sem salvar no disco (save_to_disk=False)
+    prop_res = generate_feature_pipeline(
+        dataset_name="clientes_telecom",
+        framework="pandas",
+        target_file_path=str(tmp_path / "pipeline" / "pipeline_fe.py"),
+        features=custom_features,
+        save_to_disk=False,
+    )
+    prop_data = json.loads(prop_res)
+    assert prop_data["success"] is True
+    assert prop_data["data"]["gravado_em_disco"] is False
+    assert "codigo_gerado" in prop_data["data"]
+    assert "def run():" in prop_data["data"]["codigo_gerado"]
+    assert "razao_mensal_tempo" in prop_data["data"]["codigo_gerado"]
+    assert not (tmp_path / "pipeline" / "pipeline_fe.py").exists()
+
+    # 2. Gravação confirmada (save_to_disk=True)
+    apply_res = generate_feature_pipeline(
+        dataset_name="clientes_telecom",
+        framework="pandas",
+        target_file_path=str(tmp_path / "pipeline" / "pipeline_fe.py"),
+        features=custom_features,
+        save_to_disk=True,
+    )
+    apply_data = json.loads(apply_res)
+    assert apply_data["success"] is True
+    assert apply_data["data"]["gravado_em_disco"] is True
+    assert (tmp_path / "pipeline" / "pipeline_fe.py").exists()
+    assert (tmp_path / "pipeline" / "pipeline_fe.py").read_text(encoding="utf-8") == apply_data["data"]["codigo_gerado"]
+
+
+def test_public_tool_generate_feature_pipeline_pyspark():
+    """Valida generate_feature_pipeline gerando código PySpark agnóstico com SparkSession e Window."""
+    custom_features = [
+        {
+            "name": "media_gasto_por_regiao",
+            "category": "agregacao",
+            "expression": "F.avg('gasto').over(Window.partitionBy('regiao'))",
+            "description": "Média de gasto por região via Window partitionBy",
+        }
+    ]
+    prop_res = generate_feature_pipeline(
+        dataset_name="transacoes_globais",
+        framework="pyspark",
+        target_file_path="pipeline/pipeline_spark.py",
+        features=custom_features,
+        save_to_disk=False,
+    )
+    prop_data = json.loads(prop_res)
+    assert prop_data["success"] is True
+    code = prop_data["data"]["codigo_gerado"]
+    assert "pyspark.sql" in code
+    assert "SparkSession" in code
+    assert "from pyspark.sql.window import Window" in code
+    assert "media_gasto_por_regiao" in code
+    assert "def run():" in code
+
+
+def test_public_tool_add_feature_to_pipeline(tmp_path, monkeypatch):
+    """Valida add_feature_to_pipeline inserindo nova feature via AST com backup .bak em qualquer pipeline."""
+    from agent_fiap import config
+    monkeypatch.setattr(config, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(config, "READ_DIRS", [tmp_path])
+    monkeypatch.setattr(config, "WRITE_DIRS", [tmp_path])
+
+    pipeline_file = tmp_path / "pipeline_custom.py"
+    initial_code = (
+        "import pandas as pd\n\n"
+        "def run():\n"
+        "    df = pd.DataFrame({'a': [1, 2], 'b': [10.0, 20.0]})\n"
+        "    return df\n"
+    )
+    pipeline_file.write_text(initial_code, encoding="utf-8")
+
+    # 1. Proposta sem confirmação: arquivo não deve mudar
+    prop_res = add_feature_to_pipeline(
+        file_path=str(pipeline_file),
+        feature_name="coluna_c",
+        expression="df['b'] * 2",
+        framework="pandas",
+        description="Dobro da coluna b",
+        confirmed_by_user=False,
+    )
+    prop_data = json.loads(prop_res)
+    assert prop_data["success"] is True
+    assert prop_data["data"]["requer_confirmacao"] is True
+    assert pipeline_file.read_text(encoding="utf-8") == initial_code
+
+    # 2. Aplicação confirmada: injeta antes do return e cria backup .bak
+    apply_res = add_feature_to_pipeline(
+        file_path=str(pipeline_file),
+        feature_name="coluna_c",
+        expression="df['b'] * 2",
+        framework="pandas",
+        description="Dobro da coluna b",
+        confirmed_by_user=True,
+    )
+    apply_data = json.loads(apply_res)
+    assert apply_data["success"] is True
+    assert (tmp_path / "pipeline_custom.py.bak").exists()
+    assert (tmp_path / "pipeline_custom.py.bak").read_text(encoding="utf-8") == initial_code
+    new_content = pipeline_file.read_text(encoding="utf-8")
+    assert "coluna_c" in new_content
+
+
+def test_public_tool_preview_features():
+    """Valida a ferramenta pública preview_features calculando expressões sobre amostra e verificando nulos."""
+    preview_res = preview_features(
+        dataset_name="dados_vendas",
+        framework="pandas",
+        feature_name="custo_estimado",
+        expression="df['price_x'] * 0.7",
+        sample_rows=10,
+    )
+    preview_data = json.loads(preview_res)
+    assert preview_data["success"] is True
+    assert "new_columns" in preview_data["data"]
+    assert "custo_estimado" in preview_data["data"]["new_columns"]
+    assert "sample_preview" in preview_data["data"]
+    assert len(preview_data["data"]["sample_preview"]) > 0
+    assert "null_counts" in preview_data["data"]
 
 
 # ==============================================================================

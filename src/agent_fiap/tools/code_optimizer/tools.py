@@ -8,6 +8,7 @@ import json
 from typing import Any
 
 from agent_fiap.audit_logger import record_code_validation_event, record_guardrail_event
+from agent_fiap.schemas import ToolResult
 from agent_fiap.tools.code_optimizer.services.ast_service import (
     find_ast_security_violations,
     inspect_source_code_ast,
@@ -109,11 +110,10 @@ def inspect_pipeline(
         f"{len(report.issues)} apontamento(s) identificado(s): {by_severity}."
     )
 
-    payload = {
-        "success": True,
-        "operation": "inspect_pipeline",
-        "summary": summary_text,
-        "data": {
+    return ToolResult.ok(
+        summary=summary_text,
+        operation="inspect_pipeline",
+        data={
             "file_path": rel_path,
             "line_count": report.line_count,
             "imported_modules": report.imported_modules,
@@ -124,10 +124,8 @@ def inspect_pipeline(
             "resumo_apontamentos": {"por_severidade": by_severity, "por_categoria": by_category},
             "conteudo_atual": content if report.line_count <= 250 else "(conteúdo extenso omitido no sumário)",
         },
-        "warnings": [f"{cnt} apontamento(s) de severidade '{sev}'" for sev, cnt in by_severity.items() if sev in ("high", "medium")],
-        "errors": [],
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+        warnings=[f"{cnt} apontamento(s) de severidade '{sev}'" for sev, cnt in by_severity.items() if sev in ("high", "medium")],
+    ).to_json()
 
 
 def optimize_pipeline(
@@ -311,12 +309,13 @@ def optimize_pipeline(
         f"({write_res.get('line_count')} linhas). Backup salvo em '{write_res.get('backup_file')}'. "
         f"{'Benchmark executado.' if run_benchmark else ''}"
     )
+    if benchmark_data and benchmark_data.get("tabela_markdown"):
+        summary_final += f"\n\n{benchmark_data['tabela_markdown']}"
 
-    payload = {
-        "success": True,
-        "operation": "optimize_pipeline:apply",
-        "summary": summary_final,
-        "data": {
+    return ToolResult.ok(
+        summary=summary_final,
+        operation="optimize_pipeline:apply",
+        data={
             "file_path": rel_path,
             "linhas_gravadas": write_res.get("line_count"),
             "backup_criado": write_res.get("backup_created"),
@@ -324,10 +323,8 @@ def optimize_pipeline(
             "benchmark": benchmark_data,
             "testes": tests_data,
         },
-        "warnings": apply_warnings,
-        "errors": apply_errors,
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+        warnings=apply_warnings,
+    ).to_json()
 
 
 def validate_pipeline(
@@ -401,11 +398,22 @@ def validate_pipeline(
 
     # Nível 4: Benchmark Comparativo com o Baseline
     benchmark_output: dict[str, Any] | None = None
+    validation_warnings: list[str] = []
     if compare_with_baseline:
-        benchmark_output = run_pipeline_benchmark(
-            baseline_file_path=f"{clean_path}.bak",
-            candidate_file_path=clean_path,
-        )
+        from agent_fiap.tools.code_optimizer.services.benchmark_service import clean_snapshot_key, load_profile_snapshot
+        bak_candidate = Path(config.PROJECT_ROOT) / f"{clean_path}.bak"
+        clean_key = clean_snapshot_key(clean_path)
+        has_baseline = bak_candidate.is_file() or load_profile_snapshot(f"baseline::{clean_key}") is not None
+
+        if has_baseline:
+            benchmark_output = run_pipeline_benchmark(
+                baseline_file_path=f"{clean_path}.bak",
+                candidate_file_path=clean_path,
+            )
+        else:
+            validation_warnings.append(
+                f"Benchmark comparativo não executado: arquivo de backup '{clean_path}.bak' ainda não foi gerado."
+            )
 
     # Avaliação Geral
     static_ok = static_status == "APROVADA"
@@ -428,6 +436,8 @@ def validate_pipeline(
         f"Benchmark={'OK' if benchmark_ok else ('FALHA' if benchmark_output else 'IGNORADO')}. "
         f"Status Geral: {'APROVADO' if overall_success else 'REPROVADO'}."
     )
+    if benchmark_output and benchmark_output.get("data", {}).get("tabela_markdown"):
+        summary_text += f"\n\n{benchmark_output['data']['tabela_markdown']}"
 
     record_code_validation_event(
         action="validate_pipeline",
@@ -442,20 +452,28 @@ def validate_pipeline(
         },
     )
 
-    payload = {
-        "success": overall_success,
-        "operation": "validate_pipeline",
-        "summary": summary_text,
-        "data": {
-            "file_path": rel_path,
-            "validacao_estatica": static_status,
-            "testes_automatizados": tests_output,
-            "perfil_execucao": profile_output,
-            "benchmark_equivalencia": benchmark_output.get("data") if benchmark_output else None,
-            "rollback_executado": rollback_applied,
-        },
-        "warnings": [] if overall_success else ["Uma ou mais etapas de validação falharam."],
-        "errors": [] if overall_success else ["Pipeline apresentou falhas nas validações."],
+    data_val = {
+        "file_path": rel_path,
+        "validacao_estatica": static_status,
+        "testes_automatizados": tests_output,
+        "perfil_execucao": profile_output,
+        "benchmark_equivalencia": benchmark_output.get("data") if benchmark_output else None,
+        "rollback_executado": rollback_applied,
     }
-    return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+
+    if overall_success:
+        return ToolResult.ok(
+            summary=summary_text,
+            operation="validate_pipeline",
+            data=data_val,
+            warnings=validation_warnings,
+        ).to_json()
+    else:
+        return ToolResult.fail(
+            summary=summary_text,
+            operation="validate_pipeline",
+            errors=["Pipeline apresentou falhas nas validações."],
+            data=data_val,
+            warnings=["Uma ou mais etapas de validação falharam."],
+        ).to_json()
 

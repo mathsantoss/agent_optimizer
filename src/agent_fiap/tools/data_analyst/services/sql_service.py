@@ -10,6 +10,7 @@ from sqlglot import exp as sql_expressions
 
 from agent_fiap import config
 from agent_fiap.guardrails import sanitize_untrusted_data_text
+from agent_fiap.schemas import ToolResult
 from agent_fiap.tools.data_analyst.services.dataset_service import list_dataset_files, read_dataset_dataframe
 
 FORBIDDEN_SQL_STATEMENTS = (
@@ -122,13 +123,11 @@ def execute_sql_service(
 
     parsed_statements, validation_error = _validate_sql_query(query, set(available_tables.keys()))
     if validation_error:
-        return {
-            "success": False,
-            "operation": "query_dataset",
-            "summary": validation_error,
-            "data": None,
-            "errors": [validation_error],
-        }
+        return ToolResult.fail(
+            summary=validation_error,
+            operation="query_dataset",
+            errors=validation_error,
+        ).model_dump()
 
     statement = parsed_statements[0]
     referenced_tables: list[str] = [
@@ -193,11 +192,10 @@ def execute_sql_service(
 
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
-        return {
-            "success": True,
-            "operation": "query_dataset",
-            "summary": f"Consulta executada com sucesso ({len(result_df)} linhas em {elapsed_ms}ms).",
-            "data": {
+        return ToolResult.ok(
+            summary=f"Consulta executada com sucesso ({len(result_df)} linhas em {elapsed_ms}ms).",
+            operation="query_dataset",
+            data={
                 "query": query,
                 "tabelas_consultadas": unique_tables,
                 "total_linhas_retornadas": len(result_df),
@@ -205,23 +203,19 @@ def execute_sql_service(
                 "tabela_markdown": markdown_table,
                 "registros": result_df.to_dict(orient="records"),
             },
-            "warnings": warnings,
-            "errors": [],
-        }
+            warnings=warnings,
+        ).model_dump()
     except Exception as err:
         err_str = str(err)
         if "interrupted" in err_str.lower():
             err_msg = f"Erro de Guardrail SQL: consulta excedeu o tempo limite de {timeout_seconds} segundos."
         else:
             err_msg = f"Erro na execução da consulta SQL: {err_str}"
-        return {
-            "success": False,
-            "operation": "query_dataset",
-            "summary": err_msg,
-            "data": None,
-            "warnings": [],
-            "errors": [err_msg],
-        }
+        return ToolResult.fail(
+            summary=err_msg,
+            operation="query_dataset",
+            errors=err_msg,
+        ).model_dump()
     finally:
         connection.close()
 
