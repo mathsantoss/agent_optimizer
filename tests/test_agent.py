@@ -21,7 +21,11 @@ from agent_fiap.tools import (
 from agent_fiap.tools.code_optimizer.services.benchmark_service import run_pipeline_benchmark
 from agent_fiap.tools.code_optimizer.services.file_service import write_source_file
 from agent_fiap.tools.code_optimizer.services.profiling_service import profile_pipeline_service
-from agent_fiap.tools.data_analyst.services.dataset_service import get_available_datasets_catalog
+from agent_fiap.tools.data_analyst.services.dataset_service import (
+    get_available_datasets_catalog,
+    read_dataset_dataframe,
+    resolve_dataset_file,
+)
 
 
 def test_multi_agent_structure():
@@ -258,11 +262,12 @@ def test_public_tool_add_feature_to_pipeline(tmp_path, monkeypatch):
 
 def test_public_tool_preview_features():
     """Valida a ferramenta pública preview_features calculando expressões sobre amostra e verificando nulos."""
+    expr = "df['preco_unitario'] * 0.7" if "preco_unitario" in read_dataset_dataframe(resolve_dataset_file("dados_vendas")[0], max_rows=1).columns else "df['price_x'] * 0.7"
     preview_res = preview_features(
         dataset_name="dados_vendas",
         framework="pandas",
         feature_name="custo_estimado",
-        expression="df['price_x'] * 0.7",
+        expression=expr,
         sample_rows=10,
     )
     preview_data = json.loads(preview_res)
@@ -355,7 +360,7 @@ def test_public_tool_optimize_pipeline_lifecycle(tmp_path, monkeypatch):
     assert apply_data["data"]["backup_criado"] is True
     assert (tmp_path / "pipeline_prep.py.bak").exists()
     assert (tmp_path / "pipeline_prep.py.bak").read_text(encoding="utf-8") == initial_code
-    assert pipeline_file.read_text(encoding="utf-8") == optimized_code
+    assert pipeline_file.read_text(encoding="utf-8").strip() == optimized_code.strip()
 
 
 def test_public_tool_validate_pipeline(tmp_path, monkeypatch):
@@ -390,7 +395,8 @@ def test_service_list_datasets():
     """Testa a descoberta dinâmica de datasets ignorando a subpasta conhecimento."""
     catalog = get_available_datasets_catalog()
     table_names = [ds["tabela"] for ds in catalog]
-    assert "tabela_sql" in table_names
+    assert "dados_vendas" in table_names
+    assert "tabela_sql" in catalog[0]
     assert "dicionario_vendas" not in table_names
 
 

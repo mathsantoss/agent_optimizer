@@ -26,7 +26,7 @@ from agent_fiap.tools.feature_engineer.services.pipeline_generator_service impor
 def generate_feature_pipeline(
     dataset_name: str = "dados_vendas",
     framework: str = "pandas",
-    target_file_path: str = "pipeline/pipeline_features.py",
+    target_file_path: str = "pipeline/pipeline_prep.py",
     features: list[dict[str, Any]] | None = None,
     save_to_disk: bool = False,
 ) -> str:
@@ -37,7 +37,7 @@ def generate_feature_pipeline(
     Args:
         dataset_name: Nome do dataset fonte em pipeline/dados/ ou arquivo arbitrário.
         framework: Framework de dados desejado: 'pandas' ou 'pyspark'.
-        target_file_path: Caminho do arquivo a ser criado (padrão: 'pipeline/pipeline_features.py').
+        target_file_path: Caminho do arquivo alvo do pipeline (padrão único: 'pipeline/pipeline_prep.py').
         features: Lista opcional de dicionários com as features a criar (name, expression, category, description).
                   Se omitido, infere dinamicamente do schema do dataset.
         save_to_disk: Se True, grava o pipeline gerado no disco. Se False, exibe a proposta e o código para aprovação.

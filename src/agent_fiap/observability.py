@@ -169,27 +169,40 @@ class SanitizingBatchLogRecordProcessor(BatchLogRecordProcessor):
     emitidos com 'content': '<elided>' ou payloads vazios antes de exportar ao Loki.
     """
 
-    def emit(self, log_data: Any) -> None:
+    def _should_drop_record(self, log_record: Any) -> bool:
         try:
-            record = getattr(log_data, "log_record", None) or log_data
+            record = getattr(log_record, "log_record", None) or log_record
             if record is not None:
                 body = getattr(record, "body", None)
                 if isinstance(body, str):
                     if "<elided>" in body:
-                        return
+                        return True
                     if body.strip() in ("", "{}"):
-                        return
+                        return True
                 elif isinstance(body, dict):
                     if body.get("content") == "<elided>":
-                        return
+                        return True
                     if not body:
-                        return
+                        return True
                 attrs = getattr(record, "attributes", None) or {}
                 if isinstance(attrs, dict) and attrs.get("content") == "<elided>":
-                    return
+                    return True
         except Exception:
             pass
-        super().emit(log_data)
+        return False
+
+    def on_emit(self, log_record: Any) -> None:
+        if self._should_drop_record(log_record):
+            return
+        super().on_emit(log_record)
+
+    def emit(self, log_data: Any) -> None:
+        if self._should_drop_record(log_data):
+            return
+        if hasattr(super(), "emit"):
+            super().emit(log_data)
+        else:
+            super().on_emit(log_data)
 
 
 # Alias para retrocompatibilidade
@@ -220,6 +233,9 @@ class SanitizingLogRecordProcessor(LogRecordProcessor):
         except Exception:
             pass
         self._delegate.emit(log_data)
+
+    def on_emit(self, log_record: Any) -> None:
+        self.emit(log_record)
 
     def shutdown(self) -> None:
         self._delegate.shutdown()

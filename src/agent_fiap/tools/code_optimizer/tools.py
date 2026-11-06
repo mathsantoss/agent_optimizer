@@ -5,8 +5,10 @@
 """
 import ast
 import json
+from pathlib import Path
 from typing import Any
 
+from agent_fiap import config
 from agent_fiap.audit_logger import record_code_validation_event, record_guardrail_event
 from agent_fiap.schemas import ToolResult
 from agent_fiap.tools.code_optimizer.services.ast_service import (
@@ -17,8 +19,10 @@ from agent_fiap.tools.code_optimizer.services.ast_service import (
 from agent_fiap.tools.code_optimizer.services.benchmark_service import run_pipeline_benchmark
 from agent_fiap.tools.code_optimizer.services.execution_service import execute_pipeline_script
 from agent_fiap.tools.code_optimizer.services.file_service import (
+    get_pipeline_tmp_dir,
     read_source_file,
     resolve_pipeline_path,
+    sync_pipeline_tmp_files,
     write_source_file,
 )
 from agent_fiap.tools.code_optimizer.services.profiling_service import execute_and_profile_pipeline
@@ -189,12 +193,46 @@ def optimize_pipeline(
         if contract_violation:
             proposal_warnings.append(contract_violation)
 
-        summary_proposal = (
-            f"Proposta de otimização para '{rel_path}' elaborada com sucesso. "
-            "NENHUM arquivo foi alterado no disco ainda. "
-            "Apresente o plano e as mudanças ao usuário e solicite aprovação explícita. "
-            "Para aplicar a gravação física no disco e rodar os benchmarks, invoque 'optimize_pipeline' com 'confirmed_by_user=True'."
+        # 1. Salva e sincroniza fisicamente os 2 arquivos fixos na pasta pipeline/tmp/:
+        #    - pipeline/tmp/pipeline_prep_original.bak (backup do original)
+        #    - pipeline/tmp/pipeline_prep_otimizado.bak (pipeline otimizado)
+        #    Ambos permanecem fisicamente no disco e são sobrescritos conforme novas propostas.
+        #    Nenhum arquivo .bak é criado na raiz de pipeline/.
+        tmp_original_path, tmp_opt_path = sync_pipeline_tmp_files(
+            original_content=current_code,
+            optimized_content=clean_code,
         )
+
+        # Executa benchmark comparativo da proposta sem alterar o arquivo original
+        benchmark_proposal_data = None
+        if run_benchmark:
+            try:
+                bench_res = run_pipeline_benchmark(
+                    baseline_file_path=str(tmp_original_path),
+                    candidate_file_path=str(tmp_opt_path),
+                )
+                benchmark_proposal_data = bench_res.get("data")
+            except Exception as bench_err:
+                proposal_warnings.append(f"Benchmark prévio não pôde ser concluído: {bench_err}")
+
+        summary_proposal = (
+            f"Proposta de otimização para '{rel_path}' elaborada com sucesso.\n"
+            f"Arquivos físicos salvos e sincronizados na pasta 'pipeline/tmp/':\n"
+            f"  1. Backup do original: '{tmp_original_path.relative_to(config.PROJECT_ROOT)}'\n"
+            f"  2. Pipeline otimizado: '{tmp_opt_path.relative_to(config.PROJECT_ROOT)}'\n\n"
+            f"O arquivo original '{rel_path}' NÃO foi alterado no disco e permanece com o código original até sua confirmação explícita.\n\n"
+        )
+        if benchmark_proposal_data and benchmark_proposal_data.get("tabela_markdown"):
+            summary_proposal += (
+                f"{benchmark_proposal_data['tabela_markdown']}\n\n"
+                f"Deseja confirmar a aplicação dessa otimização para substituir definitivamente o arquivo original "
+                f"'{rel_path}'? Responda confirmando para prosseguirmos."
+            )
+        else:
+            summary_proposal += (
+                f"Apresente a proposta ao usuário. Para aplicar a gravação física no disco e substituir "
+                f"definitivamente '{rel_path}', invoque 'optimize_pipeline' com 'confirmed_by_user=True'."
+            )
 
         payload = {
             "success": True,
@@ -204,6 +242,7 @@ def optimize_pipeline(
                 "file_path": rel_path,
                 "linhas_originais": len(current_code.splitlines()),
                 "linhas_propostas": len(clean_code.splitlines()),
+                "benchmark": benchmark_proposal_data,
                 "requer_confirmacao": True,
                 "instrucao_confirmacao": "Chame optimize_pipeline(file_path=..., proposed_code=..., confirmed_by_user=True)",
             },
@@ -296,8 +335,9 @@ def optimize_pipeline(
             apply_warnings.append(f"Atenção: Testes automatizados falharam após a otimização.")
 
         # Executa benchmark comparativo Antes vs Depois
+        base_file = "pipeline/tmp/pipeline_prep_original.bak" if Path("pipeline/tmp/pipeline_prep_original.bak").is_file() else f"{clean_target}.bak"
         bench_res = run_pipeline_benchmark(
-            baseline_file_path=f"{clean_target}.bak",
+            baseline_file_path=base_file,
             candidate_file_path=clean_target,
         )
         benchmark_data = bench_res.get("data")
@@ -306,7 +346,8 @@ def optimize_pipeline(
 
     summary_final = (
         f"Pipeline '{rel_path}' otimizado e gravado com SUCESSO no disco "
-        f"({write_res.get('line_count')} linhas). Backup salvo em '{write_res.get('backup_file')}'. "
+        f"({write_res.get('line_count')} linhas). "
+        f"Arquivos físicos salvos em 'pipeline/tmp/': 'pipeline_prep_original.bak' e 'pipeline_prep_otimizado.bak'. "
         f"{'Benchmark executado.' if run_benchmark else ''}"
     )
     if benchmark_data and benchmark_data.get("tabela_markdown"):
@@ -401,15 +442,25 @@ def validate_pipeline(
     validation_warnings: list[str] = []
     if compare_with_baseline:
         from agent_fiap.tools.code_optimizer.services.benchmark_service import clean_snapshot_key, load_profile_snapshot
-        bak_candidate = Path(config.PROJECT_ROOT) / f"{clean_path}.bak"
         clean_key = clean_snapshot_key(clean_path)
-        has_baseline = bak_candidate.is_file() or load_profile_snapshot(f"baseline::{clean_key}") is not None
+        try:
+            bak_candidate = resolve_pipeline_path(f"{clean_path}.bak", allow_write=False)
+            has_bak_file = bak_candidate.is_file() and bak_candidate.stat().st_size > 0
+        except Exception:
+            has_bak_file = False
+
+        tmp_base = config.PROJECT_ROOT / "pipeline" / "tmp" / "pipeline_prep_original.bak"
+        has_tmp_base = tmp_base.is_file() and tmp_base.stat().st_size > 0
+        has_baseline = has_tmp_base or has_bak_file or load_profile_snapshot(f"baseline::{clean_key}") is not None
 
         if has_baseline:
+            base_choice = "pipeline/tmp/pipeline_prep_original.bak" if has_tmp_base else f"{clean_path}.bak"
             benchmark_output = run_pipeline_benchmark(
-                baseline_file_path=f"{clean_path}.bak",
+                baseline_file_path=base_choice,
                 candidate_file_path=clean_path,
             )
+            if not benchmark_output.get("success"):
+                validation_warnings.append(benchmark_output.get("summary", "Benchmark apresentou divergências."))
         else:
             validation_warnings.append(
                 f"Benchmark comparativo não executado: arquivo de backup '{clean_path}.bak' ainda não foi gerado."

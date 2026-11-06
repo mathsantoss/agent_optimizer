@@ -5,7 +5,7 @@ import pyarrow.parquet as parquet
 
 from agent_fiap import config
 
-SUPPORTED_DATASET_EXTENSIONS = (".csv", ".parquet")
+SUPPORTED_DATASET_EXTENSIONS = (".csv", ".parquet", ".json", ".jsonl", ".txt")
 
 
 def list_dataset_files(data_dir: Path | None = None) -> list[Path]:
@@ -121,7 +121,18 @@ def read_dataset_dataframe(file_path: Path, max_rows: int | None = None) -> pd.D
             except Exception:
                 return pd.DataFrame()
 
-    # Tratamento para CSV
+    # Tratamento para JSON e JSONL
+    if file_path.suffix.lower() in (".json", ".jsonl"):
+        try:
+            try:
+                df = pd.read_json(file_path)
+            except ValueError:
+                df = pd.read_json(file_path, lines=True)
+            return df.head(max_rows) if max_rows else df
+        except Exception:
+            return pd.DataFrame()
+
+    # Tratamento para CSV e TXT (delimitado)
     try:
         return pd.read_csv(
             file_path,

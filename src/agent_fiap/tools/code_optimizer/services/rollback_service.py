@@ -11,17 +11,24 @@ def execute_pipeline_rollback(file_path: str = "pipeline/pipeline_prep.py") -> d
     """Restaura o arquivo a partir da cópia de segurança (.bak)."""
     try:
         resolved_path = resolve_pipeline_path(file_path, allow_write=True)
+        tmp_backup_path = config.PROJECT_ROOT / "pipeline" / "tmp" / "pipeline_prep_original.bak"
         backup_path = resolved_path.with_suffix(resolved_path.suffix + ".bak")
 
-        if not backup_path.is_file() or backup_path.stat().st_size == 0:
+        chosen_backup = None
+        if tmp_backup_path.is_file() and tmp_backup_path.stat().st_size > 0:
+            chosen_backup = tmp_backup_path
+        elif backup_path.is_file() and backup_path.stat().st_size > 0:
+            chosen_backup = backup_path
+
+        if chosen_backup is None:
             return ToolResult.fail(
-                summary=f"Erro de rollback: nenhum backup válido encontrado em '{backup_path.name}'.",
+                summary=f"Erro de rollback: nenhum backup válido encontrado em 'pipeline/tmp/pipeline_prep_original.bak'.",
                 operation="rollback_pipeline",
-                errors=f"Arquivo de backup '{backup_path.name}' não encontrado ou vazio.",
-                data={"file_path": file_path, "backup_file": str(backup_path.name)},
+                errors=f"Arquivo de backup não encontrado ou vazio.",
+                data={"file_path": file_path, "backup_file": str(tmp_backup_path.name)},
             ).model_dump()
 
-        backup_content = backup_path.read_text(encoding="utf-8")
+        backup_content = chosen_backup.read_text(encoding="utf-8")
         resolved_path.write_text(backup_content, encoding="utf-8")
 
         try:

@@ -18,12 +18,20 @@ def get_profiles_store_path() -> Path:
 
 
 def clean_snapshot_key(raw_path: str) -> str:
-    """Remove prefixos redundantes como 'baseline::' ou 'latest::' para manter chaves limpas e canônicas."""
+    """Remove prefixos e sufixos temporários para manter chaves limpas e canônicas."""
     clean = raw_path.strip()
     while clean.startswith("baseline::"):
         clean = clean[len("baseline::"):]
     while clean.startswith("latest::"):
         clean = clean[len("latest::"):]
+    if "pipeline_prep_original" in clean or "pipeline_prep_otimizado" in clean:
+        return "pipeline/pipeline_prep.py"
+    for suffix in (".candidate.py", ".candidate", ".opt.py", ".opt", ".bak"):
+        if clean.endswith(suffix):
+            clean = clean[:-len(suffix)]
+            if not clean.endswith(".py"):
+                clean += ".py"
+            break
     return clean
 
 
@@ -99,11 +107,20 @@ def run_pipeline_benchmark(
         baseline_resolved = resolve_pipeline_path(baseline_file_path, allow_write=False)
         if baseline_resolved.is_file() and baseline_resolved.stat().st_size > 0:
             baseline_file_exists = True
+            base_content = baseline_resolved.read_text(encoding="utf-8", errors="ignore")
+            is_slow_code = any(p in base_content for p in ("time.sleep", "iterrows()", "pd.concat", "for index in range(len(df))"))
+
             # Tenta carregar do cache para evitar re-executar loops lentos de 120s
             cached_base = load_profile_snapshot(f"baseline::{clean_cand_key}")
             if cached_base is not None and cached_base.execution_status in ("success", "timeout"):
-                baseline_profile = cached_base
-            else:
+                # Se o arquivo baseline possui gargalos comprovados (sleep, iterrows, concat em loop),
+                # um snapshot cached alegando sucesso em < 5.0s é inválido/desatualizado.
+                if is_slow_code and cached_base.execution_status == "success" and cached_base.duration_seconds < 5.0:
+                    cached_base = None
+                else:
+                    baseline_profile = cached_base
+
+            if baseline_profile is None:
                 baseline_profile = execute_and_profile_pipeline(baseline_resolved)
                 if baseline_profile is not None:
                     save_profile_snapshot(clean_cand_key, baseline_profile, stage="baseline")
@@ -216,6 +233,7 @@ def run_pipeline_benchmark(
         "summary": f"Benchmark concluído: Speedup de {speedup:+.2f}%, Equivalência: {'Aprovada' if results_equivalent else 'Reprovada'}.",
         "data": {
             "comparison": comparison.model_dump(),
+            "summary_comparison": comparison.model_dump(),
             "tabela_markdown": markdown_table,
             "baseline_status": baseline_profile.execution_status,
             "candidate_status": candidate_profile.execution_status,

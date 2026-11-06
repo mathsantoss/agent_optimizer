@@ -7,7 +7,10 @@ import pandas as pd
 
 from agent_fiap import config
 from agent_fiap.schemas import FeaturePreviewSummary
-from agent_fiap.tools.data_analyst.services.dataset_service import resolve_dataset_file
+from agent_fiap.tools.data_analyst.services.dataset_service import (
+    read_dataset_dataframe,
+    resolve_dataset_file,
+)
 from agent_fiap.tools.feature_engineer.services.pipeline_generator_service import (
     infer_candidate_features_from_schema,
 )
@@ -37,10 +40,9 @@ def preview_features_on_sample(
 
     # 1. Carrega amostra segura
     try:
-        if file_path.suffix.lower() == ".parquet":
-            df = pd.read_parquet(file_path).head(sample_rows).copy()
-        else:
-            df = pd.read_csv(file_path, nrows=sample_rows).copy()
+        df = read_dataset_dataframe(file_path, max_rows=sample_rows).copy()
+        if df.empty:
+            raise ValueError("Dataset vazio ou formato ilegível.")
     except Exception:
         return FeaturePreviewSummary(
             source_dataset=dataset_name,

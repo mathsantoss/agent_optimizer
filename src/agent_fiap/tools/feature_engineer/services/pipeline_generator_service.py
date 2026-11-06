@@ -248,8 +248,13 @@ def generate_pandas_pipeline_code(
         "    # 1. Ingestão segura dos dados",
         "    if str(data_path).endswith('.parquet'):",
         "        df = pd.read_parquet(data_path)",
+        "    elif str(data_path).endswith('.json') or str(data_path).endswith('.jsonl'):",
+        "        try:",
+        "            df = pd.read_json(data_path)",
+        "        except ValueError:",
+        "            df = pd.read_json(data_path, lines=True)",
         "    else:",
-        "        df = pd.read_csv(data_path)",
+        "        df = pd.read_csv(data_path, sep=None, engine='python')",
         "",
     ]
 
@@ -317,6 +322,8 @@ def generate_pyspark_pipeline_code(
         "    # 1. Ingestão distribuída",
         "    if data_path.endswith('.parquet'):",
         "        df = spark.read.parquet(data_path)",
+        "    elif data_path.endswith('.json') or data_path.endswith('.jsonl'):",
+        "        df = spark.read.json(data_path)",
         "    else:",
         "        df = spark.read.option('header', 'true').option('inferSchema', 'true').csv(data_path)",
         "",
@@ -343,7 +350,7 @@ def generate_pyspark_pipeline_code(
 def create_feature_pipeline_plan(
     dataset_name: str,
     framework: str = "pandas",
-    target_file_path: str = "pipeline/pipeline_features.py",
+    target_file_path: str = "pipeline/pipeline_prep.py",
     features: list[FeatureSpec] | list[dict[str, Any]] | None = None,
 ) -> FeaturePipelinePlan:
     """Monta o plano de construção de pipeline de features com código e especificações completas para qualquer dataset."""
