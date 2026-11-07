@@ -66,17 +66,3 @@ docker compose -f docker-compose.observability.yml down -v
 
 1. **Spans (Tempo)**: O `SanitizingADKSpanProcessor` remove automaticamente atributos brutos (`gcp.vertex.agent.llm_request`, `gcp.vertex.agent.llm_response`, `gcp.vertex.agent.tool_call_args`, `gcp.vertex.agent.tool_response`, prompts, respostas completas, *chain-of-thought* e chaves de API) antes da exportação OTLP, preservando metadados operacionais (agentes, ferramentas, durações, tokens, guardrails e erros).
 2. **Logs (Loki)**: O `SanitizingLogRecordProcessor` intercepta e descarta chunks de streaming internos emitidos pelo Google ADK (como `{"content": "<elided>"}`), mantendo o Loki limpo com logs estruturados de eventos de negócio e auditoria.
-
-## 7. Solução de Problemas Comuns no Grafana
-
-### Painel de Logs com Ícone de Alerta (`⚠ Logs` / Erro de Sintaxe 400)
-- **Causa**: O LogQL do Loki **não aceita** o operador `or` entre seletores de stream (ex: `{service_name="a"} or {job="b"}` é inválido). A sintaxe correta é usar um único seletor com regex: `{service_name=~".*kraken-ia.*"}`.
-- **Resolução**: O dashboard JSON foi atualizado para a versão 6 com a query corrigida. No navegador Grafana, recarregue a página com `Ctrl+F5` (ou clique no ícone de atualização no canto superior direito) para limpar a consulta antiga em cache.
-
-### Painel de Traces Distribuídos Vazio ("No data")
-- **Causa**: O Tempo pesquisa spans dentro da janela de tempo selecionada no topo direito (ex.: `Last 30 minutes`). Se nenhuma mensagem foi enviada ao Agent nesse intervalo, o resultado será vazio.
-- **Resolução**: 
-  1. No topo direito, altere o seletor de tempo para `Last 1 hour` ou `Last 6 hours`.
-  2. Envie uma mensagem para o agente no terminal do ADK (`adk web src`) para gerar spans recentes.
-  3. Você também pode acessar o menu lateral **Explore → Tempo** e pesquisar por Service Name `kraken-ia`.
-
