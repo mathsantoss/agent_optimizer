@@ -1,7 +1,7 @@
 services:
   otel-lgtm:
     image: grafana/otel-lgtm:latest
-    container_name: agent-fiap-otel-lgtm
+    container_name: kraken-ia-otel-lgtm
     ports:
       - "3000:3000"   # Grafana UI (admin / admin)
       - "4317:4317"   # OpenTelemetry OTLP gRPC receiver
@@ -14,8 +14,8 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ./observability/grafana/provisioning/dashboards/agent-fiap-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/agent-fiap-dashboards.yaml:ro
-      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards/agent-fiap:ro
+      - ./observability/grafana/provisioning/dashboards/kraken-ia-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/kraken-ia-dashboards.yaml:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards/kraken-ia:ro
       - lgtm_data:/data
     restart: unless-stopped
 

@@ -1,6 +1,6 @@
-# 🤖 Agent FIAP
+# 🐙 Kraken IA
 
-O **Agent FIAP** é um copiloto autônomo de **Análise de Dados e Engenharia de Pipelines**, inspirado na experiência do **Databricks Genie**.
+O **Kraken IA** é um copiloto autônomo de **Análise de Dados e Engenharia de Pipelines**, inspirado na experiência do **Databricks Genie**.
 
 Ele permite que cientistas, engenheiros e analistas interajam em linguagem natural para explorar bases de dados, responder perguntas de negócio com consultas SQL reais, investigar insights e criar, refatorar ou otimizar pipelines de dados e *Feature Engineering* diretamente no projeto — validando a execução do código de ponta a ponta.
 
@@ -12,13 +12,13 @@ O produto opera em uma arquitetura multi-agentes composta pelo **Orquestrador Ce
 
 ```mermaid
 flowchart TB
-    U(["👤 Usuário"]) --> O["🧠 Agent FIAP (Orquestrador)"]
+    U(["👤 Usuário"]) --> O["🧠 Kraken IA (Orquestrador)"]
     O -->|Análise, Estatística e SQL| A["📊 Agente Analista de Dados"]
     O -->|Engenharia de Features Pandas/PySpark| F["🔬 Agente Feature Engineer"]
     O -->|Diagnóstico AST, Otimização e Benchmark| C["⚙️ Agente Otimizador de Código"]
 ```
 
-- **Orquestrador (`agent_fiap`)**: Interpreta a intenção em linguagem natural e direciona as tarefas para o especialista correto.
+- **Orquestrador (`kraken_ia`)**: Interpreta a intenção em linguagem natural e direciona as tarefas para o especialista correto.
 - **Agente Analista (`data_analyst_agent`)**: Explora os datasets em `pipeline/dados/`, gera diagnósticos de qualidade, estatística descritiva, consulta o Dicionário de Dados e executa queries SQL analíticas em memória (`analyze_dataset`, `query_dataset`, `search_knowledge_base`).
 - **Agente Feature Engineer (`feature_engineer_agent`)**: Projeta pipelines completos e adiciona novas features para Machine Learning agnósticas a qualquer dataset, suportando nativamente Pandas e PySpark (`generate_feature_pipeline`, `add_feature_to_pipeline`, `preview_features`).
 - **Agente Otimizador (`code_optimizer_agent`)**: Realiza diagnóstico estático AST, propõe e aplica otimizações sob autorização explícita, gera backups automáticos e executa benchmarks comparativos de Antes vs Depois em tempo e memória (`inspect_pipeline`, `optimize_pipeline`, `validate_pipeline`).
@@ -95,8 +95,8 @@ Edite o `.env` conforme o modelo que deseja utilizar:
 Caso utilize o **Google Cloud Vertex AI** (Opção 1), as bibliotecas Python necessitam das credenciais locais do ADC. Execute no seu terminal (WSL):
 
 ```bash
-# 1. Ative seu ambiente conda (se aplicável)
-conda activate fiap
+# 1. Ative seu ambiente python (se aplicável)
+conda activate kraken-ia  # ou seu ambiente configurado
 
 # 2. Autentique as credenciais padrão de aplicação (ADC)
 gcloud auth application-default login
@@ -127,7 +127,7 @@ adk web src
 ```
 *(Ou `cd src && adk web`)*
 
-Abra no navegador em **`http://localhost:8000`** e selecione **`agent_fiap`**.
+Abra no navegador em **`http://localhost:8000`** e selecione **`kraken_ia`**.
 
 ---
 

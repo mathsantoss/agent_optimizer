@@ -1,5 +1,5 @@
 [project]
-name = "agent-fiap"
+name = "kraken-ia"
 version = "0.1.0"
 description = "Assistente inteligente de Ciência de Dados, Analytics e Engenharia de Pipelines com Google ADK e LiteLLM"
 readme = "README.md"
@@ -28,3 +28,7 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

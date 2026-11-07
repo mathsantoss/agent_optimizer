@@ -1,0 +1,15 @@
+apiVersion: 1
+
+providers:
+  - name: "Kraken IA Observability"
+    orgId: 1
+    folder: "Kraken IA"
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/kraken-ia
+      foldersFromFilesStructure: false
+
