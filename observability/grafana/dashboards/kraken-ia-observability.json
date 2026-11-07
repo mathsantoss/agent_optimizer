@@ -1435,21 +1435,26 @@
           },
           {
             "selected": false,
-            "text": "data_analyst_agent",
-            "value": "data_analyst_agent"
+            "text": "kraken_planner",
+            "value": "kraken_planner"
           },
           {
             "selected": false,
-            "text": "feature_engineer_agent",
-            "value": "feature_engineer_agent"
+            "text": "kraken_analyst",
+            "value": "kraken_analyst"
           },
           {
             "selected": false,
-            "text": "code_optimizer_agent",
-            "value": "code_optimizer_agent"
+            "text": "kraken_code",
+            "value": "kraken_code"
+          },
+          {
+            "selected": false,
+            "text": "kraken_optimizer",
+            "value": "kraken_optimizer"
           }
         ],
-        "query": "kraken_ia, data_analyst_agent, feature_engineer_agent, code_optimizer_agent",
+        "query": "kraken_ia, kraken_planner, kraken_analyst, kraken_code, kraken_optimizer",
         "type": "custom"
       },
       {

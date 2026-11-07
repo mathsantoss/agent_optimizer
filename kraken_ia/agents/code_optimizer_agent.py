@@ -1,4 +1,4 @@
-"""Definição do Code Optimizer Agent com suas 3 ferramentas públicas oficiais."""
+"""Definição do Kraken Optimizer Agent com suas 3 ferramentas públicas oficiais."""
 from typing import Any
 from google.adk.agents import Agent
 
@@ -16,13 +16,13 @@ from kraken_ia.tools.code_optimizer import (
 )
 
 
-def create_code_optimizer_agent(language_model: Any) -> Agent:
-    """Instancia o Agente Otimizador de Código com exatamente 3 ferramentas públicas orientadas a objetivos."""
+def create_kraken_optimizer_agent(language_model: Any) -> Agent:
+    """Instancia o Kraken Optimizer com exatamente 3 ferramentas públicas orientadas a otimização de código."""
     return Agent(
-        name="code_optimizer_agent",
+        name="kraken_optimizer",
         model=language_model,
         description=(
-            "Agente especialista em diagnóstico estático (AST), proposta e aplicação de otimizações com autorização explícita, "
+            "Kraken Optimizer — Agente especialista em diagnóstico estático (AST), proposta e aplicação de otimizações com autorização explícita, "
             "backup (.bak), testes automatizados e validação comparativa de benchmarks (Antes vs Depois) e equivalência funcional."
         ),
         static_instruction=CODE_OPTIMIZER_AGENT_INSTRUCTION,

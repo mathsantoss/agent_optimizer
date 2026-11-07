@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Carrega variáveis do arquivo .env na raiz do repositório
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(REPOSITORY_ROOT / ".env", override=False)
 
 # Diretórios do projeto
@@ -14,7 +14,7 @@ KNOWLEDGE_DIR = DATA_DIR / "conhecimento"
 LOGS_DIR = (PROJECT_ROOT / os.getenv("KRAKEN_IA_LOGS_DIR", "logs")).resolve()
 
 # Diretórios autorizados para leitura e escrita pelo agente
-READ_DIRS = [PROJECT_ROOT / directory for directory in ("pipeline", "src", "tests", "docs", "logs")]
+READ_DIRS = [PROJECT_ROOT / directory for directory in ("pipeline", "kraken_ia", "tests", "docs", "logs")]
 WRITE_DIRS = [PROJECT_ROOT / directory for directory in ("pipeline", "tests")]
 
 # Configurações do Google Cloud / Vertex AI (autenticação via ADC gcloud)

@@ -22,3 +22,8 @@ from kraken_ia.schemas.pipeline import (
     PipelineBenchmarkComparison,
     PipelineProfileResult,
 )
+from kraken_ia.schemas.plan import (
+    ExecutionPlan,
+    PlanStep,
+    StepStatus,
+)

@@ -1,6 +1,6 @@
 # 🛡️ Guardrails do Kraken IA: Analista de Dados e Otimizador de Código
 
-Este documento detalha a arquitetura de **Guardrails (Barreiras de Segurança, Qualidade e Confiabilidade)** implementada no **Kraken IA**, cobrindo o orquestrador (`kraken_ia`) e seus dois especialistas (`data_analyst_agent` e `code_optimizer_agent`).
+Este documento detalha a arquitetura de **Guardrails (Barreiras de Segurança, Qualidade e Confiabilidade)** implementada no **Kraken IA**, cobrindo o orquestrador (`kraken_ia`), o planejador (`kraken_planner`) e seus especialistas (`kraken_analyst`, `kraken_code` e `kraken_optimizer`).
 
 Como o agente possui capacidade de **consultar dados reais**, **executar SQL** e **reescrever/executar código Python em disco**, os guardrails combinam **validações determinísticas no código** (`AST`, `SQLGlot`, hashes SHA-256) e **callbacks nativos do Google ADK** (`before_model_callback`, `after_model_callback`, `before_tool_callback`, `after_tool_callback`).
 
@@ -29,19 +29,19 @@ flowchart TB
 
 ## 2. Guardrails Implementados no Projeto
 
-### 2.1. Camada de Entrada, Saída e Orquestração (`src/kraken_ia/guardrails.py`)
+### 2.1. Camada de Entrada, Saída e Orquestração (`kraken_ia/guardrails.py`)
 
 | Guardrail | Função / Callback | Como Funciona |
 |---|---|---|
 | **Bloqueio de Prompt Injection Direto** | `check_prompt_injection` / `before_model_guardrail` | Inspeciona a mensagem do usuário antes do LLM para bloquear tentativas de sobrescrever regras do sistema (*"ignore previous instructions"*, *"desative os guardrails"*, `<system>`). |
 | **Sanitização de Alfabetos Estrangeiros e Fake Tool Calls** | `sanitize_model_text` / `after_model_guardrail` | Remove automaticamente vazamentos de caracteres em alfabetos CJK/Tailandês (`[\u4e00-\u9fff\u0e00-\u0e7f]`) e tags `<tool_call>` em texto puro. |
 | **Circuit Breaker de Gravação (`save_file`)** | `before_tool_guardrail` | Limita a no máximo `5` chamadas a `save_file` na mesma sessão sem rollback, evitando que o agente entre em loop infinito tentando reeditar um script com falha. |
-| **Prevenção de Loop entre Agentes (`transfer_to_agent`)** | `before_tool_guardrail` | Limita transferências consecutivas entre `data_analyst_agent` e `code_optimizer_agent` (`MAX_AGENT_TRANSFERS = 4`). |
+| **Prevenção de Loop entre Agentes (`transfer_to_agent`)** | `before_tool_guardrail` | Limita transferências consecutivas entre sub-agentes (`MAX_AGENT_TRANSFERS = 10`). |
 | **Proteção contra Indirect Prompt Injection** | `sanitize_untrusted_data_text` / `after_tool_guardrail` | Sanitiza textos vindos de células de CSV/Parquet ou retornos de ferramentas que contenham comandos maliciosos embutidos nos dados e trunca células longas (> 300 chars). |
 
 ---
 
-### 2.2. Guardrails do Agente Analista de Dados (`src/kraken_ia/tools/data_analyst/`)
+### 2.2. Guardrails do Agente Analista de Dados (`kraken_ia/tools/data_analyst/`)
 
 | Guardrail | Função | Risco Mitigado |
 |---|---|---|
@@ -53,7 +53,7 @@ flowchart TB
 
 ---
 
-### 2.3. Guardrails do Agente Otimizador de Código (`src/kraken_ia/tools/code_optimizer/`)
+### 2.3. Guardrails do Agente Otimizador de Código (`kraken_ia/tools/code_optimizer/`)
 
 | Guardrail | Função | Risco Mitigado |
 |---|---|---|
@@ -99,7 +99,7 @@ sequenceDiagram
 
 ## 4. Arquitetura de Logs, Métricas e Auditoria (`logs/`)
 
-Todas as etapas de análise de dados, validação de código, profiling, comparações de equivalência (Antes vs Depois) e acionamentos de guardrails são gravadas automaticamente pelo módulo `src/kraken_ia/audit_logger.py` dentro da pasta **`logs/`** na raiz do repositório:
+Todas as etapas de análise de dados, validação de código, profiling, comparações de equivalência (Antes vs Depois) e acionamentos de guardrails são gravadas automaticamente pelo módulo `kraken_ia/audit_logger.py` dentro da pasta **`logs/`** na raiz do repositório:
 
 | Arquivo em `logs/` | Formato | Finalidade |
 |---|---|---|

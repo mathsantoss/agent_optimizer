@@ -1,21 +1,26 @@
-"""Testes automatizados para o Kraken IA e a nova arquitetura de ferramentas (3 por especialista)."""
+"""Testes automatizados para o Kraken IA e a arquitetura multi-agentes com Kraken Planner."""
 import json
 from pathlib import Path
 from kraken_ia.agent import (
-    code_optimizer_agent,
-    data_analyst_agent,
-    feature_engineer_agent,
+    kraken_analyst_agent,
+    kraken_code_agent,
+    kraken_optimizer_agent,
+    kraken_planner_agent,
     root_agent,
 )
 from kraken_ia.tools import (
     add_feature_to_pipeline,
     analyze_dataset,
+    create_execution_plan,
     generate_feature_pipeline,
+    get_plan_status,
     inspect_pipeline,
     optimize_pipeline,
     preview_features,
     query_dataset,
+    replan_execution,
     search_knowledge_base,
+    update_plan_step,
     validate_pipeline,
 )
 from kraken_ia.tools.code_optimizer.services.benchmark_service import run_pipeline_benchmark
@@ -29,33 +34,41 @@ from kraken_ia.tools.data_analyst.services.dataset_service import (
 
 
 def test_multi_agent_structure():
-    """Valida a separação entre o Orquestrador e os 3 Subagentes com exatamente 3 ferramentas cada."""
+    """Valida a separação entre o Orquestrador (Kraken IA), o Planner e os 3 Especialistas."""
     assert root_agent.name == "kraken_ia"
     sub_agent_names = [agent.name for agent in root_agent.sub_agents]
-    assert "data_analyst_agent" in sub_agent_names
-    assert "feature_engineer_agent" in sub_agent_names
-    assert "code_optimizer_agent" in sub_agent_names
+    assert "kraken_planner" in sub_agent_names
+    assert "kraken_analyst" in sub_agent_names
+    assert "kraken_code" in sub_agent_names
+    assert "kraken_optimizer" in sub_agent_names
     assert len(root_agent.tools) == 0, "O orquestrador não deve possuir ferramentas diretas de baixo nível."
 
-    # Ferramentas públicas do Agente Analista de Dados (exatamente 3)
-    analyst_tool_names = sorted(tool.__name__ for tool in data_analyst_agent.tools)
-    expected_analyst_tools = sorted(["analyze_dataset", "query_dataset", "search_knowledge_base"])
-    assert analyst_tool_names == expected_analyst_tools, (
-        f"data_analyst_agent deve expor exatamente {expected_analyst_tools}, obteve {analyst_tool_names}"
+    # Ferramentas públicas do Kraken Planner (exatamente 4 de planejamento/coordenação)
+    planner_tool_names = sorted(tool.__name__ for tool in kraken_planner_agent.tools)
+    expected_planner_tools = sorted(["create_execution_plan", "get_plan_status", "replan_execution", "update_plan_step"])
+    assert planner_tool_names == expected_planner_tools, (
+        f"kraken_planner deve expor exatamente {expected_planner_tools}, obteve {planner_tool_names}"
     )
 
-    # Ferramentas públicas do Agente Engenheiro de Features (exatamente 3)
-    feature_tool_names = sorted(tool.__name__ for tool in feature_engineer_agent.tools)
+    # Ferramentas públicas do Agente Analista de Dados (exatamente 3)
+    analyst_tool_names = sorted(tool.__name__ for tool in kraken_analyst_agent.tools)
+    expected_analyst_tools = sorted(["analyze_dataset", "query_dataset", "search_knowledge_base"])
+    assert analyst_tool_names == expected_analyst_tools, (
+        f"kraken_analyst deve expor exatamente {expected_analyst_tools}, obteve {analyst_tool_names}"
+    )
+
+    # Ferramentas públicas do Agente Kraken Code (exatamente 3)
+    feature_tool_names = sorted(tool.__name__ for tool in kraken_code_agent.tools)
     expected_feature_tools = sorted(["add_feature_to_pipeline", "generate_feature_pipeline", "preview_features"])
     assert feature_tool_names == expected_feature_tools, (
-        f"feature_engineer_agent deve expor exatamente {expected_feature_tools}, obteve {feature_tool_names}"
+        f"kraken_code deve expor exatamente {expected_feature_tools}, obteve {feature_tool_names}"
     )
 
     # Ferramentas públicas do Agente Especialista em Otimização de Código (exatamente 3)
-    optimizer_tool_names = sorted(tool.__name__ for tool in code_optimizer_agent.tools)
+    optimizer_tool_names = sorted(tool.__name__ for tool in kraken_optimizer_agent.tools)
     expected_optimizer_tools = sorted(["inspect_pipeline", "optimize_pipeline", "validate_pipeline"])
     assert optimizer_tool_names == expected_optimizer_tools, (
-        f"code_optimizer_agent deve expor exatamente {expected_optimizer_tools}, obteve {optimizer_tool_names}"
+        f"kraken_optimizer deve expor exatamente {expected_optimizer_tools}, obteve {optimizer_tool_names}"
     )
 
 
@@ -513,3 +526,153 @@ def test_guardrails_callbacks_and_sanitization():
     )
     assert blocked is not None
     assert "CIRCUIT BREAKER" in blocked["result"]
+
+
+# ==============================================================================
+# Testes das 4 Ferramentas Públicas do Kraken Planner (Ciclo de Vida & Replanejamento)
+# ==============================================================================
+
+def test_planner_plan_lifecycle_and_dependencies():
+    """Valida a criação de planos estruturados, avanço sequencial e verificação de dependências."""
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+    global_plan_manager.reset_plan()
+
+    # 1. Criação do plano
+    steps = [
+        {
+            "step_id": "1",
+            "title": "Explorar Dataset de Vendas",
+            "agent": "kraken_analyst",
+            "description": "Examinar colunas, dados nulos e estatísticas das vendas.",
+            "dependencies": [],
+        },
+        {
+            "step_id": "2",
+            "title": "Gerar Features Temporais e Financeiras",
+            "agent": "kraken_code",
+            "description": "Criar total_faturamento e extrair mes_venda.",
+            "dependencies": ["1"],
+        },
+        {
+            "step_id": "3",
+            "title": "Otimizar Código do Pipeline e Medir Benchmark",
+            "agent": "kraken_optimizer",
+            "description": "Refatorar gargalos e comparar Antes vs Depois.",
+            "dependencies": ["2"],
+        },
+    ]
+
+    res = create_execution_plan(
+        objective="Construir e otimizar pipeline de features de vendas de ponta a ponta",
+        steps=steps,
+        success_criteria="Pipeline executado sem erros com ganho de speedup comprovado em benchmark.",
+    )
+    assert res["status"] == "success"
+    assert res["total_steps"] == 3
+    assert res["current_step_id"] == "1"
+    assert "### 🗺️ Plano de Execução Estruturado" in res["markdown"]
+
+    # 2. Inspeciona status inicial
+    status_res = get_plan_status()
+    assert status_res["status"] == "success"
+    assert status_res["current_step_id"] == "1"
+
+    # 3. Avança Etapa 1 para 'in_progress' e depois 'completed'
+    up1 = update_plan_step(step_id="1", status="in_progress")
+    assert up1["step_status"] == "in_progress"
+
+    done1 = update_plan_step(
+        step_id="1",
+        status="completed",
+        result_summary="Dataset avaliado: 44.500 linhas sem nulos, colunas numéricas identificadas.",
+    )
+    assert done1["step_status"] == "completed"
+    assert done1["next_step_id"] == "2"  # Etapa 2 liberada pois dependia apenas da 1
+    assert done1["next_agent"] == "kraken_code"
+
+    # 4. Avança Etapa 2 para 'completed'
+    done2 = update_plan_step(
+        step_id="2",
+        status="completed",
+        result_summary="Features 'total_faturamento' e 'mes_venda' projetadas com sucesso.",
+    )
+    assert done2["step_status"] == "completed"
+    assert done2["next_step_id"] == "3"  # Etapa 3 liberada
+    assert done2["next_agent"] == "kraken_optimizer"
+
+    # 5. Avança Etapa 3 para 'completed'
+    done3 = update_plan_step(
+        step_id="3",
+        status="completed",
+        result_summary="Código vetorizado. Benchmark obteve 3.5x de speedup e redução de 40% de memória.",
+    )
+    assert done3["step_status"] == "completed"
+    assert done3["plan_status"] == "completed"
+    assert done3["next_step_id"] is None
+
+
+def test_planner_replanning_on_failure():
+    """Valida o mecanismo de replanejamento quando uma etapa falha ou ocorrem imprevistos."""
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+    global_plan_manager.reset_plan()
+
+    # Cria plano inicial
+    steps = [
+        {
+            "step_id": "1",
+            "title": "Verificar coluna de churn",
+            "agent": "kraken_analyst",
+            "description": "Buscar coluna churn_status no dataset.",
+            "dependencies": [],
+        },
+        {
+            "step_id": "2",
+            "title": "Projetar modelo supervisionado",
+            "agent": "kraken_code",
+            "description": "Criar features com base em churn_status.",
+            "dependencies": ["1"],
+        },
+    ]
+
+    create_execution_plan(
+        objective="Desenvolver pipeline preditivo de churn",
+        steps=steps,
+        success_criteria="Modelo de churn treinado.",
+    )
+
+    # Simula falha na etapa 1 (coluna ausente)
+    fail_res = update_plan_step(
+        step_id="1",
+        status="failed",
+        result_summary="Coluna 'churn_status' não encontrada no dataset de vendas.",
+    )
+    assert fail_res["plan_status"] == "failed"
+
+    # Aciona replanejamento adaptativo
+    revised_steps = [
+        {
+            "step_id": "2",
+            "title": "Definir Churn Proxy via Inatividade de Compras",
+            "agent": "kraken_analyst",
+            "description": "Calcular dias desde última compra via SQL como target de churn heurístico.",
+            "dependencies": [],
+        },
+        {
+            "step_id": "3",
+            "title": "Projetar Features baseadas no Churn Proxy",
+            "agent": "kraken_code",
+            "description": "Construir variáveis temporais usando a nova definição de inatividade.",
+            "dependencies": ["2"],
+        },
+    ]
+
+    replan_res = replan_execution(
+        reason="Dataset não possui target explícito. Adotada estratégia de target proxy por inatividade.",
+        failed_step_id="1",
+        revised_steps=revised_steps,
+    )
+
+    assert replan_res["status"] == "replanned"
+    assert replan_res["revision"] == 2
+    assert "target proxy" in replan_res["replan_reason"]
+    assert "Definir Churn Proxy" in replan_res["markdown"]

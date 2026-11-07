@@ -8,20 +8,25 @@ Ele permite que cientistas, engenheiros e analistas interajam em linguagem natur
 
 ## 🏗️ Arquitetura
 
-O produto opera em uma arquitetura multi-agentes composta pelo **Orquestrador Central** e **3 Especialistas**:
+O produto opera em uma arquitetura multi-agentes composta pelo **Orquestrador Central**, o **Agente de Planejamento** e **3 Especialistas Técnicos**:
 
 ```mermaid
 flowchart TB
     U(["👤 Usuário"]) --> O["🧠 Kraken IA (Orquestrador)"]
-    O -->|Análise, Estatística e SQL| A["📊 Agente Analista de Dados"]
-    O -->|Engenharia de Features Pandas/PySpark| F["🔬 Agente Feature Engineer"]
-    O -->|Diagnóstico AST, Otimização e Benchmark| C["⚙️ Agente Otimizador de Código"]
+    O -->|Solicitações Complexas / Decomposição| P["🗺️ Kraken Planner"]
+    P -->|Etapas Analíticas| A["📊 Kraken Analyst"]
+    P -->|Etapas de Features e Código| F["🔬 Kraken Code"]
+    P -->|Etapas de Otimização e Benchmark| C["⚙️ Kraken Optimizer"]
+    O -->|Consultas Analíticas Diretas| A
+    O -->|Features Diretas| F
+    O -->|Otimização Direta| C
 ```
 
-- **Orquestrador (`kraken_ia`)**: Interpreta a intenção em linguagem natural e direciona as tarefas para o especialista correto.
-- **Agente Analista (`data_analyst_agent`)**: Explora os datasets em `pipeline/dados/`, gera diagnósticos de qualidade, estatística descritiva, consulta o Dicionário de Dados e executa queries SQL analíticas em memória (`analyze_dataset`, `query_dataset`, `search_knowledge_base`).
-- **Agente Feature Engineer (`feature_engineer_agent`)**: Projeta pipelines completos e adiciona novas features para Machine Learning agnósticas a qualquer dataset, suportando nativamente Pandas e PySpark (`generate_feature_pipeline`, `add_feature_to_pipeline`, `preview_features`).
-- **Agente Otimizador (`code_optimizer_agent`)**: Realiza diagnóstico estático AST, propõe e aplica otimizações sob autorização explícita, gera backups automáticos e executa benchmarks comparativos de Antes vs Depois em tempo e memória (`inspect_pipeline`, `optimize_pipeline`, `validate_pipeline`).
+- **Kraken IA (`kraken_ia`)**: Orquestrador principal. Interpreta a intenção do usuário e direciona solicitações complexas para o Planner ou demandas pontuais diretamente para o especialista adequado.
+- **Kraken Planner (`kraken_planner`)**: Agente de planejamento estratégico. Decompõe solicitações complexas em etapas estruturadas com dependências e critérios de sucesso, coordena os especialistas em sequência e realiza replanejamento automático em caso de falhas ou imprevistos (`create_execution_plan`, `get_plan_status`, `update_plan_step`, `replan_execution`).
+- **Kraken Analyst (`kraken_analyst`)**: Explora os datasets em `pipeline/dados/`, gera diagnósticos de qualidade, estatística descritiva, consulta o Dicionário de Dados e executa queries SQL analíticas em memória (`analyze_dataset`, `query_dataset`, `search_knowledge_base`).
+- **Kraken Code (`kraken_code`)**: Projeta pipelines completos e adiciona novas features para Machine Learning agnósticas a qualquer dataset, suportando nativamente Pandas e PySpark (`generate_feature_pipeline`, `add_feature_to_pipeline`, `preview_features`).
+- **Kraken Optimizer (`kraken_optimizer`)**: Realiza diagnóstico estático AST, propõe e aplica otimizações sob autorização explícita, gera backups automáticos e executa benchmarks comparativos de Antes vs Depois em tempo e memória (`inspect_pipeline`, `optimize_pipeline`, `validate_pipeline`).
 
 ---
 
@@ -123,11 +128,11 @@ pip install -r requirements.txt
 Suba o servidor do Google ADK:
 ```bash
 # A partir da raiz do repositório:
-adk web src
+adk web .
 ```
-*(Ou `cd src && adk web`)*
+*(Ou simplesmente `adk web`)*
 
-Abra no navegador em **`http://localhost:8000`** e selecione **`kraken_ia`**.
+Abra no navegador em **`http://localhost:8000`** e o agente selecionado será diretamente o **`kraken_ia`**.
 
 ---
 

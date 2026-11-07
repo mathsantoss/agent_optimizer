@@ -29,19 +29,19 @@ Os traces distribuídos do Google ADK e LiteLLM são exportados para o Tempo via
 2. **Menu Explore → Tempo (Modo Search)**:
    - **Service Name**: `kraken-ia`
    - **Span Name**: `execute_tool`, `call_llm`, `agent_run`, `guardrail.*`
-   - **Tags**: filtre por `status = error`, `tool.name = profile_pipeline`, `agent.name = code_optimizer_agent`, etc.
+   - **Tags**: filtre por `status = error`, `tool.name = profile_pipeline`, `agent.name = kraken_optimizer`, etc.
 3. **Menu Explore → Tempo (Modo TraceQL)**:
    - Traces com erro ou timeout: `{ span.status = error }`
    - Traces de uma ferramenta específica: `{ span.tool.name = "profile_pipeline" }`
    - Traces com latência superior a 2 segundos: `{ duration > 2s }`
-   - Traces de delegação: `{ span.agent.delegated_to = "data_analyst_agent" }`
+   - Traces de delegação: `{ span.agent.delegated_to = "kraken_analyst" }`
 4. **Correlação Trace ↔ Logs**: Ao inspecionar qualquer span no Tempo, clique no botão **"Related logs"** para ver imediatamente os logs do Loki correspondentes àquela exata execução.
 
 ## 4. Executar o Kraken IA com telemetria ativa
 
 ```bash
 # Interface Web do Google ADK
-adk web src
+adk web .
 ```
 
 Variáveis opcionais de ambiente (já possuem valores padrão locais):

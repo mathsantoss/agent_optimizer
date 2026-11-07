@@ -17,7 +17,7 @@ from kraken_ia.audit_logger import record_guardrail_event
 
 # Limites operacionais de Circuit Breaker
 MAX_SAVE_FILE_ATTEMPTS = 5
-MAX_AGENT_TRANSFERS = 4
+MAX_AGENT_TRANSFERS = 10
 MAX_CELL_STRING_LENGTH = 300
 
 # Padrões de caracteres de alfabetos estrangeiros indesejados (vazamento de tokens CJK/Tailandês em modelos locais)

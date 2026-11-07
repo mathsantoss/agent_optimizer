@@ -11,7 +11,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from kraken_ia.agent import code_optimizer_agent, data_analyst_agent, root_agent
+from kraken_ia.agent import kraken_analyst_agent, kraken_optimizer_agent, root_agent
 import kraken_ia.observability as obs
 
 
@@ -90,7 +90,7 @@ def test_sanitizing_span_processor_redacts_prompts_and_extracts_safe_metadata():
                 }
             ),
         )
-        span.set_attribute("gcp.vertex.agent.tool_call_args", '{"agent_name": "data_analyst_agent", "secret": "123"}')
+        span.set_attribute("gcp.vertex.agent.tool_call_args", '{"agent_name": "kraken_analyst", "secret": "123"}')
         span.set_attribute("thinking", "cadeia de pensamento confidencial")
         span.set_attribute("api_key", "sk-secret-key")
 
@@ -110,7 +110,7 @@ def test_sanitizing_span_processor_redacts_prompts_and_extracts_safe_metadata():
     assert exported_attrs.get("gen_ai.usage.output_tokens") == 45
     assert exported_attrs.get("gen_ai.usage.total_tokens") == 165
     assert exported_attrs.get("gen_ai.response.model") == "ollama_chat/qwen3.6:35b-a3b"
-    assert exported_attrs.get("agent.delegated_to") == "data_analyst_agent"
+    assert exported_attrs.get("agent.delegated_to") == "kraken_analyst"
     assert exported_attrs.get("service.name") == "kraken-ia"
 
 
@@ -121,38 +121,38 @@ def test_agent_callbacks_delegation_tools_guardrails_and_metrics():
     meter = meter_provider.get_meter("test.kraken_ia")
     obs._init_metrics(meter)
 
-    # Garante que os 3 agentes foram instrumentados
+    # Garante que os agentes foram instrumentados
     obs.setup_observability(root_agent)
     assert id(root_agent) in obs._INSTRUMENTED_AGENTS
-    assert id(data_analyst_agent) in obs._INSTRUMENTED_AGENTS
-    assert id(code_optimizer_agent) in obs._INSTRUMENTED_AGENTS
+    assert id(kraken_analyst_agent) in obs._INSTRUMENTED_AGENTS
+    assert id(kraken_optimizer_agent) in obs._INSTRUMENTED_AGENTS
 
-    # 1. Simula ciclo de execução do agente principal e delegação para data_analyst_agent
+    # 1. Simula ciclo de execução do agente principal e delegação para kraken_analyst
     dummy_ctx = SimpleNamespace(agent_name="kraken_ia")
     root_agent.before_agent_callback(callback_context=dummy_ctx)
 
     transfer_tool = SimpleNamespace(name="transfer_to_agent")
     root_agent.before_tool_callback(
         tool=transfer_tool,
-        args={"agent_name": "data_analyst_agent"},
+        args={"agent_name": "kraken_analyst"},
         tool_context=None,
     )
     root_agent.after_tool_callback(
         tool=transfer_tool,
-        args={"agent_name": "data_analyst_agent"},
+        args={"agent_name": "kraken_analyst"},
         tool_context=None,
         tool_response={"result": "ok"},
     )
     root_agent.after_agent_callback(callback_context=dummy_ctx)
 
-    # 2. Simula bloqueio de guardrail de SQL proibido no data_analyst_agent
+    # 2. Simula bloqueio de guardrail de SQL proibido no kraken_analyst_agent
     sql_tool = SimpleNamespace(name="query_dataset")
-    data_analyst_agent.before_tool_callback(
+    kraken_analyst_agent.before_tool_callback(
         tool=sql_tool,
         args={"query": "DROP TABLE pedidos"},
         tool_context=None,
     )
-    data_analyst_agent.after_tool_callback(
+    kraken_analyst_agent.after_tool_callback(
         tool=sql_tool,
         args={"query": "DROP TABLE pedidos"},
         tool_context=None,

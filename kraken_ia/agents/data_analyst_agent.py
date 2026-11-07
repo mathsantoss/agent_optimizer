@@ -1,4 +1,4 @@
-"""Definição do Data Analyst Agent com suas 3 ferramentas públicas oficiais."""
+"""Definição do Kraken Analyst Agent com suas 3 ferramentas públicas oficiais."""
 from typing import Any
 from google.adk.agents import Agent
 
@@ -16,13 +16,13 @@ from kraken_ia.tools.data_analyst import (
 )
 
 
-def create_data_analyst_agent(language_model: Any) -> Agent:
-    """Instancia o Agente Analista de Dados com exatamente 3 ferramentas públicas orientadas a objetivos."""
+def create_kraken_analyst_agent(language_model: Any) -> Agent:
+    """Instancia o Kraken Analyst com exatamente 3 ferramentas públicas orientadas a objetivos."""
     return Agent(
-        name="data_analyst_agent",
+        name="kraken_analyst",
         model=language_model,
         description=(
-            "Agente Analista de Dados especialista em análise exploratória, verificação de qualidade, "
+            "Kraken Analyst — Agente Analista de Dados especialista em análise exploratória, verificação de qualidade, "
             "resumos estatísticos descritivos, consultas SQL analíticas e consulta ao Dicionário de Dados."
         ),
         static_instruction=ANALYST_AGENT_INSTRUCTION,
@@ -36,3 +36,4 @@ def create_data_analyst_agent(language_model: Any) -> Agent:
             search_knowledge_base,
         ],
     )
+

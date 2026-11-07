@@ -1,4 +1,4 @@
-"""Definição do Feature Engineer Agent com suas 3 ferramentas públicas oficiais."""
+"""Definição do Kraken Code Agent (Feature Engineering e Pipelines) com suas 3 ferramentas públicas oficiais."""
 from typing import Any
 from google.adk.agents import Agent
 
@@ -16,15 +16,15 @@ from kraken_ia.tools.feature_engineer import (
 )
 
 
-def create_feature_engineer_agent(language_model: Any) -> Agent:
-    """Instancia o Agente Especialista em Feature Engineering com 3 ferramentas públicas orientadas a objetivos."""
+def create_kraken_code_agent(language_model: Any) -> Agent:
+    """Instancia o Kraken Code com 3 ferramentas públicas orientadas a Engenharia de Features."""
     return Agent(
-        name="feature_engineer_agent",
+        name="kraken_code",
         model=language_model,
         description=(
-            "Agente especialista em Engenharia de Features para Machine Learning. Cria pipelines completos de features "
-            "ou inclui novas transformações em scripts existentes, com suporte completo em Pandas e PySpark, "
-            "prévia em amostra e prevenção estrita de data leakage."
+            "Kraken Code — Agente especialista em Engenharia de Features e Pipelines para Machine Learning. "
+            "Cria pipelines completos de features ou inclui novas transformações em scripts existentes, "
+            "com suporte completo em Pandas e PySpark, prévia em amostra e prevenção estrita de data leakage."
         ),
         static_instruction=FEATURE_ENGINEER_AGENT_INSTRUCTION,
         before_model_callback=before_model_guardrail,
