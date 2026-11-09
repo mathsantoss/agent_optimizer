@@ -848,10 +848,23 @@ def _instrument_single_agent(agent: Any) -> None:
 
     agent.before_agent_callback = wrapped_before_agent
     agent.after_agent_callback = wrapped_after_agent
-    agent.before_model_callback = wrapped_before_model
-    agent.after_model_callback = wrapped_after_model
-    agent.before_tool_callback = wrapped_before_tool
-    agent.after_tool_callback = wrapped_after_tool
+    if hasattr(agent, "before_model_callback"):
+        agent.before_model_callback = wrapped_before_model
+    if hasattr(agent, "after_model_callback"):
+        agent.after_model_callback = wrapped_after_model
+    if hasattr(agent, "before_tool_callback"):
+        agent.before_tool_callback = wrapped_before_tool
+    if hasattr(agent, "after_tool_callback"):
+        agent.after_tool_callback = wrapped_after_tool
+
+
+def _instrument_agent_tree(agent: Any) -> None:
+    """Instrumenta recursivamente um agente e toda a sua sub-árvore de `sub_agents`."""
+    if agent is None:
+        return
+    _instrument_single_agent(agent)
+    for sub_agent in getattr(agent, "sub_agents", []) or []:
+        _instrument_agent_tree(sub_agent)
 
 
 def setup_observability(root_agent: Any = None) -> None:
@@ -935,11 +948,9 @@ def setup_observability(root_agent: Any = None) -> None:
         atexit.register(flush_observability)
         _INITIALIZED = True
 
-    # 5. Instrumenta de forma modular o root_agent e seus sub-agentes
+    # 5. Instrumenta de forma modular e recursiva o root_agent e toda a árvore de sub-agentes
     if root_agent is not None:
-        _instrument_single_agent(root_agent)
-        for sub_agent in getattr(root_agent, "sub_agents", []) or []:
-            _instrument_single_agent(sub_agent)
+        _instrument_agent_tree(root_agent)
 
 
 def flush_observability(timeout_millis: int = 5000) -> None:

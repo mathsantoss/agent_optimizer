@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(REPOSITORY_ROOT / ".env", override=False)
 
+os.environ.setdefault("ADK_SUPPRESS_GEMINI_LITELLM_WARNINGS", "true")
+
 # Diretórios do projeto
 PROJECT_ROOT = Path(os.getenv("KRAKEN_IA_ROOT", REPOSITORY_ROOT)).resolve()
 DATA_DIR = (PROJECT_ROOT / os.getenv("KRAKEN_IA_DATA_DIR", "pipeline/dados")).resolve()

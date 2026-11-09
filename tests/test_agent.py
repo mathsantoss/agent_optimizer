@@ -4,10 +4,14 @@ from pathlib import Path
 from kraken_ia.agent import (
     kraken_analyst_agent,
     kraken_code_agent,
+    kraken_coordinator_agent,
     kraken_optimizer_agent,
+    kraken_planner,
     kraken_planner_agent,
+    kraken_validator_agent,
     root_agent,
 )
+from kraken_ia.agents.planner_agent import KrakenPlanner
 from kraken_ia.tools import (
     add_feature_to_pipeline,
     analyze_dataset,
@@ -34,16 +38,30 @@ from kraken_ia.tools.data_analyst.services.dataset_service import (
 
 
 def test_multi_agent_structure():
-    """Valida a separação entre o Orquestrador (Kraken IA), o Planner e os 3 Especialistas."""
+    """Valida a arquitetura com Planejador Híbrido (KrakenPlanner) e Coordenador sem bypass direto para especialistas."""
     assert root_agent.name == "kraken_ia"
-    sub_agent_names = [agent.name for agent in root_agent.sub_agents]
-    assert "kraken_planner" in sub_agent_names
-    assert "kraken_analyst" in sub_agent_names
-    assert "kraken_code" in sub_agent_names
-    assert "kraken_optimizer" in sub_agent_names
+    root_sub_names = [agent.name for agent in root_agent.sub_agents]
+    assert root_sub_names == ["kraken_coordinator"], (
+        "Os especialistas NÃO devem estar em root_agent.sub_agents para impedir bypass do Planner e Coordinator."
+    )
+    assert "kraken_analyst" not in root_sub_names
+    assert "kraken_code" not in root_sub_names
+    assert "kraken_optimizer" not in root_sub_names
     assert len(root_agent.tools) == 0, "O orquestrador não deve possuir ferramentas diretas de baixo nível."
 
-    # Ferramentas públicas do Kraken Planner (exatamente 4 de planejamento/coordenação)
+    assert isinstance(kraken_planner, KrakenPlanner)
+    assert kraken_planner.name == "kraken_planner"
+    assert root_agent.planner is kraken_planner
+    assert kraken_coordinator_agent.planner is kraken_planner
+
+    coordinator_sub_names = [agent.name for agent in kraken_coordinator_agent.sub_agents]
+    assert "kraken_analyst" in coordinator_sub_names
+    assert "kraken_code" in coordinator_sub_names
+    assert "kraken_optimizer" in coordinator_sub_names
+    assert "kraken_validator" in coordinator_sub_names
+    assert kraken_validator_agent.name == "kraken_validator"
+
+    # Ferramentas associadas ao Kraken Planner (exatamente 4 de planejamento/coordenação)
     planner_tool_names = sorted(tool.__name__ for tool in kraken_planner_agent.tools)
     expected_planner_tools = sorted(["create_execution_plan", "get_plan_status", "replan_execution", "update_plan_step"])
     assert planner_tool_names == expected_planner_tools, (
@@ -676,3 +694,744 @@ def test_planner_replanning_on_failure():
     assert replan_res["revision"] == 2
     assert "target proxy" in replan_res["replan_reason"]
     assert "Definir Churn Proxy" in replan_res["markdown"]
+
+
+# ==============================================================================
+# Testes da Arquitetura de Workflows ADK, PlanManager Seguro e 10 Cenários Obrigatórios
+# ==============================================================================
+
+def _run_workflow_sync(
+    user_message: str,
+    session_id: str = "test_session",
+    extra_state: dict | None = None,
+) -> tuple[list, dict]:
+    """
+    Executa `root_agent` de ponta a ponta em modo determinístico usando o pipeline real de
+    agentes do Google ADK (`KrakenOrchestratorAgent` -> `SequentialAgent` -> `kraken_planner` ->
+    `KrakenCoordinatorAgent` -> `ParallelAgent` / `LoopAgent` -> `KrakenValidatorAgent`).
+    """
+    import asyncio
+    from google.genai import types
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    global_plan_manager.reset_plan(session_id=session_id)
+
+    state = {"session_id": session_id, "deterministic_mode": True}
+    if extra_state:
+        state.update(extra_state)
+
+    user_content = types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
+
+    async def _drive():
+        # Usa InMemoryRunner / InvocationContext compatível com ADK
+        try:
+            from google.adk.runners import InMemoryRunner
+
+            runner = InMemoryRunner(agent=root_agent, app_name="kraken_ia_test")
+            session = await runner.session_service.create_session(
+                app_name="kraken_ia_test",
+                user_id="test_user",
+                session_id=session_id,
+                state=state,
+            )
+            collected = []
+            async for ev in runner.run_async(
+                user_id="test_user",
+                session_id=session.id,
+                new_message=user_content,
+            ):
+                collected.append(ev)
+            updated_session = await runner.session_service.get_session(
+                app_name="kraken_ia_test",
+                user_id="test_user",
+                session_id=session.id,
+            )
+            final_state = dict(session.state)
+            if updated_session:
+                final_state.update(updated_session.state)
+            return collected, final_state
+        except Exception:
+            # Fallback para invocação direta caso InMemoryRunner não esteja no ambiente mínimo
+            class _DummySession:
+                def __init__(self, sid: str, st: dict):
+                    self.id = sid
+                    self.state = st
+                    self.events = []
+
+            class _DummyCtx:
+                def __init__(self, sid: str, st: dict, uc: object):
+                    self.invocation_id = f"inv_{sid}"
+                    self.session = _DummySession(sid, st)
+                    self.user_content = uc
+                    self.branch = None
+
+            ctx = _DummyCtx(session_id, state, user_content)
+            collected = []
+            async for ev in root_agent._run_async_impl(ctx):
+                collected.append(ev)
+            return collected, ctx.session.state
+
+    return asyncio.run(_drive())
+
+
+def test_plan_manager_immutability_no_deadlock_and_dag_validation():
+    """
+    Valida as correções estruturais do PlanManager:
+    - Sem deadlock em replan() mesmo quando não há plano ativo.
+    - Imutabilidade do retorno (alterar o objeto retornado não corrompe o estado interno).
+    - Detecção de ciclos de dependência, dependências inexistentes e agentes inválidos.
+    - Bloqueio de atualização de etapa cujas dependências ainda não foram concluídas.
+    """
+    from kraken_ia.tools.planner.plan_manager import PlanManager, PlanValidationError
+
+    pm = PlanManager()
+
+    # 1. Replan sem plano prévio não deve causar deadlock (usa RLock)
+    replanned_empty = pm.replan(
+        reason="Replanejamento inicial sem plano ativo",
+        revised_steps=[
+            {
+                "step_id": "1",
+                "title": "Explorar catálogo",
+                "agent": "kraken_analyst",
+                "description": "Listar tabelas",
+                "dependencies": [],
+            }
+        ],
+        session_id="sess_deadlock_check",
+    )
+    assert replanned_empty.revision == 2
+    assert replanned_empty.status == "replanned"
+
+    # 2. Imutabilidade: mutar a cópia retornada não deve alterar o plano interno
+    replanned_empty.steps[0].title = "TITULO_ADULTERADO_EXTERNAMENTE"
+    internal_copy = pm.get_plan(session_id="sess_deadlock_check")
+    assert internal_copy is not None
+    assert internal_copy.steps[0].title == "Explorar catálogo"
+
+    # 3. Rejeição de ciclo de dependências (1 -> 2 -> 1)
+    cycle_err = create_execution_plan(
+        objective="Plano com ciclo",
+        steps=[
+            {"step_id": "1", "title": "A", "agent": "kraken_analyst", "description": "A", "dependencies": ["2"]},
+            {"step_id": "2", "title": "B", "agent": "kraken_code", "description": "B", "dependencies": ["1"]},
+        ],
+        success_criteria="Deve falhar",
+        session_id="sess_cycle",
+    )
+    assert cycle_err.get("status") == "error"
+    assert "ciclo" in cycle_err.get("error", "").lower()
+
+    # 4. Rejeição de dependência inexistente
+    missing_dep_err = create_execution_plan(
+        objective="Plano com dependência fantasma",
+        steps=[
+            {"step_id": "1", "title": "A", "agent": "kraken_analyst", "description": "A", "dependencies": ["99"]},
+        ],
+        success_criteria="Deve falhar",
+        session_id="sess_missing_dep",
+    )
+    assert missing_dep_err.get("status") == "error"
+    assert "inexistente" in missing_dep_err.get("error", "").lower()
+
+    # 5. Rejeição de agente inválido
+    bad_agent_err = create_execution_plan(
+        objective="Plano com agente desconhecido",
+        steps=[
+            {"step_id": "1", "title": "A", "agent": "agente_inexistente", "description": "A", "dependencies": []},
+        ],
+        success_criteria="Deve falhar",
+        session_id="sess_bad_agent",
+    )
+    assert bad_agent_err.get("status") == "error"
+    assert "inválido" in bad_agent_err.get("error", "").lower()
+
+    # 6. Impede concluir etapa 2 antes da etapa 1 concluir
+    create_execution_plan(
+        objective="Plano sequencial",
+        steps=[
+            {"step_id": "1", "title": "A", "agent": "kraken_analyst", "description": "A", "dependencies": []},
+            {"step_id": "2", "title": "B", "agent": "kraken_code", "description": "B", "dependencies": ["1"]},
+        ],
+        success_criteria="Ordem respeitada",
+        session_id="sess_order",
+    )
+    premature = update_plan_step(step_id="2", status="completed", session_id="sess_order")
+    assert "error" in premature
+    assert "dependências" in premature["error"].lower()
+
+
+def test_scenario_1_simple_greeting_direct_path():
+    """Cenário 1: Saudação simples ('oi') segue caminho direto sem criar planos artificiais."""
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    events, state = _run_workflow_sync("oi", session_id="scen_1_greeting")
+    assert len(events) >= 1
+    wf = state["workflow_state"]
+    assert wf["intent"] == "greeting"
+    assert "direct_greeting_path" in wf["execution_log"]
+    assert global_plan_manager.get_plan(session_id="scen_1_greeting") is None
+
+
+def test_scenario_2_what_data_do_we_have():
+    """Cenário 2: 'Quais dados temos?' passa pelo Planner -> Coordinator -> Kraken Analyst."""
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    events, state = _run_workflow_sync("Quais dados temos?", session_id="scen_2_catalog")
+    plan = global_plan_manager.get_plan(session_id="scen_2_catalog")
+    assert plan is not None
+    assert plan.status == "completed"
+    assert len(plan.steps) == 1
+    assert plan.steps[0].agent == "kraken_analyst"
+    assert plan.steps[0].status.value == "completed"
+    assert "dados_vendas" in state["workflow_state"]["final_result"]
+
+
+def test_scenario_3_detailed_analysis():
+    """Cenário 3: 'Faça uma análise detalhada' gera plano e executa diagnóstico completo."""
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    events, state = _run_workflow_sync("Faça uma análise detalhada dos dados", session_id="scen_3_detailed")
+    plan = global_plan_manager.get_plan(session_id="scen_3_detailed")
+    assert plan is not None
+    assert plan.status == "completed"
+    assert plan.steps[0].agent == "kraken_analyst"
+    assert "planner_completed" in state["workflow_state"]["execution_log"]
+    assert "coordinator_completed" in state["workflow_state"]["execution_log"]
+    assert "estatisticas" in state["workflow_state"]["final_result"].lower()
+
+
+def test_scenario_4_optimize_pipeline(tmp_path):
+    """Cenário 4: 'Otimize o pipeline' executa Planner -> Coordinator -> LoopAgent (Optimizer + Validator)."""
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    pipeline_file = tmp_path / "pipeline_prep.py"
+    initial_code = "import pandas as pd\ndef run():\n    return pd.DataFrame({'a': [1, 2]})\n"
+    pipeline_file.write_text(initial_code, encoding="utf-8")
+
+    events, state = _run_workflow_sync(
+        "Otimize o pipeline",
+        session_id="scen_4_optimize",
+        extra_state={"target_pipeline_path": str(pipeline_file)},
+    )
+    plan = global_plan_manager.get_plan(session_id="scen_4_optimize")
+    assert plan is not None
+    assert len(plan.steps) == 1
+    assert plan.steps[0].agent == "kraken_optimizer"
+    assert plan.steps[0].requires_validation is True
+    assert plan.steps[0].attempt_count == 1
+    assert plan.status == "awaiting_approval"
+    assert state["workflow_state"]["awaiting_user_approval"] is True
+    assert pipeline_file.read_text(encoding="utf-8") == initial_code
+
+
+def test_scenario_5_parallel_execution_analyze_and_optimize(tmp_path):
+    """
+    Cenário 5: 'Analise os dados e otimize o pipeline' executa etapas independentes em paralelo
+    via ParallelAgent com saídas isoladas por step_id.
+    """
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    pipeline_file = tmp_path / "pipeline_prep.py"
+    pipeline_file.write_text("import pandas as pd\ndef run():\n    return pd.DataFrame({'a': [1, 2]})\n", encoding="utf-8")
+
+    events, state = _run_workflow_sync(
+        "Analise os dados e otimize o pipeline",
+        session_id="scen_5_parallel",
+        extra_state={"target_pipeline_path": str(pipeline_file)},
+    )
+    plan = global_plan_manager.get_plan(session_id="scen_5_parallel")
+    assert plan is not None
+    assert len(plan.steps) == 2
+    assert plan.parallel_groups == [["1", "2"]]
+    assert any(log.startswith("parallel_execution:[1, 2]") for log in state["workflow_state"]["execution_log"])
+    assert "1" in state["step_results"]
+    assert "2" in state["step_results"]
+    assert state["step_results"]["1"] != state["step_results"]["2"]
+
+
+def test_scenario_6_sequential_execution_create_then_optimize(tmp_path, monkeypatch):
+    """
+    Cenário 6: 'Crie um pipeline e depois otimize' impõe dependência sequencial estrita
+    (Etapa 1: kraken_code -> Etapa 2: kraken_optimizer com dependencies=['1']).
+    """
+    from kraken_ia import config
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    monkeypatch.setattr(config, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(config, "READ_DIRS", [tmp_path, config.DATA_DIR])
+    monkeypatch.setattr(config, "WRITE_DIRS", [tmp_path])
+
+    pipeline_file = tmp_path / "pipeline_prep.py"
+    pipeline_file.write_text("import pandas as pd\ndef run():\n    return pd.DataFrame({'a': [1, 2]})\n", encoding="utf-8")
+
+    events, state = _run_workflow_sync(
+        "Crie um pipeline e depois otimize",
+        session_id="scen_6_sequential",
+        extra_state={"target_pipeline_path": str(pipeline_file)},
+    )
+    plan = global_plan_manager.get_plan(session_id="scen_6_sequential")
+    assert plan is not None
+    assert len(plan.steps) == 2
+    assert plan.steps[0].agent == "kraken_code"
+    assert plan.steps[1].agent == "kraken_optimizer"
+    assert plan.steps[1].dependencies == ["1"]
+    assert plan.parallel_groups == [["1"], ["2"]]
+
+    log = state["workflow_state"]["execution_log"]
+    idx_step_1 = log.index("sequential_step:1:kraken_code")
+    idx_step_2 = log.index("sequential_step:2:kraken_optimizer")
+    assert idx_step_1 < idx_step_2, "A Etapa 1 (kraken_code) deve executar antes da Etapa 2 (kraken_optimizer)."
+
+
+def test_scenario_7_loop_agent_retry_on_validation_failure(tmp_path):
+    """
+    Cenário 7: Falha transitória na tentativa 1 aciona segunda iteração do LoopAgent
+    com KrakenValidatorAgent, registrando histórico de tentativas e aprovando na tentativa 2.
+    """
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    pipeline_file = tmp_path / "pipeline_prep.py"
+    pipeline_file.write_text("import pandas as pd\ndef run():\n    return pd.DataFrame({'a': [1, 2]})\n", encoding="utf-8")
+
+    events, state = _run_workflow_sync(
+        "Otimize o pipeline",
+        session_id="scen_7_retry_loop",
+        extra_state={
+            "target_pipeline_path": str(pipeline_file),
+            "simulated_step_failures": {"1": 1},  # Falha na tentativa 1, passa na tentativa 2
+        },
+    )
+    plan = global_plan_manager.get_plan(session_id="scen_7_retry_loop")
+    assert plan is not None
+    step1 = plan.steps[0]
+    assert step1.attempt_count == 2
+    assert len(step1.attempt_history) == 2
+    assert step1.attempt_history[0].status == "failed"
+    assert step1.attempt_history[1].status in ("passed", "awaiting_approval")
+    assert step1.status.value == "completed"
+
+
+def test_scenario_8_failure_exhausting_retries_triggers_replanning(tmp_path):
+    """
+    Cenário 8: Quando uma etapa falha em todas as tentativas do LoopAgent, o Coordinator
+    aciona `replan()`, preserva as etapas já concluídas (`COMPLETED`) e executa a etapa replanejada.
+    """
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    pipeline_file = tmp_path / "pipeline_prep.py"
+    pipeline_file.write_text("import pandas as pd\ndef run():\n    return pd.DataFrame({'a': [1, 2]})\n", encoding="utf-8")
+
+    executed_step_ids: list[str] = []
+
+    def tracking_executor(step, user_text, st):
+        executed_step_ids.append(step.step_id)
+        if step.step_id == "2":
+            return json.dumps({"success": False, "status": "error", "errors": ["Erro persistente na etapa 2"]})
+        return f"Sucesso na etapa {step.step_id} ({step.agent})"
+
+    events, state = _run_workflow_sync(
+        "Crie um pipeline e depois otimize",
+        session_id="scen_8_replan",
+        extra_state={
+            "target_pipeline_path": str(pipeline_file),
+            "custom_step_executor": tracking_executor,
+        },
+    )
+    plan = global_plan_manager.get_plan(session_id="scen_8_replan")
+    assert plan is not None
+    assert plan.revision == 2
+    assert plan.replan_reason is not None
+    # Etapa 1 foi executada apenas UMA vez (preservada durante o replanejamento)
+    assert executed_step_ids.count("1") == 1
+    # Etapa 2 tentou max_retries (2 vezes) e falhou, acionando a etapa 2_recovery
+    assert executed_step_ids.count("2") == 2
+    assert "2_recovery" in executed_step_ids
+    assert plan.status == "completed"
+
+
+def test_scenario_9_two_simultaneous_sessions_without_conflict():
+    """
+    Cenário 9: Duas sessões simultâneas possuem planos e estados completamente isolados.
+    """
+    from kraken_ia.tools.planner.plan_manager import global_plan_manager
+
+    _, state_a = _run_workflow_sync("Quais dados temos?", session_id="session_alpha")
+    _, state_b = _run_workflow_sync("Analise os dados e otimize o pipeline", session_id="session_beta")
+
+    plan_a = global_plan_manager.get_plan(session_id="session_alpha")
+    plan_b = global_plan_manager.get_plan(session_id="session_beta")
+
+    assert plan_a is not None and plan_b is not None
+    assert plan_a.plan_id != plan_b.plan_id
+    assert plan_a.session_id == "session_alpha"
+    assert plan_b.session_id == "session_beta"
+    assert len(plan_a.steps) == 1
+    assert len(plan_b.steps) == 2
+
+
+def test_scenario_10_file_modification_requires_user_approval_and_blocks_bypass(tmp_path, monkeypatch):
+    """
+    Cenário 10: Alteração em arquivo exige aprovação explícita do usuário mesmo em fluxos com
+    LoopAgent, e tentativas de bypass direto para especialistas sem plano ativo são bloqueadas.
+    """
+    from kraken_ia import config, guardrails
+
+    monkeypatch.setattr(config, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(config, "READ_DIRS", [tmp_path])
+    monkeypatch.setattr(config, "WRITE_DIRS", [tmp_path])
+
+    pipeline_file = tmp_path / "pipeline_prep.py"
+    initial_code = "import pandas as pd\ndef run():\n    return pd.DataFrame({'a': [1, 2], 'b': [10.0, 20.0]})\n"
+    pipeline_file.write_text(initial_code, encoding="utf-8")
+    proposed_code = "import pandas as pd\ndef run():\n    df = pd.DataFrame({'a': [1, 2], 'b': [10.0, 20.0]})\n    df['c'] = df['b'] * 2\n    return df\n"
+
+    # 1. Sem confirmação do usuário: arquivo permanece intacto
+    _, state_unconfirmed = _run_workflow_sync(
+        "Otimize o pipeline",
+        session_id="scen_10_unconfirmed",
+        extra_state={
+            "target_pipeline_path": str(pipeline_file),
+            "proposed_optimized_code": proposed_code,
+            "user_confirmed_write": False,
+        },
+    )
+    assert state_unconfirmed["workflow_state"]["awaiting_user_approval"] is True
+    assert pipeline_file.read_text(encoding="utf-8") == initial_code
+
+    # 2. Com confirmação explícita do usuário: grava otimização e cria backup .bak
+    _, state_confirmed = _run_workflow_sync(
+        "Otimize o pipeline",
+        session_id="scen_10_confirmed",
+        extra_state={
+            "target_pipeline_path": str(pipeline_file),
+            "proposed_optimized_code": proposed_code,
+            "user_confirmed_write": True,
+        },
+    )
+    assert pipeline_file.read_text(encoding="utf-8").strip() == proposed_code.strip()
+    assert (tmp_path / "pipeline_prep.py.bak").exists()
+
+    # 3. Guardrail bloqueia tentativa de transfer_to_agent direto para especialista sem plano ativo
+    class _DummyTransferTool:
+        name = "transfer_to_agent"
+
+    class _DummyCtxNoPlan:
+        def __init__(self):
+            self.state = {}
+
+    bypass_block = guardrails.before_tool_guardrail(
+        tool=_DummyTransferTool(),
+        args={"agent_name": "kraken_optimizer"},
+        tool_context=_DummyCtxNoPlan(),
+    )
+    assert bypass_block is not None
+    assert "GUARDRAIL DE ORQUESTRAÇÃO ATIVADO" in bypass_block["result"]
+
+
+# ==============================================================================
+# Testes Específicos do KrakenPlanner Híbrido (Python Determinístico + LLM sob Demanda)
+# ==============================================================================
+
+def test_hybrid_planner_strategy_selection_deterministic_vs_llm():
+    """
+    Valida que o KrakenPlanner escolhe planejamento determinístico (sem chamar o LLM)
+    para solicitações claras e aciona o LLM somente quando há ambiguidade relevante,
+    condições contextuais ou ausência de correspondência direta de especialistas.
+    """
+    from kraken_ia.tools.planner.plan_manager import PlanManager
+
+    llm_call_count = 0
+
+    def mock_llm_callable(system_prompt: str, user_prompt: str) -> str:
+        nonlocal llm_call_count
+        llm_call_count += 1
+        return json.dumps(
+            {
+                "objective": "Investigar queda de retenção e propor ações técnicas",
+                "success_criteria": "Diagnóstico concluído e features propostas com sucesso.",
+                "steps": [
+                    {
+                        "step_id": "1",
+                        "title": "Investigação de Retenção nos Dados",
+                        "agent": "kraken_analyst",
+                        "description": "Analisar comportamento de retenção na base.",
+                        "dependencies": [],
+                        "success_criteria": "Métricas de retenção levantadas.",
+                    },
+                    {
+                        "step_id": "2",
+                        "title": "Criação de Variáveis Preditivas de Retenção",
+                        "agent": "kraken_code",
+                        "description": "Construir features com base nos achados.",
+                        "dependencies": ["1"],
+                        "success_criteria": "Features validadas em amostra.",
+                    },
+                ],
+            }
+        )
+
+    pm = PlanManager()
+    planner = KrakenPlanner(model="mock-model", plan_manager=pm, llm_callable=mock_llm_callable)
+
+    # 1. Solicitações claras: devem usar estratégia 'deterministic' e NÃO chamar o LLM
+    clear_requests = [
+        "Quais dados temos?",
+        "Faça uma análise detalhada dos dados",
+        "Otimize o pipeline",
+        "Analise os dados e otimize o pipeline",
+        "Crie um pipeline e depois otimize",
+    ]
+    for idx, req in enumerate(clear_requests):
+        assert planner.decide_strategy(req) == "deterministic"
+        assert planner.should_use_llm(req) is False
+        state = {"session_id": f"clear_{idx}", "workflow_state": {}}
+        plan = planner.create_plan(req, session_id=f"clear_{idx}", state=state, force_new=True)
+        assert plan is not None
+        assert state["workflow_state"]["planning_strategy"] == "deterministic"
+
+    assert llm_call_count == 0, "Nenhuma chamada ao LLM deve ocorrer para solicitações determinísticas claras."
+
+    # 2. Solicitação ambígua / condicional / sem mapeamento direto: deve usar 'llm'
+    ambiguous_req = (
+        "Não sei por onde começar para investigar a queda de conversão; "
+        "descubra a causa raiz e caso encontre distorções estruture uma estratégia."
+    )
+    assert planner.decide_strategy(ambiguous_req) == "llm"
+    assert planner.should_use_llm(ambiguous_req) is True
+
+    state_llm = {"session_id": "ambiguous_1", "workflow_state": {}}
+    llm_plan = planner.create_plan(ambiguous_req, session_id="ambiguous_1", state=state_llm, force_new=True)
+    assert llm_call_count == 1
+    assert state_llm["workflow_state"]["planning_strategy"] == "llm"
+    assert len(llm_plan.steps) == 2
+    assert llm_plan.steps[0].agent == "kraken_analyst"
+    assert llm_plan.steps[1].agent == "kraken_code"
+    assert llm_plan.steps[1].dependencies == ["1"]
+
+
+def test_hybrid_planner_llm_fallback_on_invalid_plan_or_error():
+    """
+    Valida que se o LLM retornar um plano inválido (ex: agente proibido ou ciclo) ou falhar,
+    o KrakenPlanner rejeita o plano inválido na validação e faz fallback seguro para o plano determinístico.
+    """
+    from kraken_ia.tools.planner.plan_manager import PlanManager
+
+    def invalid_llm_callable(system_prompt: str, user_prompt: str) -> str:
+        # Retorna especialista inexistente
+        return json.dumps(
+            {
+                "objective": "Plano inválido do LLM",
+                "success_criteria": "Critério",
+                "steps": [
+                    {
+                        "step_id": "1",
+                        "title": "Etapa inválida",
+                        "agent": "especialista_fantasma",
+                        "description": "Descrição",
+                        "dependencies": [],
+                        "success_criteria": "Sucesso",
+                    }
+                ],
+            }
+        )
+
+    pm = PlanManager()
+    planner = KrakenPlanner(model="mock-model", plan_manager=pm, llm_callable=invalid_llm_callable)
+
+    state = {"session_id": "fallback_sess", "workflow_state": {}}
+    plan = planner.create_plan(
+        "Investigue a causa de lentidão e caso encontre problemas otimize o pipeline",
+        session_id="fallback_sess",
+        state=state,
+        force_new=True,
+    )
+    assert plan is not None
+    assert state["workflow_state"]["planning_strategy"] == "deterministic_fallback"
+    assert len(plan.steps) >= 1
+    assert all(s.agent in ("kraken_analyst", "kraken_code", "kraken_optimizer") for s in plan.steps)
+
+
+def test_hybrid_planner_contract_validation_and_replan_dependency_reevaluation():
+    """
+    Valida:
+    - Validação de contrato (critérios de sucesso definidos, grupos paralelos consistentes).
+    - Replanejamento preservando etapas COMPLETED e reavaliando dependências das etapas PENDING restantes.
+    """
+    import pytest
+    from kraken_ia.schemas.plan import ExecutionPlan, PlanStep
+    from kraken_ia.tools.planner.plan_manager import PlanManager, PlanValidationError
+
+    pm = PlanManager()
+    planner = KrakenPlanner(plan_manager=pm)
+
+    # 1. Rejeita plano com parallel_groups inconsistentes (etapa dependente no mesmo grupo paralelo)
+    bad_parallel_plan = ExecutionPlan(
+        plan_id="plan_bad_groups",
+        session_id="s_bad",
+        objective="Objetivo válido",
+        success_criteria="Critério válido",
+        steps=[
+            PlanStep(step_id="1", title="A", agent="kraken_analyst", description="A", dependencies=[], success_criteria="OK"),
+            PlanStep(step_id="2", title="B", agent="kraken_code", description="B", dependencies=["1"], success_criteria="OK"),
+        ],
+        parallel_groups=[["1", "2"]],  # Inválido: 2 depende de 1 e não pode estar na mesma onda paralela
+    )
+    with pytest.raises(PlanValidationError):
+        planner.validate_plan(bad_parallel_plan)
+
+    # 2. Replanejamento de plano de 3 etapas onde a Etapa 1 concluiu, Etapa 2 falhou e Etapa 3 dependia da 2
+    plan = planner.create_plan(
+        "Analise os dados, crie um pipeline e depois otimize",
+        session_id="sess_replan_3_steps",
+        force_new=True,
+    )
+    assert len(plan.steps) == 3
+    assert [s.step_id for s in plan.steps] == ["1", "2", "3"]
+
+    planner.update_step(step_id="1", status="completed", result_summary="Dados analisados", session_id="sess_replan_3_steps")
+    planner.update_step(step_id="2", status="failed", result_summary="Erro ao gerar feature", session_id="sess_replan_3_steps")
+
+    replanned = planner.replan(
+        reason="Falha na etapa 2 ao gerar feature",
+        failed_step_id="2",
+        session_id="sess_replan_3_steps",
+    )
+
+    assert replanned.revision == 2
+    assert replanned.status == "replanned"
+    step_ids = [s.step_id for s in replanned.steps]
+    assert step_ids == ["1", "2_recovery", "3"]
+    # Etapa 1 permanece COMPLETED
+    assert replanned.steps[0].status.value == "completed"
+    # Etapa 2_recovery depende de ["1"] e é a próxima elegível
+    assert replanned.steps[1].dependencies == ["1"]
+    assert replanned.current_step_id == "2_recovery"
+    # Etapa 3 teve sua dependência reavaliada de ["2"] para ["2_recovery"]
+    assert replanned.steps[2].dependencies == ["2_recovery"]
+
+
+# ==============================================================================
+# Testes de Filtragem de UX no ADK Web (Sem Ruído, Sem Duplicação, Sem Tabelas Internas)
+# ==============================================================================
+
+def test_user_facing_clean_experience_no_internal_planner_or_empty_validator_events():
+    """
+    Valida que solicitações operacionais normais geram uma experiência limpa para o usuário:
+    - Nenhum evento com tabela de plano (🗺️ Plano de Execução Estruturado) quando não solicitado.
+    - Nenhum evento vazio de validador (ex.: 'kraken_validator_step_1' ou 'K').
+    - Nenhuma resposta duplicada (a resposta do especialista é entregue em uma mensagem única e limpa).
+    """
+    events, state = _run_workflow_sync("quais dados tem", session_id="sess_clean_ux_test")
+
+    # Deve haver exatamente 1 evento retornado para o usuário
+    assert len(events) == 1
+    event = events[0]
+
+    # Autor oficial do evento voltado ao usuário é o Kraken IA
+    assert event.author == "kraken_ia"
+
+    # Conteúdo textual não deve conter a tabela interna do plano nem ruído de validador
+    content = event.content
+    assert content is not None and content.parts
+    text = "\n".join(p.text for p in content.parts if getattr(p, "text", None))
+
+    assert "🗺️ Plano de Execução Estruturado" not in text
+    assert "Status Geral: IN_PROGRESS" not in text
+    assert "Status Geral: COMPLETED" not in text
+    assert "dados_vendas" in text
+
+
+def test_user_facing_plan_displayed_when_explicitly_requested():
+    """
+    Valida que o plano estruturado em Markdown é exibido apenas quando o usuário
+    solicitar explicitamente a visualização das etapas planejadas.
+    """
+    events, state = _run_workflow_sync(
+        "qual o plano de execução para analisar os dados e otimizar o pipeline",
+        session_id="sess_plan_requested_test",
+    )
+    assert len(events) >= 1
+    all_text = " ".join(
+        p.text for ev in events if getattr(ev, "content", None) for p in ev.content.parts if getattr(p, "text", None)
+    )
+    assert "🗺️ Plano de Execução Estruturado" in all_text
+
+
+def test_natural_language_queries_deterministic_single_step():
+    """
+    Valida que perguntas comuns em linguagem natural (incluindo pequenos erros de digitação,
+    confirmações diretas e adições de feature) são mapeadas determinísticamente com precisão.
+    """
+    from kraken_ia.agents.planner_agent import default_planner
+
+    # 1. "faça uma sumario estastisco" com erro de digitação deve classificar como kraken_analyst
+    plan_stats = default_planner.create_plan("faça uma sumario estastisco", session_id="s_typo", force_new=True)
+    assert len(plan_stats.steps) == 1
+    assert plan_stats.steps[0].agent == "kraken_analyst"
+
+    # 2. "sim, aplicar" com confirmação pendente deve classificar como kraken_optimizer
+    plan_confirm = default_planner.create_plan(
+        "sim, aplicar",
+        session_id="s_confirm",
+        state={"awaiting_user_approval": True},
+        force_new=True,
+    )
+    assert len(plan_confirm.steps) == 1
+    assert plan_confirm.steps[0].agent == "kraken_optimizer"
+
+    # 3. "implemente a feature de nome banana que será a media de price_x" deve ser kraken_code em etapa única
+    plan_feat = default_planner.create_plan(
+        "implemente a feature de nome banana que será a media de price_x",
+        session_id="s_feat_banana",
+        force_new=True,
+    )
+    assert len(plan_feat.steps) == 1
+    assert plan_feat.steps[0].agent == "kraken_code"
+
+
+def test_llm_steps_consolidation_merges_consecutive_same_agent_steps():
+    """
+    Valida que se o LLM decompor uma solicitação atômica em múltiplos passos sequenciais
+    para o mesmo especialista, eles são consolidados em uma única etapa coesa.
+    """
+    from kraken_ia.agents.planner_agent import KrakenPlanner
+
+    raw_fragmented_steps = [
+        {
+            "step_id": "1",
+            "title": "Gerar pipeline de features",
+            "agent": "kraken_code",
+            "description": "Criar base do script",
+            "dependencies": [],
+            "success_criteria": "Script gerado",
+        },
+        {
+            "step_id": "2",
+            "title": "Adicionar feature banana",
+            "agent": "kraken_code",
+            "description": "Inserir cálculo da coluna banana",
+            "dependencies": ["1"],
+            "success_criteria": "Feature adicionada",
+        },
+        {
+            "step_id": "3",
+            "title": "Visualizar amostra das features",
+            "agent": "kraken_code",
+            "description": "Validar preview em 5 linhas",
+            "dependencies": ["2"],
+            "success_criteria": "Preview exibido",
+        },
+    ]
+
+    consolidated = KrakenPlanner._consolidate_consecutive_same_agent_steps(raw_fragmented_steps)
+    assert len(consolidated) == 1
+    step = consolidated[0]
+    assert step["step_id"] == "1"
+    assert step["agent"] == "kraken_code"
+    assert "Gerar pipeline" in step["title"] and "Adicionar feature banana" in step["title"]
+    assert "banana" in step["description"]
+    assert step["dependencies"] == []
+
+
+

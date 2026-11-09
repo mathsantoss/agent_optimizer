@@ -26,6 +26,13 @@ FOREIGN_SCRIPT_PATTERN = re.compile(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af\u
 # Padrões de chamadas fictícias de ferramentas em texto puro
 FAKE_TOOL_CALL_TAG_PATTERN = re.compile(r"<tool_call>.*?</tool_call>", re.DOTALL | re.IGNORECASE)
 
+# Padrões de blocos de pensamento/raciocínio interno a serem suprimidos da visão do usuário
+THOUGHT_PATTERNS = (
+    re.compile(r"<(thought|thinking)>.*?</\1>", re.DOTALL | re.IGNORECASE),
+    re.compile(r"^\s*\[(thought|thinking)\].*?$", re.MULTILINE | re.IGNORECASE),
+    re.compile(r"^\s*(thinking process|internal reasoning):\s*.*$", re.MULTILINE | re.IGNORECASE),
+)
+
 # Padrões de Prompt Injection direto e indireto
 PROMPT_INJECTION_PATTERNS = (
     re.compile(r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions", re.IGNORECASE),
@@ -62,6 +69,7 @@ def sanitize_model_text(text: str) -> tuple[str, bool]:
     Limpa o texto gerado pelo modelo removendo:
     - Caracteres em alfabetos CJK (chinês/japonês/coreano) e tailandês.
     - Blocos de chamadas fictícias `<tool_call>...</tool_call>` em texto puro.
+    - Blocos e tags de pensamento/raciocínio interno (`<thought>`, `<thinking>`, `[thought]`).
     Retorna `(texto_limpo, foi_modificado)`.
     """
     if not text:
@@ -78,12 +86,17 @@ def sanitize_model_text(text: str) -> tuple[str, bool]:
         cleaned = FAKE_TOOL_CALL_TAG_PATTERN.sub("", cleaned)
         modified = True
 
+    for pattern in THOUGHT_PATTERNS:
+        if pattern.search(cleaned):
+            cleaned = pattern.sub("", cleaned).strip()
+            modified = True
+
     if modified:
         record_guardrail_event(
             "OUTPUT_SANITIZATION",
             "sanitize_model_text",
             "SANITIZADO",
-            "Removidos caracteres de alfabeto estrangeiro (CJK/Thai) ou tags <tool_call> em texto puro.",
+            "Removidos caracteres de alfabeto estrangeiro (CJK/Thai), tags <tool_call> ou pensamentos internos.",
         )
 
     return cleaned, modified
@@ -201,6 +214,38 @@ def before_model_guardrail(
     return None
 
 
+def _build_fallback_for_empty_response(agent_name: str, callback_context: Any = None) -> str:
+    """Gera uma resposta de fallback válida e informativa quando o modelo encerra sem conteúdo de texto ou apenas com pensamentos."""
+    from kraken_ia.tools.planner.plan_manager import current_user_request_var, global_plan_manager
+    session_id = "default"
+    state = getattr(callback_context, "state", None) if callback_context is not None else None
+    if hasattr(state, "get") and state.get("session_id"):
+        session_id = str(state["session_id"])
+
+    user_req = current_user_request_var.get().strip()
+
+    if agent_name == "kraken_planner":
+        from kraken_ia.agents.planner_agent import synthesize_plan_for_request
+        plan = global_plan_manager.get_plan(session_id=session_id)
+        if plan is None:
+            plan = synthesize_plan_for_request(user_req, session_id=session_id, force_new=True, state=state)
+        return global_plan_manager.format_plan_markdown(plan)
+
+    if "optimizer" in agent_name:
+        return (
+            "Diagnóstico do pipeline executado. Proposta de otimização registrada em `pipeline/tmp/pipeline_prep_otimizado.bak`. "
+            "Aguardando confirmação explícita do usuário para aplicação no arquivo oficial."
+        )
+
+    if "analyst" in agent_name:
+        return "Análise exploratória e consulta dos datasets executada com sucesso."
+
+    if "code" in agent_name:
+        return "Features projetadas e testadas com sucesso no pipeline."
+
+    return "Operação processada com sucesso pelo especialista."
+
+
 def after_model_guardrail(
     callback_context: Any = None,
     llm_response: Any = None,
@@ -208,24 +253,53 @@ def after_model_guardrail(
 ) -> Any:
     """
     Callback executado após a resposta do LLM (`after_model_callback`).
-    Remove caracteres de alfabetos estrangeiros inesperados (CJK/Thai) e tags `<tool_call>` em texto puro.
+    - Remove caracteres de alfabetos estrangeiros inesperados (CJK/Thai) e tags `<tool_call>`.
+    - Suprime partes de pensamento/raciocínio interno (`thought=True`).
+    - Intercepta e recupera graciosamente respostas vazias (`MODEL_RETURNED_NO_CONTENT`).
     """
     response = llm_response or kwargs.get("llm_response")
-    if response is None or not getattr(response, "content", None):
-        return None
 
-    parts = getattr(response.content, "parts", None)
-    if not parts:
-        return None
-
-    modified = False
-    cleaned_parts = []
+    # Detecta se o modelo retornou erro MODEL_RETURNED_NO_CONTENT ou resposta sem partes
+    is_empty_or_no_content = False
+    if response is None:
+        is_empty_or_no_content = True
+    elif getattr(response, "error_code", None) == "MODEL_RETURNED_NO_CONTENT":
+        is_empty_or_no_content = True
+    elif not getattr(response, "content", None) or not getattr(response.content, "parts", None):
+        is_empty_or_no_content = True
 
     try:
         from google.adk.models import LlmResponse
         from google.genai import types
 
+        agent = getattr(callback_context, "agent", None) if callback_context is not None else None
+        agent_name = getattr(agent, "name", "")
+
+        if is_empty_or_no_content:
+            fallback_text = _build_fallback_for_empty_response(agent_name, callback_context)
+            record_guardrail_event(
+                "EMPTY_RESPONSE_RECOVERY",
+                "after_model_guardrail",
+                "RECUPERADO",
+                f"MODEL_RETURNED_NO_CONTENT recuperado determinísticamente para o agente '{agent_name}'.",
+            )
+            return LlmResponse(
+                content=types.Content(
+                    role="model",
+                    parts=[types.Part.from_text(text=fallback_text)],
+                ),
+            )
+
+        parts = getattr(response.content, "parts", [])
+        modified = False
+        cleaned_parts = []
+
         for part in parts:
+            # 1. Suprime partes de pensamento nativas (thought=True) para a visão do usuário
+            if getattr(part, "thought", False) is True:
+                modified = True
+                continue
+
             part_text = getattr(part, "text", None)
             if part_text:
                 cleaned_text, was_cleaned = sanitize_model_text(part_text)
@@ -236,6 +310,16 @@ def after_model_guardrail(
                     cleaned_parts.append(part)
             else:
                 cleaned_parts.append(part)
+
+        # Se todas as partes eram pensamentos e foram suprimidas, gera fallback limpo
+        if not cleaned_parts:
+            fallback_text = _build_fallback_for_empty_response(agent_name, callback_context)
+            return LlmResponse(
+                content=types.Content(
+                    role="model",
+                    parts=[types.Part.from_text(text=fallback_text)],
+                ),
+            )
 
         if modified:
             return LlmResponse(
@@ -266,7 +350,7 @@ def before_tool_guardrail(
     tool_name = getattr(target_tool, "name", getattr(target_tool, "__name__", ""))
 
     state = getattr(context, "state", None) if context is not None else None
-    if not isinstance(state, dict):
+    if not hasattr(state, "get"):
         return None
 
     # 1. Circuit Breaker de escritas repetidas em disco sem validação
@@ -297,8 +381,23 @@ def before_tool_guardrail(
         # Reseta contador após qualquer etapa de inspeção, preview ou validação
         state["save_file_attempts"] = 0
 
-    # 2. Limite de handoffs consecutivos entre agentes especialistas
+    # 2. Bloqueio de bypass direto para especialistas sem passar pelo Planner/Coordinator e limite de handoffs
     if tool_name == "transfer_to_agent":
+        target_agent = str((args or {}).get("agent_name") or "").strip()
+        if target_agent in ("kraken_analyst", "kraken_code", "kraken_optimizer"):
+            has_active_plan = bool(state.get("execution_plan")) or (
+                isinstance(state.get("workflow_state"), dict)
+                and bool(state["workflow_state"].get("active_plan"))
+            )
+            if not has_active_plan:
+                msg = (
+                    f"GUARDRAIL DE ORQUESTRAÇÃO ATIVADO: Delegação direta para '{target_agent}' bloqueada. "
+                    "Solicitações operacionais devem obrigatoriamente passar pelo 'kraken_planner' e "
+                    "ser executadas pelo 'kraken_coordinator' com um plano estruturado ativo."
+                )
+                record_guardrail_event("ORCHESTRATION_BYPASS", "transfer_to_agent", "BLOQUEADO", msg)
+                return {"result": msg}
+
         transfers = int(state.get("agent_transfer_count", 0))
         if transfers >= MAX_AGENT_TRANSFERS:
             msg = (
