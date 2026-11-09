@@ -1,0 +1,354 @@
+{
+  "exec-65b236d86a46": {
+    "id": "exec-65b236d86a46",
+    "conversa_id": "11a72298-f815-478b-88d7-34842b3ee1a0",
+    "status": "sucesso",
+    "latencia_segundos": 7.94,
+    "provedor": "Vertex AI (Google Cloud)",
+    "modelo": "vertex_ai/gemini-2.5-flash",
+    "especialista": "kraken_analyst",
+    "ferramentas_executadas": [
+      {
+        "agente": "kraken_copilot",
+        "ferramenta": "transfer_to_agent",
+        "argumentos": {
+          "agent_name": "kraken_analyst"
+        }
+      },
+      {
+        "agente": "kraken_analyst",
+        "ferramenta": "analyze_dataset",
+        "argumentos": {
+          "dataset_name": "list"
+        }
+      }
+    ],
+    "etapas": [
+      {
+        "tipo": "guardrail.before_model",
+        "titulo": "🛡️ Guardrail de Entrada e Sanitização",
+        "descricao": "Sanitização de comandos inseguros, SQL injection destrutivo e validação de escopo.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "input_chars": 30
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: transfer_to_agent",
+        "descricao": "Chamada executada pelo especialista 'kraken_copilot'.",
+        "payload": {
+          "ferramenta": "transfer_to_agent",
+          "argumentos": {
+            "agent_name": "kraken_analyst"
+          }
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: analyze_dataset",
+        "descricao": "Chamada executada pelo especialista 'kraken_analyst'.",
+        "payload": {
+          "ferramenta": "analyze_dataset",
+          "argumentos": {
+            "dataset_name": "list"
+          }
+        }
+      },
+      {
+        "tipo": "guardrail.after_model",
+        "titulo": "🛡️ Guardrail de Saída e Auditoria",
+        "descricao": "Inspeção contra vazamento de credenciais, chaves de API, PII e caminhos não autorizados.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "output_chars": 477
+        }
+      }
+    ],
+    "criado_em": "2026-11-09T16:20:09.441089+00:00"
+  },
+  "exec-c7d0287c9146": {
+    "id": "exec-c7d0287c9146",
+    "conversa_id": "4193810a-6171-4af9-a743-d0958b652839",
+    "status": "sucesso",
+    "latencia_segundos": 5.67,
+    "provedor": "Vertex AI (Google Cloud)",
+    "modelo": "vertex_ai/gemini-2.5-flash",
+    "especialista": "kraken_analyst",
+    "ferramentas_executadas": [
+      {
+        "agente": "kraken_copilot",
+        "ferramenta": "transfer_to_agent",
+        "argumentos": {
+          "agent_name": "kraken_analyst"
+        }
+      },
+      {
+        "agente": "kraken_analyst",
+        "ferramenta": "analyze_dataset",
+        "argumentos": {}
+      }
+    ],
+    "etapas": [
+      {
+        "tipo": "guardrail.before_model",
+        "titulo": "🛡️ Guardrail de Entrada e Sanitização",
+        "descricao": "Sanitização de comandos inseguros, SQL injection destrutivo e validação de escopo.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "input_chars": 30
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: transfer_to_agent",
+        "descricao": "Chamada executada pelo especialista 'kraken_copilot'.",
+        "payload": {
+          "ferramenta": "transfer_to_agent",
+          "argumentos": {
+            "agent_name": "kraken_analyst"
+          }
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: analyze_dataset",
+        "descricao": "Chamada executada pelo especialista 'kraken_analyst'.",
+        "payload": {
+          "ferramenta": "analyze_dataset",
+          "argumentos": {}
+        }
+      },
+      {
+        "tipo": "guardrail.after_model",
+        "titulo": "🛡️ Guardrail de Saída e Auditoria",
+        "descricao": "Inspeção contra vazamento de credenciais, chaves de API, PII e caminhos não autorizados.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "output_chars": 453
+        }
+      }
+    ],
+    "criado_em": "2026-11-09T16:20:15.049651+00:00"
+  },
+  "exec-2f2cde697eb4": {
+    "id": "exec-2f2cde697eb4",
+    "conversa_id": "4193810a-6171-4af9-a743-d0958b652839",
+    "status": "sucesso",
+    "latencia_segundos": 10.3,
+    "provedor": "Vertex AI (Google Cloud)",
+    "modelo": "vertex_ai/gemini-2.5-flash",
+    "especialista": "kraken_analyst",
+    "ferramentas_executadas": [
+      {
+        "agente": "kraken_analyst",
+        "ferramenta": "analyze_dataset",
+        "argumentos": {
+          "dataset_name": "dados_vendas",
+          "operation": "full"
+        }
+      }
+    ],
+    "etapas": [
+      {
+        "tipo": "guardrail.before_model",
+        "titulo": "🛡️ Guardrail de Entrada e Sanitização",
+        "descricao": "Sanitização de comandos inseguros, SQL injection destrutivo e validação de escopo.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "input_chars": 36
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: analyze_dataset",
+        "descricao": "Chamada executada pelo especialista 'kraken_analyst'.",
+        "payload": {
+          "ferramenta": "analyze_dataset",
+          "argumentos": {
+            "dataset_name": "dados_vendas",
+            "operation": "full"
+          }
+        }
+      },
+      {
+        "tipo": "guardrail.after_model",
+        "titulo": "🛡️ Guardrail de Saída e Auditoria",
+        "descricao": "Inspeção contra vazamento de credenciais, chaves de API, PII e caminhos não autorizados.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "output_chars": 3819
+        }
+      }
+    ],
+    "criado_em": "2026-11-09T16:21:56.839840+00:00"
+  },
+  "exec-2d1aa108edbe": {
+    "id": "exec-2d1aa108edbe",
+    "conversa_id": "4193810a-6171-4af9-a743-d0958b652839",
+    "status": "sucesso",
+    "latencia_segundos": 25.37,
+    "provedor": "Vertex AI (Google Cloud)",
+    "modelo": "vertex_ai/gemini-2.5-flash",
+    "especialista": "kraken_optimizer",
+    "ferramentas_executadas": [
+      {
+        "agente": "kraken_analyst",
+        "ferramenta": "transfer_to_agent",
+        "argumentos": {
+          "agent_name": "kraken_optimizer"
+        }
+      },
+      {
+        "agente": "kraken_optimizer",
+        "ferramenta": "inspect_pipeline",
+        "argumentos": {}
+      },
+      {
+        "agente": "kraken_optimizer",
+        "ferramenta": "optimize_pipeline",
+        "argumentos": {
+          "run_benchmark": true,
+          "proposed_code": "\nimport pandas as pd\nimport numpy as np\nimport os\nimport time\nimport warnings\n\nwarnings.filterwarnings('ignore')\n\n# Desativa a notação científica para melhor legibilidade de números grandes\npd.set_option('display.float_format', lambda x: '%.2f' % x)\n\n# Constantes\nDATA_PATH = 'pipeline/dados/'\nOUTPUT_PATH = 'pipeline/saida/'\n\ndef carregar_dados(file_name=\"dados_vendas.csv\"):\n    \"\"\"\n    Carrega os dados de um arquivo CSV. Assume que o arquivo está na pasta DATA_PATH.\n    \"\"\"\n    try:\n        file_path = os.path.join(DATA_PATH, file_name)\n        df = pd.read_csv(file_path)\n        print(f\"Dados carregados com sucesso de '{file_name}'. {len(df)} linhas.\")\n        return df\n    except FileNotFoundError:\n        print(f\"Erro: O arquivo '{file_name}' não foi encontrado em '{DATA_PATH}'.\")\n        return None\n\ndef calcular_estatisticas_cliente(df):\n    \"\"\"\n    Calcula estatísticas de compras por cliente.\n    \"\"\"\n    print(\"Calculando estatísticas por cliente...\")\n    # Convertendo 'created_at' para datetime apenas uma vez para evitar reprocessamento\n    df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')\n\n    # Garante que 'price_x' e 'quantity' são numéricos\n    df['price_x'] = pd.to_numeric(df['price_x'], errors='coerce')\n    df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')\n\n    # Removendo linhas com valores nulos resultantes das conversões, se houver\n    df.dropna(subset=['created_at', 'price_x', 'quantity'], inplace=True)\n\n    # Calcula o total gasto por linha\n    df['total_price'] = df['price_x'] * df['quantity']\n\n    # Agrupamento vetorizado para estatísticas do cliente\n    client_stats = df.groupby('email').agg(\n        client_total_spent=('total_price', 'sum'),\n        client_transaction_count=('sale_id', 'nunique'),\n        client_average_spent=('total_price', 'mean')\n    ).reset_index()\n\n    # Combina a primeira data de compra e a última data de compra\n    first_purchase = df.groupby('email')['created_at'].min().rename('client_first_purchase')\n    last_purchase = df.groupby('email')['created_at'].max().rename('client_last_purchase')\n\n    client_stats = client_stats.merge(first_purchase, on='email', how='left')\n    client_stats = client_stats.merge(last_purchase, on='email', how='left')\n\n    # Calcula a diferença de tempo entre a primeira e a última compra em dias\n    client_stats['client_days_since_first_purchase'] = (pd.to_datetime('now', utc=True) - client_stats['client_first_purchase']).dt.days\n    client_stats['client_days_since_last_purchase'] = (pd.to_datetime('now', utc=True) - client_stats['client_last_purchase']).dt.days\n\n    print(\"Estatísticas por cliente calculadas.\")\n    return client_stats\n\ndef calcular_estatisticas_produto(df):\n    \"\"\"\n    Calcula estatísticas por produto.\n    \"\"\"\n    print(\"Calculando estatísticas por produto...\")\n    df['price_y'] = pd.to_numeric(df['price_y'], errors='coerce')\n    df.dropna(subset=['price_y'], inplace=True)\n\n    product_stats = df.groupby('product').agg(\n        product_mean_price=('price_y', 'mean'),\n        product_min_price=('price_y', 'min'),\n        product_max_price=('price_y', 'max')\n    ).reset_index()\n    print(\"Estatísticas por produto calculadas.\")\n    return product_stats\n\ndef engenharia_features(df):\n    \"\"\"\n    Realiza a engenharia de features no DataFrame.\n    \"\"\"\n    print(\"Iniciando engenharia de features...\")\n\n    df_processed = df.copy()\n\n    # Conversão para datetime otimizada\n    df_processed['created_at'] = pd.to_datetime(df_processed['created_at'], errors='coerce')\n    df_processed['updated_at'] = pd.to_datetime(df_processed['updated_at'], errors='coerce')\n\n    # Remover linhas onde a conversão de data falhou\n    df_processed.dropna(subset=['created_at', 'updated_at'], inplace=True)\n\n    # Feature Engineering de Tempo Otimizada\n    df_processed['created_year'] = df_processed['created_at'].dt.year\n    df_processed['created_month'] = df_processed['created_at'].dt.month\n    df_processed['created_day'] = df_processed['created_at'].dt.day\n    df_processed['created_hour'] = df_processed['created_at'].dt.hour\n    df_processed['created_weekday'] = df_processed['created_at'].dt.weekday\n    df_processed['time_difference'] = (df_processed['updated_at'] - df_processed['created_at']).dt.total_seconds() / 60 # em minutos\n\n    # Garantir que as colunas de preço são numéricas e calcular com segurança\n    df_processed['price_x'] = pd.to_numeric(df_processed['price_x'], errors='coerce')\n    df_processed['price_y'] = pd.to_numeric(df_processed['price_y'], errors='coerce')\n    df_processed['quantity'] = pd.to_numeric(df_processed['quantity'], errors='coerce')\n\n    # Remover linhas com valores nulos resultantes de conversões\n    df_processed.dropna(subset=['price_x', 'price_y', 'quantity'], inplace=True)\n\n    # Cálculo de novas features de preço vetorizadas\n    df_processed['price_diff'] = df_processed['price_x'] - df_processed['price_y']\n    df_processed['price_ratio'] = df_processed['price_x'] / df_processed['price_y']\n\n    # Total de Vendas por Transação\n    df_processed['total_value_x'] = df_processed['price_x'] * df_processed['quantity']\n    df_processed['total_value_y'] = df_processed['price_y'] * df_processed['quantity']\n\n    print(\"Engenharia de features concluída.\")\n    return df_processed\n\ndef executar_pipeline(df):\n    \"\"\"\n    Executa o pipeline completo de processamento de dados.\n    \"\"\"\n    print(\"Iniciando execução do pipeline...\")\n    df_features = engenharia_features(df.copy())\n    df_client_stats = calcular_estatisticas_cliente(df.copy())\n    df_product_stats = calcular_estatisticas_produto(df.copy())\n\n    # Unir estatísticas de cliente e produto ao DataFrame principal\n    df_final = df_features.merge(df_client_stats, on='email', how='left')\n    df_final = df_final.merge(df_product_stats, on='product', how='left')\n\n    # Selecionar e reordenar colunas para a saída final, garantindo a preservação das originais\n    final_columns = [\n        'name', 'sale_id', 'product_id', 'product', 'price_y', 'quantity', 'price_x', \n        'created_at', 'updated_at', 'email',\n        'created_year', 'created_month', 'created_day', 'created_hour', 'created_weekday',\n        'time_difference', 'price_diff', 'price_ratio', 'total_value_x', 'total_value_y',\n        'client_total_spent', 'client_transaction_count', 'client_average_spent',\n        'client_first_purchase', 'client_last_purchase', \n        'client_days_since_first_purchase', 'client_days_since_last_purchase',\n        'product_mean_price', 'product_min_price', 'product_max_price'\n    ]\n    \n    # Garantir que todas as colunas existem antes de selecionar\n    for col in final_columns:\n        if col not in df_final.columns:\n            df_final[col] = np.nan # ou outro valor padrão adequado\n\n    df_final = df_final[final_columns]\n\n    print(\"Pipeline concluído. DataFrame final gerado.\")\n    return df_final\n\nif __name__ == \"__main__\":\n    start_time = time.time()\n    df_vendas = carregar_dados()\n\n    if df_vendas is not None:\n        df_resultado = executar_pipeline(df_vendas)\n\n        # Salvar o resultado (exemplo)\n        output_file = os.path.join(OUTPUT_PATH, \"dados_processados.csv\")\n        os.makedirs(OUTPUT_PATH, exist_ok=True)\n        df_resultado.to_csv(output_file, index=False)\n        print(f\"Dados processados salvos em '{output_file}'.\")\n\n    end_time = time.time()\n    print(f\"Tempo total de execução: {end_time - start_time:.2f} segundos\")\n\n",
+          "confirmed_by_user": false
+        }
+      }
+    ],
+    "etapas": [
+      {
+        "tipo": "guardrail.before_model",
+        "titulo": "🛡️ Guardrail de Entrada e Sanitização",
+        "descricao": "Sanitização de comandos inseguros, SQL injection destrutivo e validação de escopo.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "input_chars": 18
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: transfer_to_agent",
+        "descricao": "Chamada executada pelo especialista 'kraken_analyst'.",
+        "payload": {
+          "ferramenta": "transfer_to_agent",
+          "argumentos": {
+            "agent_name": "kraken_optimizer"
+          }
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: inspect_pipeline",
+        "descricao": "Chamada executada pelo especialista 'kraken_optimizer'.",
+        "payload": {
+          "ferramenta": "inspect_pipeline",
+          "argumentos": {}
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: optimize_pipeline",
+        "descricao": "Chamada executada pelo especialista 'kraken_optimizer'.",
+        "payload": {
+          "ferramenta": "optimize_pipeline",
+          "argumentos": {
+            "run_benchmark": true,
+            "proposed_code": "\nimport pandas as pd\nimport numpy as np\nimport os\nimport time\nimport warnings\n\nwarnings.filterwarnings('ignore')\n\n# Desativa a notação científica para melhor legibilidade de números grandes\npd.set_option('display.float_format', lambda x: '%.2f' % x)\n\n# Constantes\nDATA_PATH = 'pipeline/dados/'\nOUTPUT_PATH = 'pipeline/saida/'\n\ndef carregar_dados(file_name=\"dados_vendas.csv\"):\n    \"\"\"\n    Carrega os dados de um arquivo CSV. Assume que o arquivo está na pasta DATA_PATH.\n    \"\"\"\n    try:\n        file_path = os.path.join(DATA_PATH, file_name)\n        df = pd.read_csv(file_path)\n        print(f\"Dados carregados com sucesso de '{file_name}'. {len(df)} linhas.\")\n        return df\n    except FileNotFoundError:\n        print(f\"Erro: O arquivo '{file_name}' não foi encontrado em '{DATA_PATH}'.\")\n        return None\n\ndef calcular_estatisticas_cliente(df):\n    \"\"\"\n    Calcula estatísticas de compras por cliente.\n    \"\"\"\n    print(\"Calculando estatísticas por cliente...\")\n    # Convertendo 'created_at' para datetime apenas uma vez para evitar reprocessamento\n    df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')\n\n    # Garante que 'price_x' e 'quantity' são numéricos\n    df['price_x'] = pd.to_numeric(df['price_x'], errors='coerce')\n    df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')\n\n    # Removendo linhas com valores nulos resultantes das conversões, se houver\n    df.dropna(subset=['created_at', 'price_x', 'quantity'], inplace=True)\n\n    # Calcula o total gasto por linha\n    df['total_price'] = df['price_x'] * df['quantity']\n\n    # Agrupamento vetorizado para estatísticas do cliente\n    client_stats = df.groupby('email').agg(\n        client_total_spent=('total_price', 'sum'),\n        client_transaction_count=('sale_id', 'nunique'),\n        client_average_spent=('total_price', 'mean')\n    ).reset_index()\n\n    # Combina a primeira data de compra e a última data de compra\n    first_purchase = df.groupby('email')['created_at'].min().rename('client_first_purchase')\n    last_purchase = df.groupby('email')['created_at'].max().rename('client_last_purchase')\n\n    client_stats = client_stats.merge(first_purchase, on='email', how='left')\n    client_stats = client_stats.merge(last_purchase, on='email', how='left')\n\n    # Calcula a diferença de tempo entre a primeira e a última compra em dias\n    client_stats['client_days_since_first_purchase'] = (pd.to_datetime('now', utc=True) - client_stats['client_first_purchase']).dt.days\n    client_stats['client_days_since_last_purchase'] = (pd.to_datetime('now', utc=True) - client_stats['client_last_purchase']).dt.days\n\n    print(\"Estatísticas por cliente calculadas.\")\n    return client_stats\n\ndef calcular_estatisticas_produto(df):\n    \"\"\"\n    Calcula estatísticas por produto.\n    \"\"\"\n    print(\"Calculando estatísticas por produto...\")\n    df['price_y'] = pd.to_numeric(df['price_y'], errors='coerce')\n    df.dropna(subset=['price_y'], inplace=True)\n\n    product_stats = df.groupby('product').agg(\n        product_mean_price=('price_y', 'mean'),\n        product_min_price=('price_y', 'min'),\n        product_max_price=('price_y', 'max')\n    ).reset_index()\n    print(\"Estatísticas por produto calculadas.\")\n    return product_stats\n\ndef engenharia_features(df):\n    \"\"\"\n    Realiza a engenharia de features no DataFrame.\n    \"\"\"\n    print(\"Iniciando engenharia de features...\")\n\n    df_processed = df.copy()\n\n    # Conversão para datetime otimizada\n    df_processed['created_at'] = pd.to_datetime(df_processed['created_at'], errors='coerce')\n    df_processed['updated_at'] = pd.to_datetime(df_processed['updated_at'], errors='coerce')\n\n    # Remover linhas onde a conversão de data falhou\n    df_processed.dropna(subset=['created_at', 'updated_at'], inplace=True)\n\n    # Feature Engineering de Tempo Otimizada\n    df_processed['created_year'] = df_processed['created_at'].dt.year\n    df_processed['created_month'] = df_processed['created_at'].dt.month\n    df_processed['created_day'] = df_processed['created_at'].dt.day\n    df_processed['created_hour'] = df_processed['created_at'].dt.hour\n    df_processed['created_weekday'] = df_processed['created_at'].dt.weekday\n    df_processed['time_difference'] = (df_processed['updated_at'] - df_processed['created_at']).dt.total_seconds() / 60 # em minutos\n\n    # Garantir que as colunas de preço são numéricas e calcular com segurança\n    df_processed['price_x'] = pd.to_numeric(df_processed['price_x'], errors='coerce')\n    df_processed['price_y'] = pd.to_numeric(df_processed['price_y'], errors='coerce')\n    df_processed['quantity'] = pd.to_numeric(df_processed['quantity'], errors='coerce')\n\n    # Remover linhas com valores nulos resultantes de conversões\n    df_processed.dropna(subset=['price_x', 'price_y', 'quantity'], inplace=True)\n\n    # Cálculo de novas features de preço vetorizadas\n    df_processed['price_diff'] = df_processed['price_x'] - df_processed['price_y']\n    df_processed['price_ratio'] = df_processed['price_x'] / df_processed['price_y']\n\n    # Total de Vendas por Transação\n    df_processed['total_value_x'] = df_processed['price_x'] * df_processed['quantity']\n    df_processed['total_value_y'] = df_processed['price_y'] * df_processed['quantity']\n\n    print(\"Engenharia de features concluída.\")\n    return df_processed\n\ndef executar_pipeline(df):\n    \"\"\"\n    Executa o pipeline completo de processamento de dados.\n    \"\"\"\n    print(\"Iniciando execução do pipeline...\")\n    df_features = engenharia_features(df.copy())\n    df_client_stats = calcular_estatisticas_cliente(df.copy())\n    df_product_stats = calcular_estatisticas_produto(df.copy())\n\n    # Unir estatísticas de cliente e produto ao DataFrame principal\n    df_final = df_features.merge(df_client_stats, on='email', how='left')\n    df_final = df_final.merge(df_product_stats, on='product', how='left')\n\n    # Selecionar e reordenar colunas para a saída final, garantindo a preservação das originais\n    final_columns = [\n        'name', 'sale_id', 'product_id', 'product', 'price_y', 'quantity', 'price_x', \n        'created_at', 'updated_at', 'email',\n        'created_year', 'created_month', 'created_day', 'created_hour', 'created_weekday',\n        'time_difference', 'price_diff', 'price_ratio', 'total_value_x', 'total_value_y',\n        'client_total_spent', 'client_transaction_count', 'client_average_spent',\n        'client_first_purchase', 'client_last_purchase', \n        'client_days_since_first_purchase', 'client_days_since_last_purchase',\n        'product_mean_price', 'product_min_price', 'product_max_price'\n    ]\n    \n    # Garantir que todas as colunas existem antes de selecionar\n    for col in final_columns:\n        if col not in df_final.columns:\n            df_final[col] = np.nan # ou outro valor padrão adequado\n\n    df_final = df_final[final_columns]\n\n    print(\"Pipeline concluído. DataFrame final gerado.\")\n    return df_final\n\nif __name__ == \"__main__\":\n    start_time = time.time()\n    df_vendas = carregar_dados()\n\n    if df_vendas is not None:\n        df_resultado = executar_pipeline(df_vendas)\n\n        # Salvar o resultado (exemplo)\n        output_file = os.path.join(OUTPUT_PATH, \"dados_processados.csv\")\n        os.makedirs(OUTPUT_PATH, exist_ok=True)\n        df_resultado.to_csv(output_file, index=False)\n        print(f\"Dados processados salvos em '{output_file}'.\")\n\n    end_time = time.time()\n    print(f\"Tempo total de execução: {end_time - start_time:.2f} segundos\")\n\n",
+            "confirmed_by_user": false
+          }
+        }
+      },
+      {
+        "tipo": "guardrail.after_model",
+        "titulo": "🛡️ Guardrail de Saída e Auditoria",
+        "descricao": "Inspeção contra vazamento de credenciais, chaves de API, PII e caminhos não autorizados.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "output_chars": 1919
+        }
+      }
+    ],
+    "criado_em": "2026-11-09T16:23:32.722129+00:00"
+  },
+  "exec-aa43d0585c32": {
+    "id": "exec-aa43d0585c32",
+    "conversa_id": "4193810a-6171-4af9-a743-d0958b652839",
+    "status": "sucesso",
+    "latencia_segundos": 54.48,
+    "provedor": "Vertex AI (Google Cloud)",
+    "modelo": "vertex_ai/gemini-2.5-flash",
+    "especialista": "kraken_optimizer",
+    "ferramentas_executadas": [
+      {
+        "agente": "kraken_optimizer",
+        "ferramenta": "optimize_pipeline",
+        "argumentos": {
+          "confirmed_by_user": true,
+          "proposed_code": "\\nimport pandas as pd\\nimport numpy as np\\nimport os\\nimport time\\nimport warnings\\n\\nwarnings.filterwarnings(\\'ignore\\')\\n\\n# Desativa a notação científica para melhor legibilidade de números grandes\\npd.set_option(\\'display.float_format\\', lambda x: \\'%.2f\\' % x)\\n\\n# Constantes\\nDATA_PATH = \\'pipeline/dados/\\'\\nOUTPUT_PATH = \\'pipeline/saida/\\'\\n\\ndef carregar_dados(file_name=\\\"dados_vendas.csv\\\"):\\n    \\\"\\\"\\\"\\n    Carrega os dados de um arquivo CSV. Assume que o arquivo está na pasta DATA_PATH.\\n    \\\"\\\"\\\"\\n    try:\\n        file_path = os.path.join(DATA_PATH, file_name)\\n        df = pd.read_csv(file_path)\\n        print(f\\\"Dados carregados com sucesso de \\'{file_name}\\'. {len(df)} linhas.\\\")\\n        return df\\n    except FileNotFoundError:\\n        print(f\\\"Erro: O arquivo \\'{file_name}\\' não foi encontrado em \\'{DATA_PATH}\\'.\\\")\\n        return None\\n\\ndef calcular_estatisticas_cliente(df):\\n    \\\"\\\"\\\"\\n    Calcula estatísticas de compras por cliente.\\n    \\\"\\\"\\\"\\\n    print(\\\"Calculando estatísticas por cliente...\\\")\\n    # Convertendo \\'created_at\\' para datetime apenas uma vez para evitar reprocessamento\\n    df[\\'created_at\\'] = pd.to_datetime(df[\\'created_at\\'], errors=\\'coerce\\')\\n\\n    # Garante que \\'price_x\\' e \\'quantity\\' são numéricos\\n    df[\\'price_x\\'] = pd.to_numeric(df[\\'price_x\\'], errors=\\'coerce\\')\\n    df[\\'quantity\\'] = pd.to_numeric(df[\\'quantity\\'], errors=\\'coerce\\')\\n\\n    # Removendo linhas com valores nulos resultantes das conversões, se houver\\n    df.dropna(subset=[\\'created_at\\', \\'price_x\\', \\'quantity\\'], inplace=True)\\n\\n    # Calcula o total gasto por linha\\n    df[\\'total_price\\'] = df[\\'price_x\\'] * df[\\'quantity\\']\\n\\n    # Agrupamento vetorizado para estatísticas do cliente\\n    client_stats = df.groupby(\\'email\\').agg(\\n        client_total_spent=(\\'total_price\\', \\'sum\\'),\\n        client_transaction_count=(\\'sale_id\\', \\'nunique\\'),\\n        client_average_spent=(\\'total_price\\', \\'mean\\')\\n    ).reset_index()\\n\\n    # Combina a primeira data de compra e a última data de compra\\n    first_purchase = df.groupby(\\'email\\')[\\'created_at\\'].min().rename(\\'client_first_purchase\\')\\n    last_purchase = df.groupby(\\'email\\')[\\'created_at\\'].max().rename(\\'client_last_purchase\\')\\n\\n    client_stats = client_stats.merge(first_purchase, on=\\'email\\', how=\\'left\\')\\n    client_stats = client_stats.merge(last_purchase, on=\\'email\\', how=\\'left\\')\\n\\n    # Calcula a diferença de tempo entre a primeira e a última compra em dias\\n    client_stats[\\'client_days_since_first_purchase\\'] = (pd.to_datetime(\\'now\\', utc=True) - client_stats[\\'client_first_purchase\\']).dt.days\\n    client_stats[\\'client_days_since_last_purchase\\'] = (pd.to_datetime(\\'now\\', utc=True) - client_stats[\\'client_last_purchase\\']).dt.days\\n\\n    print(\\\"Estatísticas por cliente calculadas.\\\")\\n    return client_stats\\n\\ndef calcular_estatisticas_produto(df):\\n    \\\"\\\"\\\"\\n    Calcula estatísticas por produto.\\n    \\\"\\\"\\\"\\n    print(\\\"Calculando estatísticas por produto...\\\")\\n    df[\\'price_y\\'] = pd.to_numeric(df[\\'price_y\\'], errors=\\'coerce\\')\\n    df.dropna(subset=[\\'price_y\\'], inplace=True)\\n\\n    product_stats = df.groupby(\\'product\\').agg(\\n        product_mean_price=(\\'price_y\\', \\'mean\\'),\\n        product_min_price=(\\'price_y\\', \\'min\\'),\\n        product_max_price=(\\'price_y\\', \\'max\\')\\n    ).reset_index()\\n    print(\\\"Estatísticas por produto calculadas.\\\")\\n    return product_stats\\n\\ndef engenharia_features(df):\\n    \\\"\\\"\\\"\\n    Realiza a engenharia de features no DataFrame.\\n    \\\"\\\"\\\"\\n    print(\\\"Iniciando engenharia de features...\\\")\\n\\n    df_processed = df.copy()\\n\\n    # Conversão para datetime otimizada\\n    df_processed[\\'created_at\\'] = pd.to_datetime(df_processed[\\'created_at\\'], errors=\\'coerce\\')\\n    df_processed[\\'updated_at\\'] = pd.to_datetime(df_processed[\\'updated_at\\'], errors=\\'coerce\\')\\n\\n    # Remover linhas onde a conversão de data falhou\\n    df_processed.dropna(subset=[\\'created_at\\', \\'updated_at\\'], inplace=True)\\n\\n    # Feature Engineering de Tempo Otimizada\\n    df_processed[\\'created_year\\'] = df_processed[\\'created_at\\'].dt.year\\n    df_processed[\\'created_month\\'] = df_processed[\\'created_at\\'].dt.month\\n    df_processed[\\'created_day\\'] = df_processed[\\'created_at\\'].dt.day\\n    df_processed[\\'created_hour\\'] = df_processed[\\'created_at\\'].dt.hour\\n    df_processed[\\'created_weekday\\'] = df_processed[\\'created_at\\'].dt.weekday\\n    df_processed[\\'time_difference\\'] = (df_processed[\\'updated_at\\'] - df_processed[\\'created_at\\']).dt.total_seconds() / 60 # em minutos\\n\\n    # Garantir que as colunas de preço são numéricas e calcular com segurança\\n    df_processed[\\'price_x\\'] = pd.to_numeric(df_processed[\\'price_x\\'], errors=\\'coerce\\')\\n    df_processed[\\'price_y\\'] = pd.to_numeric(df[\\'price_y\\'], errors=\\'coerce\\')\\n    df_processed[\\'quantity\\'] = pd.to_numeric(df[\\'quantity\\'], errors=\\'coerce\\')\\n\\n    # Remover linhas com valores nulos resultantes de conversões\\n    df_processed.dropna(subset=[\\'price_x\\', \\'price_y\\', \\'quantity\\'], inplace=True)\\n\\n    # Cálculo de novas features de preço vetorizadas\\n    df_processed[\\'price_diff\\'] = df_processed[\\'price_x\\'] - df_processed[\\'price_y\\']\\n    df_processed[\\'price_ratio\\'] = df_processed[\\'price_x\\'] / df_processed[\\'price_y\\']\\n\\n    # Total de Vendas por Transação\\n    df_processed[\\'total_value_x\\'] = df_processed[\\'price_x\\'] * df_processed[\\'quantity\\']\\n    df_processed[\\'total_value_y\\'] = df_processed[\\'price_y\\'] * df_processed[\\'quantity\\']\\n\\n    print(\\\"Engenharia de features concluída.\\\")\\n    return df_processed\\n\\ndef executar_pipeline(df):\\n    \\\"\\\"\\\"\\n    Executa o pipeline completo de processamento de dados.\\n    \\\"\\\"\\\"\\n    print(\\\"Iniciando execução do pipeline...\\\")\\n    df_features = engenharia_features(df.copy())\\n    df_client_stats = calcular_estatisticas_cliente(df.copy())\\n    df_product_stats = calcular_estatisticas_produto(df.copy())\\n\\n    # Unir estatísticas de cliente e produto ao DataFrame principal\\n    df_final = df_features.merge(df_client_stats, on=\\'email\\', how=\\'left\\')\\n    df_final = df_final.merge(df_product_stats, on=\\'product\\', how=\\'left\\')\\n\\n    # Selecionar e reordenar colunas para a saída final, garantindo a preservação das originais\\n    final_columns = [\\n        \\'name\\', \\'sale_id\\', \\'product_id\\', \\'product\\', \\'price_y\\', \\'quantity\\', \\'price_x\\', \\n        \\'created_at\\', \\'updated_at\\', \\'email\\',\\n        \\'created_year\\', \\'created_month\\', \\'created_day\\', \\'created_hour\\', \\'created_weekday\\',\\n        \\'time_difference\\', \\'price_diff\\', \\'price_ratio\\', \\'total_value_x\\', \\'total_value_y\\',\\n        \\'client_total_spent\\', \\'client_transaction_count\\', \\'client_average_spent\\',\\n        \\'client_first_purchase\\', \\'client_last_purchase\\', \\n        \\'client_days_since_first_purchase\\', \\'client_days_since_last_purchase\\',\\n        \\'product_mean_price\\', \\'product_min_price\\', \\'product_max_price\\'\\n    ]\\n    \\n    # Garantir que todas as colunas existem antes de selecionar\\n    for col in final_columns:\\n        if col not in df_final.columns:\\n            df_final[col] = np.nan # ou outro valor padrão adequado\\n\\n    df_final = df_final[final_columns]\\n\\n    print(\\\"Pipeline concluído. DataFrame final gerado.\\\")\\n    return df_final\\n\\nif __name__ == \\\"__main__\\\":\\n    start_time = time.time()\\n    df_vendas = carregar_dados()\\n\\n    if df_vendas is not None:\\n        df_resultado = executar_pipeline(df_vendas)\\n\\n        # Salvar o resultado (exemplo)\\n        output_file = os.path.join(OUTPUT_PATH, \\\"dados_processados.csv\\\")\\n        os.makedirs(OUTPUT_PATH, exist_ok=True)\\n        df_resultado.to_csv(output_file, index=False)\\n        print(f\\\"Dados processados salvos em \\'{output_file}\\'.\\\")\\n\\n    end_time = time.time()\\n    print(f\\\"Tempo total de execução: {end_time - start_time:.2f} segundos\\\")\\n\\n"
+        }
+      },
+      {
+        "agente": "kraken_optimizer",
+        "ferramenta": "optimize_pipeline",
+        "argumentos": {
+          "confirmed_by_user": true,
+          "proposed_code": "\nimport pandas as pd\nimport numpy as np\nimport os\nimport time\nimport warnings\n\nwarnings.filterwarnings('ignore')\n\n# Desativa a notação científica para melhor legibilidade de números grandes\npd.set_option('display.float_format', lambda x: '%.2f' % x)\n\n# Constantes\nDATA_PATH = 'pipeline/dados/'\nOUTPUT_PATH = 'pipeline/saida/'\n\ndef carregar_dados(file_name=\"dados_vendas.csv\"):\n    \"\"\"\n    Carrega os dados de um arquivo CSV. Assume que o arquivo está na pasta DATA_PATH.\n    \"\"\"\n    try:\n        file_path = os.path.join(DATA_PATH, file_name)\n        df = pd.read_csv(file_path)\n        print(f\"Dados carregados com sucesso de '{file_name}'. {len(df)} linhas.\")\n        return df\n    except FileNotFoundError:\n        print(f\"Erro: O arquivo '{file_name}' não foi encontrado em '{DATA_PATH}'.\")\n        return None\n\ndef calcular_estatisticas_cliente(df):\n    \"\"\"\n    Calcula estatísticas de compras por cliente.\n    \"\"\"\n    print(\"Calculando estatísticas por cliente...\")\n    # Convertendo 'created_at' para datetime apenas uma vez para evitar reprocessamento\n    df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')\n\n    # Garante que 'price_x' e 'quantity' são numéricos\n    df['price_x'] = pd.to_numeric(df['price_x'], errors='coerce')\n    df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')\n\n    # Removendo linhas com valores nulos resultantes das conversões, se houver\n    df.dropna(subset=['created_at', 'price_x', 'quantity'], inplace=True)\n\n    # Calcula o total gasto por linha\n    df['total_price'] = df['price_x'] * df['quantity']\n\n    # Agrupamento vetorizado para estatísticas do cliente\n    client_stats = df.groupby('email').agg(\n        client_total_spent=('total_price', 'sum'),\n        client_transaction_count=('sale_id', 'nunique'),\n        client_average_spent=('total_price', 'mean')\n    ).reset_index()\n\n    # Combina a primeira data de compra e a última data de compra\n    first_purchase = df.groupby('email')['created_at'].min().rename('client_first_purchase')\n    last_purchase = df.groupby('email')['created_at'].max().rename('client_last_purchase')\n\n    client_stats = client_stats.merge(first_purchase, on='email', how='left')\n    client_stats = client_stats.merge(last_purchase, on='email', how='left')\n\n    # Calcula a diferença de tempo entre a primeira e a última compra em dias\n    client_stats['client_days_since_first_purchase'] = (pd.to_datetime('now', utc=True) - client_stats['client_first_purchase']).dt.days\n    client_stats['client_days_since_last_purchase'] = (pd.to_datetime('now', utc=True) - client_stats['client_last_purchase']).dt.days\n\n    print(\"Estatísticas por cliente calculadas.\")\n    return client_stats\n\ndef calcular_estatisticas_produto(df):\n    \"\"\"\n    Calcula estatísticas por produto.\n    \"\"\"\n    print(\"Calculando estatísticas por produto...\")\n    df['price_y'] = pd.to_numeric(df['price_y'], errors='coerce')\n    df.dropna(subset=['price_y'], inplace=True)\n\n    product_stats = df.groupby('product').agg(\n        product_mean_price=('price_y', 'mean'),\n        product_min_price=('price_y', 'min'),\n        product_max_price=('price_y', 'max')\n    ).reset_index()\n    print(\"Estatísticas por produto calculadas.\")\n    return product_stats\n\ndef engenharia_features(df):\n    \"\"\"\n    Realiza a engenharia de features no DataFrame.\n    \"\"\"\n    print(\"Iniciando engenharia de features...\")\n\n    df_processed = df.copy()\n\n    # Conversão para datetime otimizada\n    df_processed['created_at'] = pd.to_datetime(df_processed['created_at'], errors='coerce')\n    df_processed['updated_at'] = pd.to_datetime(df_processed['updated_at'], errors='coerce')\n\n    # Remover linhas onde a conversão de data falhou\n    df_processed.dropna(subset=['created_at', 'updated_at'], inplace=True)\n\n    # Feature Engineering de Tempo Otimizada\n    df_processed['created_year'] = df_processed['created_at'].dt.year\n    df_processed['created_month'] = df_processed['created_at'].dt.month\n    df_processed['created_day'] = df_processed['created_at'].dt.day\n    df_processed['created_hour'] = df_processed['created_at'].dt.hour\n    df_processed['created_weekday'] = df_processed['created_at'].dt.weekday\n    df_processed['time_difference'] = (df_processed['updated_at'] - df_processed['created_at']).dt.total_seconds() / 60 # em minutos\n\n    # Garantir que as colunas de preço são numéricas e calcular com segurança\n    df_processed['price_x'] = pd.to_numeric(df_processed['price_x'], errors='coerce')\n    df_processed['price_y'] = pd.to_numeric(df_processed['price_y'], errors='coerce')\n    df_processed['quantity'] = pd.to_numeric(df_processed['quantity'], errors='coerce')\n\n    # Remover linhas com valores nulos resultantes de conversões\n    df_processed.dropna(subset=['price_x', 'price_y', 'quantity'], inplace=True)\n\n    # Cálculo de novas features de preço vetorizadas\n    df_processed['price_diff'] = df_processed['price_x'] - df_processed['price_y']\n    df_processed['price_ratio'] = df_processed['price_x'] / df_processed['price_y']\n\n    # Total de Vendas por Transação\n    df_processed['total_value_x'] = df_processed['price_x'] * df_processed['quantity']\n    df_processed['total_value_y'] = df_processed['price_y'] * df_processed['quantity']\n\n    print(\"Engenharia de features concluída.\")\n    return df_processed\n\ndef executar_pipeline(df):\n    \"\"\"\n    Executa o pipeline completo de processamento de dados.\n    \"\"\"\n    print(\"Iniciando execução do pipeline...\")\n    df_features = engenharia_features(df.copy())\n    df_client_stats = calcular_estatisticas_cliente(df.copy())\n    df_product_stats = calcular_estatisticas_produto(df.copy())\n\n    # Unir estatísticas de cliente e produto ao DataFrame principal\n    df_final = df_features.merge(df_client_stats, on='email', how='left')\n    df_final = df_final.merge(df_product_stats, on='product', how='left')\n\n    # Selecionar e reordenar colunas para a saída final, garantindo a preservação das originais\n    final_columns = [\n        'name', 'sale_id', 'product_id', 'product', 'price_y', 'quantity', 'price_x', \n        'created_at', 'updated_at', 'email',\n        'created_year', 'created_month', 'created_day', 'created_hour', 'created_weekday',\n        'time_difference', 'price_diff', 'price_ratio', 'total_value_x', 'total_value_y',\n        'client_total_spent', 'client_transaction_count', 'client_average_spent',\n        'client_first_purchase', 'client_last_purchase', \n        'client_days_since_first_purchase', 'client_days_since_last_purchase',\n        'product_mean_price', 'product_min_price', 'product_max_price'\n    ]\n    \n    # Garantir que todas as colunas existem antes de selecionar\n    for col in final_columns:\n        if col not in df_final.columns:\n            df_final[col] = np.nan # ou outro valor padrão adequado\n\n    df_final = df_final[final_columns]\n\n    print(\"Pipeline concluído. DataFrame final gerado.\")\n    return df_final\n\nif __name__ == \"__main__\":\n    start_time = time.time()\n    df_vendas = carregar_dados()\n\n    if df_vendas is not None:\n        df_resultado = executar_pipeline(df_vendas)\n\n        # Salvar o resultado (exemplo)\n        output_file = os.path.join(OUTPUT_PATH, \"dados_processados.csv\")\n        os.makedirs(OUTPUT_PATH, exist_ok=True)\n        df_resultado.to_csv(output_file, index=False)\n        print(f\"Dados processados salvos em '{output_file}'.\")\n\n    end_time = time.time()\n    print(f\"Tempo total de execução: {end_time - start_time:.2f} segundos\")\n\n"
+        }
+      }
+    ],
+    "etapas": [
+      {
+        "tipo": "guardrail.before_model",
+        "titulo": "🛡️ Guardrail de Entrada e Sanitização",
+        "descricao": "Sanitização de comandos inseguros, SQL injection destrutivo e validação de escopo.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "input_chars": 3
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: optimize_pipeline",
+        "descricao": "Chamada executada pelo especialista 'kraken_optimizer'.",
+        "payload": {
+          "ferramenta": "optimize_pipeline",
+          "argumentos": {
+            "confirmed_by_user": true,
+            "proposed_code": "\\nimport pandas as pd\\nimport numpy as np\\nimport os\\nimport time\\nimport warnings\\n\\nwarnings.filterwarnings(\\'ignore\\')\\n\\n# Desativa a notação científica para melhor legibilidade de números grandes\\npd.set_option(\\'display.float_format\\', lambda x: \\'%.2f\\' % x)\\n\\n# Constantes\\nDATA_PATH = \\'pipeline/dados/\\'\\nOUTPUT_PATH = \\'pipeline/saida/\\'\\n\\ndef carregar_dados(file_name=\\\"dados_vendas.csv\\\"):\\n    \\\"\\\"\\\"\\n    Carrega os dados de um arquivo CSV. Assume que o arquivo está na pasta DATA_PATH.\\n    \\\"\\\"\\\"\\n    try:\\n        file_path = os.path.join(DATA_PATH, file_name)\\n        df = pd.read_csv(file_path)\\n        print(f\\\"Dados carregados com sucesso de \\'{file_name}\\'. {len(df)} linhas.\\\")\\n        return df\\n    except FileNotFoundError:\\n        print(f\\\"Erro: O arquivo \\'{file_name}\\' não foi encontrado em \\'{DATA_PATH}\\'.\\\")\\n        return None\\n\\ndef calcular_estatisticas_cliente(df):\\n    \\\"\\\"\\\"\\n    Calcula estatísticas de compras por cliente.\\n    \\\"\\\"\\\"\\\n    print(\\\"Calculando estatísticas por cliente...\\\")\\n    # Convertendo \\'created_at\\' para datetime apenas uma vez para evitar reprocessamento\\n    df[\\'created_at\\'] = pd.to_datetime(df[\\'created_at\\'], errors=\\'coerce\\')\\n\\n    # Garante que \\'price_x\\' e \\'quantity\\' são numéricos\\n    df[\\'price_x\\'] = pd.to_numeric(df[\\'price_x\\'], errors=\\'coerce\\')\\n    df[\\'quantity\\'] = pd.to_numeric(df[\\'quantity\\'], errors=\\'coerce\\')\\n\\n    # Removendo linhas com valores nulos resultantes das conversões, se houver\\n    df.dropna(subset=[\\'created_at\\', \\'price_x\\', \\'quantity\\'], inplace=True)\\n\\n    # Calcula o total gasto por linha\\n    df[\\'total_price\\'] = df[\\'price_x\\'] * df[\\'quantity\\']\\n\\n    # Agrupamento vetorizado para estatísticas do cliente\\n    client_stats = df.groupby(\\'email\\').agg(\\n        client_total_spent=(\\'total_price\\', \\'sum\\'),\\n        client_transaction_count=(\\'sale_id\\', \\'nunique\\'),\\n        client_average_spent=(\\'total_price\\', \\'mean\\')\\n    ).reset_index()\\n\\n    # Combina a primeira data de compra e a última data de compra\\n    first_purchase = df.groupby(\\'email\\')[\\'created_at\\'].min().rename(\\'client_first_purchase\\')\\n    last_purchase = df.groupby(\\'email\\')[\\'created_at\\'].max().rename(\\'client_last_purchase\\')\\n\\n    client_stats = client_stats.merge(first_purchase, on=\\'email\\', how=\\'left\\')\\n    client_stats = client_stats.merge(last_purchase, on=\\'email\\', how=\\'left\\')\\n\\n    # Calcula a diferença de tempo entre a primeira e a última compra em dias\\n    client_stats[\\'client_days_since_first_purchase\\'] = (pd.to_datetime(\\'now\\', utc=True) - client_stats[\\'client_first_purchase\\']).dt.days\\n    client_stats[\\'client_days_since_last_purchase\\'] = (pd.to_datetime(\\'now\\', utc=True) - client_stats[\\'client_last_purchase\\']).dt.days\\n\\n    print(\\\"Estatísticas por cliente calculadas.\\\")\\n    return client_stats\\n\\ndef calcular_estatisticas_produto(df):\\n    \\\"\\\"\\\"\\n    Calcula estatísticas por produto.\\n    \\\"\\\"\\\"\\n    print(\\\"Calculando estatísticas por produto...\\\")\\n    df[\\'price_y\\'] = pd.to_numeric(df[\\'price_y\\'], errors=\\'coerce\\')\\n    df.dropna(subset=[\\'price_y\\'], inplace=True)\\n\\n    product_stats = df.groupby(\\'product\\').agg(\\n        product_mean_price=(\\'price_y\\', \\'mean\\'),\\n        product_min_price=(\\'price_y\\', \\'min\\'),\\n        product_max_price=(\\'price_y\\', \\'max\\')\\n    ).reset_index()\\n    print(\\\"Estatísticas por produto calculadas.\\\")\\n    return product_stats\\n\\ndef engenharia_features(df):\\n    \\\"\\\"\\\"\\n    Realiza a engenharia de features no DataFrame.\\n    \\\"\\\"\\\"\\n    print(\\\"Iniciando engenharia de features...\\\")\\n\\n    df_processed = df.copy()\\n\\n    # Conversão para datetime otimizada\\n    df_processed[\\'created_at\\'] = pd.to_datetime(df_processed[\\'created_at\\'], errors=\\'coerce\\')\\n    df_processed[\\'updated_at\\'] = pd.to_datetime(df_processed[\\'updated_at\\'], errors=\\'coerce\\')\\n\\n    # Remover linhas onde a conversão de data falhou\\n    df_processed.dropna(subset=[\\'created_at\\', \\'updated_at\\'], inplace=True)\\n\\n    # Feature Engineering de Tempo Otimizada\\n    df_processed[\\'created_year\\'] = df_processed[\\'created_at\\'].dt.year\\n    df_processed[\\'created_month\\'] = df_processed[\\'created_at\\'].dt.month\\n    df_processed[\\'created_day\\'] = df_processed[\\'created_at\\'].dt.day\\n    df_processed[\\'created_hour\\'] = df_processed[\\'created_at\\'].dt.hour\\n    df_processed[\\'created_weekday\\'] = df_processed[\\'created_at\\'].dt.weekday\\n    df_processed[\\'time_difference\\'] = (df_processed[\\'updated_at\\'] - df_processed[\\'created_at\\']).dt.total_seconds() / 60 # em minutos\\n\\n    # Garantir que as colunas de preço são numéricas e calcular com segurança\\n    df_processed[\\'price_x\\'] = pd.to_numeric(df_processed[\\'price_x\\'], errors=\\'coerce\\')\\n    df_processed[\\'price_y\\'] = pd.to_numeric(df[\\'price_y\\'], errors=\\'coerce\\')\\n    df_processed[\\'quantity\\'] = pd.to_numeric(df[\\'quantity\\'], errors=\\'coerce\\')\\n\\n    # Remover linhas com valores nulos resultantes de conversões\\n    df_processed.dropna(subset=[\\'price_x\\', \\'price_y\\', \\'quantity\\'], inplace=True)\\n\\n    # Cálculo de novas features de preço vetorizadas\\n    df_processed[\\'price_diff\\'] = df_processed[\\'price_x\\'] - df_processed[\\'price_y\\']\\n    df_processed[\\'price_ratio\\'] = df_processed[\\'price_x\\'] / df_processed[\\'price_y\\']\\n\\n    # Total de Vendas por Transação\\n    df_processed[\\'total_value_x\\'] = df_processed[\\'price_x\\'] * df_processed[\\'quantity\\']\\n    df_processed[\\'total_value_y\\'] = df_processed[\\'price_y\\'] * df_processed[\\'quantity\\']\\n\\n    print(\\\"Engenharia de features concluída.\\\")\\n    return df_processed\\n\\ndef executar_pipeline(df):\\n    \\\"\\\"\\\"\\n    Executa o pipeline completo de processamento de dados.\\n    \\\"\\\"\\\"\\n    print(\\\"Iniciando execução do pipeline...\\\")\\n    df_features = engenharia_features(df.copy())\\n    df_client_stats = calcular_estatisticas_cliente(df.copy())\\n    df_product_stats = calcular_estatisticas_produto(df.copy())\\n\\n    # Unir estatísticas de cliente e produto ao DataFrame principal\\n    df_final = df_features.merge(df_client_stats, on=\\'email\\', how=\\'left\\')\\n    df_final = df_final.merge(df_product_stats, on=\\'product\\', how=\\'left\\')\\n\\n    # Selecionar e reordenar colunas para a saída final, garantindo a preservação das originais\\n    final_columns = [\\n        \\'name\\', \\'sale_id\\', \\'product_id\\', \\'product\\', \\'price_y\\', \\'quantity\\', \\'price_x\\', \\n        \\'created_at\\', \\'updated_at\\', \\'email\\',\\n        \\'created_year\\', \\'created_month\\', \\'created_day\\', \\'created_hour\\', \\'created_weekday\\',\\n        \\'time_difference\\', \\'price_diff\\', \\'price_ratio\\', \\'total_value_x\\', \\'total_value_y\\',\\n        \\'client_total_spent\\', \\'client_transaction_count\\', \\'client_average_spent\\',\\n        \\'client_first_purchase\\', \\'client_last_purchase\\', \\n        \\'client_days_since_first_purchase\\', \\'client_days_since_last_purchase\\',\\n        \\'product_mean_price\\', \\'product_min_price\\', \\'product_max_price\\'\\n    ]\\n    \\n    # Garantir que todas as colunas existem antes de selecionar\\n    for col in final_columns:\\n        if col not in df_final.columns:\\n            df_final[col] = np.nan # ou outro valor padrão adequado\\n\\n    df_final = df_final[final_columns]\\n\\n    print(\\\"Pipeline concluído. DataFrame final gerado.\\\")\\n    return df_final\\n\\nif __name__ == \\\"__main__\\\":\\n    start_time = time.time()\\n    df_vendas = carregar_dados()\\n\\n    if df_vendas is not None:\\n        df_resultado = executar_pipeline(df_vendas)\\n\\n        # Salvar o resultado (exemplo)\\n        output_file = os.path.join(OUTPUT_PATH, \\\"dados_processados.csv\\\")\\n        os.makedirs(OUTPUT_PATH, exist_ok=True)\\n        df_resultado.to_csv(output_file, index=False)\\n        print(f\\\"Dados processados salvos em \\'{output_file}\\'.\\\")\\n\\n    end_time = time.time()\\n    print(f\\\"Tempo total de execução: {end_time - start_time:.2f} segundos\\\")\\n\\n"
+          }
+        }
+      },
+      {
+        "tipo": "tool_execution",
+        "titulo": "🛠️ Execução de Ferramenta: optimize_pipeline",
+        "descricao": "Chamada executada pelo especialista 'kraken_optimizer'.",
+        "payload": {
+          "ferramenta": "optimize_pipeline",
+          "argumentos": {
+            "confirmed_by_user": true,
+            "proposed_code": "\nimport pandas as pd\nimport numpy as np\nimport os\nimport time\nimport warnings\n\nwarnings.filterwarnings('ignore')\n\n# Desativa a notação científica para melhor legibilidade de números grandes\npd.set_option('display.float_format', lambda x: '%.2f' % x)\n\n# Constantes\nDATA_PATH = 'pipeline/dados/'\nOUTPUT_PATH = 'pipeline/saida/'\n\ndef carregar_dados(file_name=\"dados_vendas.csv\"):\n    \"\"\"\n    Carrega os dados de um arquivo CSV. Assume que o arquivo está na pasta DATA_PATH.\n    \"\"\"\n    try:\n        file_path = os.path.join(DATA_PATH, file_name)\n        df = pd.read_csv(file_path)\n        print(f\"Dados carregados com sucesso de '{file_name}'. {len(df)} linhas.\")\n        return df\n    except FileNotFoundError:\n        print(f\"Erro: O arquivo '{file_name}' não foi encontrado em '{DATA_PATH}'.\")\n        return None\n\ndef calcular_estatisticas_cliente(df):\n    \"\"\"\n    Calcula estatísticas de compras por cliente.\n    \"\"\"\n    print(\"Calculando estatísticas por cliente...\")\n    # Convertendo 'created_at' para datetime apenas uma vez para evitar reprocessamento\n    df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')\n\n    # Garante que 'price_x' e 'quantity' são numéricos\n    df['price_x'] = pd.to_numeric(df['price_x'], errors='coerce')\n    df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')\n\n    # Removendo linhas com valores nulos resultantes das conversões, se houver\n    df.dropna(subset=['created_at', 'price_x', 'quantity'], inplace=True)\n\n    # Calcula o total gasto por linha\n    df['total_price'] = df['price_x'] * df['quantity']\n\n    # Agrupamento vetorizado para estatísticas do cliente\n    client_stats = df.groupby('email').agg(\n        client_total_spent=('total_price', 'sum'),\n        client_transaction_count=('sale_id', 'nunique'),\n        client_average_spent=('total_price', 'mean')\n    ).reset_index()\n\n    # Combina a primeira data de compra e a última data de compra\n    first_purchase = df.groupby('email')['created_at'].min().rename('client_first_purchase')\n    last_purchase = df.groupby('email')['created_at'].max().rename('client_last_purchase')\n\n    client_stats = client_stats.merge(first_purchase, on='email', how='left')\n    client_stats = client_stats.merge(last_purchase, on='email', how='left')\n\n    # Calcula a diferença de tempo entre a primeira e a última compra em dias\n    client_stats['client_days_since_first_purchase'] = (pd.to_datetime('now', utc=True) - client_stats['client_first_purchase']).dt.days\n    client_stats['client_days_since_last_purchase'] = (pd.to_datetime('now', utc=True) - client_stats['client_last_purchase']).dt.days\n\n    print(\"Estatísticas por cliente calculadas.\")\n    return client_stats\n\ndef calcular_estatisticas_produto(df):\n    \"\"\"\n    Calcula estatísticas por produto.\n    \"\"\"\n    print(\"Calculando estatísticas por produto...\")\n    df['price_y'] = pd.to_numeric(df['price_y'], errors='coerce')\n    df.dropna(subset=['price_y'], inplace=True)\n\n    product_stats = df.groupby('product').agg(\n        product_mean_price=('price_y', 'mean'),\n        product_min_price=('price_y', 'min'),\n        product_max_price=('price_y', 'max')\n    ).reset_index()\n    print(\"Estatísticas por produto calculadas.\")\n    return product_stats\n\ndef engenharia_features(df):\n    \"\"\"\n    Realiza a engenharia de features no DataFrame.\n    \"\"\"\n    print(\"Iniciando engenharia de features...\")\n\n    df_processed = df.copy()\n\n    # Conversão para datetime otimizada\n    df_processed['created_at'] = pd.to_datetime(df_processed['created_at'], errors='coerce')\n    df_processed['updated_at'] = pd.to_datetime(df_processed['updated_at'], errors='coerce')\n\n    # Remover linhas onde a conversão de data falhou\n    df_processed.dropna(subset=['created_at', 'updated_at'], inplace=True)\n\n    # Feature Engineering de Tempo Otimizada\n    df_processed['created_year'] = df_processed['created_at'].dt.year\n    df_processed['created_month'] = df_processed['created_at'].dt.month\n    df_processed['created_day'] = df_processed['created_at'].dt.day\n    df_processed['created_hour'] = df_processed['created_at'].dt.hour\n    df_processed['created_weekday'] = df_processed['created_at'].dt.weekday\n    df_processed['time_difference'] = (df_processed['updated_at'] - df_processed['created_at']).dt.total_seconds() / 60 # em minutos\n\n    # Garantir que as colunas de preço são numéricas e calcular com segurança\n    df_processed['price_x'] = pd.to_numeric(df_processed['price_x'], errors='coerce')\n    df_processed['price_y'] = pd.to_numeric(df_processed['price_y'], errors='coerce')\n    df_processed['quantity'] = pd.to_numeric(df_processed['quantity'], errors='coerce')\n\n    # Remover linhas com valores nulos resultantes de conversões\n    df_processed.dropna(subset=['price_x', 'price_y', 'quantity'], inplace=True)\n\n    # Cálculo de novas features de preço vetorizadas\n    df_processed['price_diff'] = df_processed['price_x'] - df_processed['price_y']\n    df_processed['price_ratio'] = df_processed['price_x'] / df_processed['price_y']\n\n    # Total de Vendas por Transação\n    df_processed['total_value_x'] = df_processed['price_x'] * df_processed['quantity']\n    df_processed['total_value_y'] = df_processed['price_y'] * df_processed['quantity']\n\n    print(\"Engenharia de features concluída.\")\n    return df_processed\n\ndef executar_pipeline(df):\n    \"\"\"\n    Executa o pipeline completo de processamento de dados.\n    \"\"\"\n    print(\"Iniciando execução do pipeline...\")\n    df_features = engenharia_features(df.copy())\n    df_client_stats = calcular_estatisticas_cliente(df.copy())\n    df_product_stats = calcular_estatisticas_produto(df.copy())\n\n    # Unir estatísticas de cliente e produto ao DataFrame principal\n    df_final = df_features.merge(df_client_stats, on='email', how='left')\n    df_final = df_final.merge(df_product_stats, on='product', how='left')\n\n    # Selecionar e reordenar colunas para a saída final, garantindo a preservação das originais\n    final_columns = [\n        'name', 'sale_id', 'product_id', 'product', 'price_y', 'quantity', 'price_x', \n        'created_at', 'updated_at', 'email',\n        'created_year', 'created_month', 'created_day', 'created_hour', 'created_weekday',\n        'time_difference', 'price_diff', 'price_ratio', 'total_value_x', 'total_value_y',\n        'client_total_spent', 'client_transaction_count', 'client_average_spent',\n        'client_first_purchase', 'client_last_purchase', \n        'client_days_since_first_purchase', 'client_days_since_last_purchase',\n        'product_mean_price', 'product_min_price', 'product_max_price'\n    ]\n    \n    # Garantir que todas as colunas existem antes de selecionar\n    for col in final_columns:\n        if col not in df_final.columns:\n            df_final[col] = np.nan # ou outro valor padrão adequado\n\n    df_final = df_final[final_columns]\n\n    print(\"Pipeline concluído. DataFrame final gerado.\")\n    return df_final\n\nif __name__ == \"__main__\":\n    start_time = time.time()\n    df_vendas = carregar_dados()\n\n    if df_vendas is not None:\n        df_resultado = executar_pipeline(df_vendas)\n\n        # Salvar o resultado (exemplo)\n        output_file = os.path.join(OUTPUT_PATH, \"dados_processados.csv\")\n        os.makedirs(OUTPUT_PATH, exist_ok=True)\n        df_resultado.to_csv(output_file, index=False)\n        print(f\"Dados processados salvos em '{output_file}'.\")\n\n    end_time = time.time()\n    print(f\"Tempo total de execução: {end_time - start_time:.2f} segundos\")\n\n"
+          }
+        }
+      },
+      {
+        "tipo": "guardrail.after_model",
+        "titulo": "🛡️ Guardrail de Saída e Auditoria",
+        "descricao": "Inspeção contra vazamento de credenciais, chaves de API, PII e caminhos não autorizados.",
+        "duracao_ms": 1,
+        "payload": {
+          "status": "passed",
+          "output_chars": 1551
+        }
+      }
+    ],
+    "criado_em": "2026-11-09T16:24:36.659812+00:00"
+  }
+}

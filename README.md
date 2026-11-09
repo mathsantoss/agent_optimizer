@@ -8,22 +8,17 @@ Ele permite que cientistas, engenheiros e analistas interajam em linguagem natur
 
 ## 🏗️ Arquitetura
 
-O produto opera em uma arquitetura multi-agentes composta pelo **Orquestrador Central**, o **Agente de Planejamento** e **3 Especialistas Técnicos**:
+O produto opera em uma arquitetura multi-agentes composta pelo **Orquestrador Central (Kraken Copilot)** e **3 Especialistas Técnicos**:
 
 ```mermaid
 flowchart TB
     U(["👤 Usuário"]) --> O["🧠 Kraken Copilot (Orquestrador)"]
-    O -->|Solicitações Complexas / Decomposição| P["🗺️ Kraken Planner"]
-    P -->|Etapas Analíticas| A["📊 Kraken Analyst"]
-    P -->|Etapas de Features e Código| F["🔬 Kraken Code"]
-    P -->|Etapas de Otimização e Benchmark| C["⚙️ Kraken Optimizer"]
-    O -->|Consultas Analíticas Diretas| A
-    O -->|Features Diretas| F
-    O -->|Otimização Direta| C
+    O -->|Análises, Diagnósticos e SQL| A["📊 Kraken Analyst"]
+    O -->|Engenharia de Features Pandas/PySpark| F["⚡ Kraken Code"]
+    O -->|Otimização AST, Profiling e Benchmarks| C["🚀 Kraken Optimizer"]
 ```
 
-- **Kraken Copilot (`kraken_copilot`)**: Orquestrador principal. Interpreta a intenção do usuário e direciona solicitações complexas para o Planner ou demandas pontuais diretamente para o especialista adequado.
-- **Kraken Planner (`kraken_planner`)**: Agente de planejamento estratégico. Decompõe solicitações complexas em etapas estruturadas com dependências e critérios de sucesso, coordena os especialistas em sequência e realiza replanejamento automático em caso de falhas ou imprevistos (`create_execution_plan`, `get_plan_status`, `update_plan_step`, `replan_execution`).
+- **Kraken Copilot (`kraken_copilot`)**: Orquestrador principal. Interpreta a intenção do usuário em linguagem natural e coordena os especialistas técnicos com transferências nativas via Google ADK.
 - **Kraken Analyst (`kraken_analyst`)**: Explora os datasets em `pipeline/dados/`, gera diagnósticos de qualidade, estatística descritiva, consulta o Dicionário de Dados e executa queries SQL analíticas em memória (`analyze_dataset`, `query_dataset`, `search_knowledge_base`).
 - **Kraken Code (`kraken_code`)**: Projeta pipelines completos e adiciona novas features para Machine Learning agnósticas a qualquer dataset, suportando nativamente Pandas e PySpark (`generate_feature_pipeline`, `add_feature_to_pipeline`, `preview_features`).
 - **Kraken Optimizer (`kraken_optimizer`)**: Realiza diagnóstico estático AST, propõe e aplica otimizações sob autorização explícita, gera backups automáticos e executa benchmarks comparativos de Antes vs Depois em tempo e memória (`inspect_pipeline`, `optimize_pipeline`, `validate_pipeline`).
@@ -124,15 +119,27 @@ Ou com **pip** / **conda**:
 pip install -r requirements.txt
 ```
 
-### 5. Inicie a Interface Web
-Suba o servidor do Google ADK:
+### 5. Inicie a Interface Web do Kraken Copilot
+
+Você pode utilizar a **Interface Web Própria do Kraken Copilot** (recomendada para a melhor experiência) ou o ADK Web genérico:
+
+#### Opção A: Interface Própria do Kraken Copilot (Recomendado)
+Inicie o servidor web dedicado do Kraken Copilot:
 ```bash
-# A partir da raiz do repositório:
+python -m kraken_copilot.server
+```
+Abra no navegador em **`http://localhost:8080`**:
+- **Chat com Especialistas**: Identificação visual automática de qual especialista respondeu (`📊 Kraken Analyst`, `⚡ Kraken Code` ou `🚀 Kraken Optimizer`).
+- **Cards de 1 Clique**: Ações rápidas para análise de datasets, resumos estatísticos, criação de features e otimização de pipeline.
+- **Formatação Rica**: Renderização limpa de tabelas analíticas Markdown, queries SQL e blocos de código com botão de cópia.
+- **Página de Investigação e Observabilidade**: Acesse `/investigar/{execucao_id}` para auditar a timeline completa da execução, guardrails acionados, latência e métricas de telemetria.
+
+#### Opção B: Google ADK Web (Genérico)
+Caso deseje utilizar o visualizador padrão do Google ADK:
+```bash
 adk web .
 ```
-*(Ou simplesmente `adk web`)*
-
-Abra no navegador em **`http://localhost:8000`** e o agente selecionado será diretamente o **`kraken_copilot`**.
+Acesse em **`http://localhost:8000`**.
 
 ---
 

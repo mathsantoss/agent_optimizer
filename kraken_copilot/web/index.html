@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Kraken Copilot | Data Science & Pipeline AI</title>
+  <link rel="icon" type="image/svg+xml" href="/web/kraken-copilot.svg">
+  <link rel="stylesheet" href="/web/app.css">
+  <script src="/web/app.js" defer></script>
+</head>
+<body data-view="chat">
+  <a class="skip" href="#principal">Ir para a conversa</a>
+  <div class="app-shell" id="app-shell">
+    
+    <!-- Sidebar de Conversas -->
+    <aside class="sidebar" id="sidebar" aria-labelledby="titulo-historico">
+      <a class="brand" href="/" aria-label="Kraken Copilot, início">
+        <img class="brand-mark" src="/web/kraken-copilot.svg" alt="" width="40" height="40">
+        <span>Kraken <strong>Copilot</strong><small>Analytics & Pipelines</small></span>
+      </a>
+      <button class="new-conversation" type="button" id="nova-conversa">
+        <span aria-hidden="true">+</span> Nova conversa
+      </button>
+      <nav class="conversation-nav" aria-labelledby="titulo-historico">
+        <h2 class="eyebrow" id="titulo-historico">Sessões Recentes</h2>
+        <div id="historico"><p class="empty">Carregando sessões…</p></div>
+      </nav>
+      <p class="sidebar-footer">
+        <span class="signal" aria-hidden="true"></span> Vertex AI · gemini-2.5-flash
+      </p>
+    </aside>
+
+    <!-- Área Principal de Chat -->
+    <main class="conversation" id="principal" tabindex="-1" aria-labelledby="titulo">
+      <header class="conversation-header">
+        <div class="header-title">
+          <p class="eyebrow">Assistente Multi-Agente Inteligente</p>
+          <h1 id="titulo">Nova conversa</h1>
+        </div>
+        <span class="corpus-label">📁 pipeline/dados · ⚡ pipeline_prep.py</span>
+      </header>
+
+      <div class="conversation-scroll" id="conversation-scroll" tabindex="0" aria-label="Mensagens da conversa">
+        <div class="conversation-content" id="chat-messages">
+          <div class="welcome" id="welcome-card">
+            <p class="eyebrow">Google ADK & Databricks Genie Style</p>
+            <h2>Como posso ajudar hoje?</h2>
+            <p>Explore datasets, gere features para Machine Learning ou inspecione e otimize pipelines de dados com equivalência estrita.</p>
+            
+            <div class="prompt-suggestions">
+              <button class="suggestion-btn" type="button" data-prompt="quais dados temos disponíveis?">
+                <strong>📊 Análise de Dados</strong>
+                <span>Quais datasets temos disponíveis e suas características?</span>
+              </button>
+              <button class="suggestion-btn" type="button" data-prompt="mostre o resumo estatístico e nulos da base de dados_vendas">
+                <strong>📈 Estatísticas Descritivas</strong>
+                <span>Resumo numérico, nulos e distribuição de dados_vendas</span>
+              </button>
+              <button class="suggestion-btn" type="button" data-prompt="adicione uma feature de ticket médio por cliente em Pandas no pipeline_prep.py">
+                <strong>⚡ Engenharia de Features</strong>
+                <span>Adicionar feature de ticket médio em pipeline_prep.py</span>
+              </button>
+              <button class="suggestion-btn" type="button" data-prompt="inspecione os gargalos do pipeline_prep.py e mostre a tabela de benchmark antes vs depois">
+                <strong>🚀 Otimização de Código</strong>
+                <span>Inspecionar gargalos AST e rodar benchmark comparativo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Composer de Envio de Mensagem -->
+      <div class="composer">
+        <form id="consulta-form" class="composer-inner">
+          <p id="aviso" class="notice" role="status" hidden></p>
+          <label class="sr-only" for="pergunta">Mensagem para o Kraken Copilot</label>
+          <div class="composer-field">
+            <textarea id="pergunta" name="pergunta" rows="2" required maxlength="5000" placeholder="Pergunte sobre os dados, solicite features ou otimização de pipeline…"></textarea>
+            <button class="button primary" id="enviar" type="submit">Enviar <span aria-hidden="true">↑</span></button>
+          </div>
+          <p class="hint" id="ajuda-pergunta">Enter para enviar · Shift+Enter para quebrar a linha.</p>
+        </form>
+      </div>
+    </main>
+
+  </div>
+</body>
+</html>
+

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Investigação e Observabilidade | Kraken Copilot</title>
+  <link rel="icon" type="image/svg+xml" href="/web/kraken-copilot.svg">
+  <link rel="stylesheet" href="/web/app.css">
+  <script src="/web/app.js" defer></script>
+</head>
+<body data-view="investigacao">
+  <a class="skip" href="#principal">Ir para a investigação</a>
+  
+  <header class="inspection-header">
+    <div class="inspection-shell">
+      <a class="brand" href="/" aria-label="Kraken Copilot, início">
+        <img class="brand-mark" src="/web/kraken-copilot.svg" alt="" width="36" height="36">
+        <span>Kraken <strong>Copilot</strong></span>
+      </a>
+      <a class="back-link" id="nav-voltar" href="/"><span aria-hidden="true">←</span> Voltar à conversa</a>
+    </div>
+  </header>
+
+  <main class="inspection-shell inspection-main" id="principal" tabindex="-1" aria-labelledby="titulo">
+    <div class="inspection-heading">
+      <div>
+        <p class="eyebrow">Auditoria, Guardrails & OpenTelemetry</p>
+        <h1 id="titulo">Investigação da Execução</h1>
+      </div>
+      <button class="button" id="atualizar-btn" type="button">Atualizar</button>
+    </div>
+
+    <div id="investigacao-conteudo" aria-busy="true">
+      <p class="empty">Carregando telemetria da execução…</p>
+    </div>
+  </main>
+</body>
+</html>
+
