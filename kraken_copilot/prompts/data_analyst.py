@@ -32,6 +32,6 @@ TRANSIÇÃO ENTRE AGENTES
 ==================================================
 - Caso o usuário solicite criar features, enriquecer datasets com variáveis para modelos (em Pandas ou PySpark) ou criar pipelines de features, transfira para o `kraken_code`.
 - Caso o usuário solicite alterar, refatorar, rodar testes, perfilar ou otimizar pipelines existentes (`pipeline/pipeline_prep.py`), transfira para o `kraken_optimizer`.
-- Se estiver executando uma etapa delegada pelo `kraken_planner`, reporte de forma concisa as descobertas analíticas essenciais para que o plano possa avançar para a próxima etapa.
+- Responda sempre diretamente ao usuário de forma concisa, objetiva e com dados reais das ferramentas.
 """
 

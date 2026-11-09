@@ -53,6 +53,6 @@ TRANSIÇÃO ENTRE AGENTES
 ==================================================
 - Para diagnósticos de gargalos de performance, profiling de tempo/memória ou benchmarks comparativos: transfira para o `kraken_optimizer`.
 - Para explorações analíticas preliminares, investigações estatísticas ou consultas SQL: transfira para o `kraken_analyst`.
-- Se estiver executando uma etapa delegada pelo `kraken_planner`, relate o resumo das features criadas para permitir o avanço do plano.
+- Responda sempre diretamente ao usuário com as implementações e validações de features realizadas.
 """
 

@@ -216,21 +216,6 @@ def before_model_guardrail(
 
 def _build_fallback_for_empty_response(agent_name: str, callback_context: Any = None) -> str:
     """Gera uma resposta de fallback válida e informativa quando o modelo encerra sem conteúdo de texto ou apenas com pensamentos."""
-    from kraken_copilot.tools.planner.plan_manager import current_user_request_var, global_plan_manager
-    session_id = "default"
-    state = getattr(callback_context, "state", None) if callback_context is not None else None
-    if hasattr(state, "get") and state.get("session_id"):
-        session_id = str(state["session_id"])
-
-    user_req = current_user_request_var.get().strip()
-
-    if agent_name == "kraken_planner":
-        from kraken_copilot.agents.planner_agent import synthesize_plan_for_request
-        plan = global_plan_manager.get_plan(session_id=session_id)
-        if plan is None:
-            plan = synthesize_plan_for_request(user_req, session_id=session_id, force_new=True, state=state)
-        return global_plan_manager.format_plan_markdown(plan)
-
     if "optimizer" in agent_name:
         return (
             "Diagnóstico do pipeline executado. Proposta de otimização registrada em `pipeline/tmp/pipeline_prep_otimizado.bak`. "
@@ -242,6 +227,8 @@ def _build_fallback_for_empty_response(agent_name: str, callback_context: Any = 
 
     if "code" in agent_name:
         return "Features projetadas e testadas com sucesso no pipeline."
+
+    return "Operação processada com sucesso pelo assistente."
 
     return "Operação processada com sucesso pelo especialista."
 
@@ -381,23 +368,8 @@ def before_tool_guardrail(
         # Reseta contador após qualquer etapa de inspeção, preview ou validação
         state["save_file_attempts"] = 0
 
-    # 2. Bloqueio de bypass direto para especialistas sem passar pelo Planner/Coordinator e limite de handoffs
+    # 2. Limite de handoffs entre agentes para evitar loops infinitos de delegação
     if tool_name == "transfer_to_agent":
-        target_agent = str((args or {}).get("agent_name") or "").strip()
-        if target_agent in ("kraken_analyst", "kraken_code", "kraken_optimizer"):
-            has_active_plan = bool(state.get("execution_plan")) or (
-                isinstance(state.get("workflow_state"), dict)
-                and bool(state["workflow_state"].get("active_plan"))
-            )
-            if not has_active_plan:
-                msg = (
-                    f"GUARDRAIL DE ORQUESTRAÇÃO ATIVADO: Delegação direta para '{target_agent}' bloqueada. "
-                    "Solicitações operacionais devem obrigatoriamente passar pelo 'kraken_planner' e "
-                    "ser executadas pelo 'kraken_coordinator' com um plano estruturado ativo."
-                )
-                record_guardrail_event("ORCHESTRATION_BYPASS", "transfer_to_agent", "BLOQUEADO", msg)
-                return {"result": msg}
-
         transfers = int(state.get("agent_transfer_count", 0))
         if transfers >= MAX_AGENT_TRANSFERS:
             msg = (

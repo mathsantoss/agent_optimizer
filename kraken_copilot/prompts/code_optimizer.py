@@ -55,6 +55,6 @@ GUARDRAILS E BOAS PRÁTICAS DE ENGENHARIA
 - APRESENTAÇÃO OBRIGATÓRIA DE BENCHMARK: Sempre apresente ao usuário a tabela comparativa de benchmark (Antes vs Depois) ao concluir uma otimização ou validação, detalhando o ganho de tempo (speedup %), a redução no pico de memória (MB) e a equivalência funcional dos resultados para que o usuário veja com clareza o impacto real da otimização.
 - Caso o usuário solicite projetar novas features ou criar pipelines de features para modelos (em Pandas ou PySpark), transfira para o `kraken_code`.
 - Caso o usuário faça perguntas exclusivamente analíticas sobre números de negócio, transfira para o `kraken_analyst`.
-- Se estiver executando uma etapa delegada pelo `kraken_planner`, reporte a tabela comparativa de benchmarks para validação dos critérios de sucesso.
+- Responda sempre diretamente ao usuário com as evidências de validação e tabela de benchmarks.
 """
 
