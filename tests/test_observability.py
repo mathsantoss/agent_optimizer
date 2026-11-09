@@ -1,4 +1,4 @@
-"""Testes automatizados da infraestrutura de Observabilidade OpenTelemetry do Kraken IA."""
+"""Testes automatizados da infraestrutura de Observabilidade OpenTelemetry do Kraken Copilot."""
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -11,16 +11,16 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from kraken_ia.agent import kraken_analyst_agent, kraken_optimizer_agent, root_agent
-import kraken_ia.observability as obs
+from kraken_copilot.agent import kraken_analyst_agent, kraken_optimizer_agent, root_agent
+import kraken_copilot.observability as obs
 
 
 def test_observability_files_and_dashboard_valid():
     """Garante que o Docker Compose, provisioning e dashboard do Grafana existem e são válidos."""
     project_root = Path(__file__).resolve().parents[1]
     compose_file = project_root / "docker-compose.observability.yml"
-    provisioning_file = project_root / "observability" / "grafana" / "provisioning" / "dashboards" / "kraken-ia-dashboards.yaml"
-    dashboard_file = project_root / "observability" / "grafana" / "dashboards" / "kraken-ia-observability.json"
+    provisioning_file = project_root / "observability" / "grafana" / "provisioning" / "dashboards" / "kraken-copilot-dashboards.yaml"
+    dashboard_file = project_root / "observability" / "grafana" / "dashboards" / "kraken-copilot-observability.json"
     readme_file = project_root / "observability" / "README.md"
 
     assert compose_file.exists(), "docker-compose.observability.yml deve existir"
@@ -30,7 +30,7 @@ def test_observability_files_and_dashboard_valid():
     assert readme_file.exists(), "README da observabilidade deve existir"
 
     dashboard_data = json.loads(dashboard_file.read_text(encoding="utf-8"))
-    assert dashboard_data["uid"] == "kraken-ia-observability"
+    assert dashboard_data["uid"] == "kraken-copilot-observability"
     assert len(dashboard_data.get("panels", [])) >= 12
 
 
@@ -111,14 +111,14 @@ def test_sanitizing_span_processor_redacts_prompts_and_extracts_safe_metadata():
     assert exported_attrs.get("gen_ai.usage.total_tokens") == 165
     assert exported_attrs.get("gen_ai.response.model") == "ollama_chat/qwen3.6:35b-a3b"
     assert exported_attrs.get("agent.delegated_to") == "kraken_analyst"
-    assert exported_attrs.get("service.name") == "kraken-ia"
+    assert exported_attrs.get("service.name") == "kraken-copilot"
 
 
 def test_agent_callbacks_delegation_tools_guardrails_and_metrics():
     """Valida a coleta de métricas e spans em execuções de agentes, delegações, ferramentas e guardrails."""
     metric_reader = InMemoryMetricReader()
     meter_provider = MeterProvider(metric_readers=[metric_reader])
-    meter = meter_provider.get_meter("test.kraken_ia")
+    meter = meter_provider.get_meter("test.kraken_copilot")
     obs._init_metrics(meter)
 
     # Garante que os agentes foram instrumentados
@@ -128,7 +128,7 @@ def test_agent_callbacks_delegation_tools_guardrails_and_metrics():
     assert id(kraken_optimizer_agent) in obs._INSTRUMENTED_AGENTS
 
     # 1. Simula ciclo de execução do agente principal e delegação para kraken_analyst
-    dummy_ctx = SimpleNamespace(agent_name="kraken_ia")
+    dummy_ctx = SimpleNamespace(agent_name="kraken_copilot")
     root_agent.before_agent_callback(callback_context=dummy_ctx)
 
     transfer_tool = SimpleNamespace(name="transfer_to_agent")
@@ -186,14 +186,14 @@ def test_agent_callbacks_delegation_tools_guardrails_and_metrics():
         for m in sm.metrics
     }
 
-    assert "kraken_ia_agent_executions" in metric_names
-    assert "kraken_ia_agent_duration_ms" in metric_names
-    assert "kraken_ia_agent_delegations" in metric_names
-    assert "kraken_ia_tool_calls" in metric_names
-    assert "kraken_ia_tool_duration_ms" in metric_names
-    assert "kraken_ia_guardrail_executions" in metric_names
-    assert "kraken_ia_guardrail_blocks" in metric_names
-    assert "kraken_ia_llm_calls" in metric_names
-    assert "kraken_ia_llm_duration_ms" in metric_names
-    assert "kraken_ia_llm_tokens" in metric_names
+    assert "kraken_copilot_agent_executions" in metric_names
+    assert "kraken_copilot_agent_duration_ms" in metric_names
+    assert "kraken_copilot_agent_delegations" in metric_names
+    assert "kraken_copilot_tool_calls" in metric_names
+    assert "kraken_copilot_tool_duration_ms" in metric_names
+    assert "kraken_copilot_guardrail_executions" in metric_names
+    assert "kraken_copilot_guardrail_blocks" in metric_names
+    assert "kraken_copilot_llm_calls" in metric_names
+    assert "kraken_copilot_llm_duration_ms" in metric_names
+    assert "kraken_copilot_llm_tokens" in metric_names
 

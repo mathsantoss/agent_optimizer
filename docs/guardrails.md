@@ -1,6 +1,6 @@
-# 🛡️ Guardrails do Kraken IA: Analista de Dados e Otimizador de Código
+# 🛡️ Guardrails do Kraken Copilot: Analista de Dados e Otimizador de Código
 
-Este documento detalha a arquitetura de **Guardrails (Barreiras de Segurança, Qualidade e Confiabilidade)** implementada no **Kraken IA**, cobrindo o orquestrador (`kraken_ia`), o planejador (`kraken_planner`) e seus especialistas (`kraken_analyst`, `kraken_code` e `kraken_optimizer`).
+Este documento detalha a arquitetura de **Guardrails (Barreiras de Segurança, Qualidade e Confiabilidade)** implementada no **Kraken Copilot**, cobrindo o orquestrador (`kraken_copilot`), o planejador (`kraken_planner`) e seus especialistas (`kraken_analyst`, `kraken_code` e `kraken_optimizer`).
 
 Como o agente possui capacidade de **consultar dados reais**, **executar SQL** e **reescrever/executar código Python em disco**, os guardrails combinam **validações determinísticas no código** (`AST`, `SQLGlot`, hashes SHA-256) e **callbacks nativos do Google ADK** (`before_model_callback`, `after_model_callback`, `before_tool_callback`, `after_tool_callback`).
 
@@ -11,7 +11,7 @@ Como o agente possui capacidade de **consultar dados reais**, **executar SQL** e
 ```mermaid
 flowchart TB
     U(["👤 Usuário"]) --> G1["🛡️ 1. Guardrails de Entrada e Orquestração<br/>(Anti-Prompt Injection, Escopo, Limite de Handoffs e Circuit Breaker)"]
-    G1 --> O["🧠 Orquestrador (kraken_ia)"]
+    G1 --> O["🧠 Orquestrador (kraken_copilot)"]
 
     O --> A["📊 Analista de Dados"]
     O --> C["⚙️ Otimizador de Código"]
@@ -29,7 +29,7 @@ flowchart TB
 
 ## 2. Guardrails Implementados no Projeto
 
-### 2.1. Camada de Entrada, Saída e Orquestração (`kraken_ia/guardrails.py`)
+### 2.1. Camada de Entrada, Saída e Orquestração (`kraken_copilot/guardrails.py`)
 
 | Guardrail | Função / Callback | Como Funciona |
 |---|---|---|
@@ -41,7 +41,7 @@ flowchart TB
 
 ---
 
-### 2.2. Guardrails do Agente Analista de Dados (`kraken_ia/tools/data_analyst/`)
+### 2.2. Guardrails do Agente Analista de Dados (`kraken_copilot/tools/data_analyst/`)
 
 | Guardrail | Função | Risco Mitigado |
 |---|---|---|
@@ -53,7 +53,7 @@ flowchart TB
 
 ---
 
-### 2.3. Guardrails do Agente Otimizador de Código (`kraken_ia/tools/code_optimizer/`)
+### 2.3. Guardrails do Agente Otimizador de Código (`kraken_copilot/tools/code_optimizer/`)
 
 | Guardrail | Função | Risco Mitigado |
 |---|---|---|
@@ -99,7 +99,7 @@ sequenceDiagram
 
 ## 4. Arquitetura de Logs, Métricas e Auditoria (`logs/`)
 
-Todas as etapas de análise de dados, validação de código, profiling, comparações de equivalência (Antes vs Depois) e acionamentos de guardrails são gravadas automaticamente pelo módulo `kraken_ia/audit_logger.py` dentro da pasta **`logs/`** na raiz do repositório:
+Todas as etapas de análise de dados, validação de código, profiling, comparações de equivalência (Antes vs Depois) e acionamentos de guardrails são gravadas automaticamente pelo módulo `kraken_copilot/audit_logger.py` dentro da pasta **`logs/`** na raiz do repositório:
 
 | Arquivo em `logs/` | Formato | Finalidade |
 |---|---|---|

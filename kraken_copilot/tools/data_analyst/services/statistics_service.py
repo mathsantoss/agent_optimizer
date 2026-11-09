@@ -1,0 +1,87 @@
+"""Serviço de análise estatística descritiva e detecção de outliers (IQR) em colunas numéricas."""
+from pathlib import Path
+from typing import Any
+import pandas as pd
+
+from kraken_copilot.tools.data_analyst.services.dataset_service import read_dataset_dataframe
+
+
+def calculate_descriptive_statistics(
+    file_path: Path,
+    sample_size: int = 20_000,
+) -> dict[str, Any]:
+    """
+    Calcula métricas descritivas para todas as colunas numéricas do dataset:
+    média, desvio padrão, min, quartis, max, contagem de nulos e contagem de outliers (1.5 * IQR).
+    """
+    df = read_dataset_dataframe(file_path, max_rows=sample_size)
+    if df.empty:
+        return {
+            "vazio": True,
+            "mensagem": "Dataset vazio, sem dados numéricos para análise estatística.",
+            "estatisticas": {},
+            "total_linhas": 0,
+            "amostragem_ativa": False,
+        }
+
+    total_rows = len(df)
+    sampling_active = bool(total_rows >= sample_size)
+    numeric_df = df.select_dtypes(include="number")
+
+    if numeric_df.empty:
+        return {
+            "vazio": False,
+            "mensagem": "O dataset não possui colunas numéricas para análise descritiva.",
+            "estatisticas": {},
+            "total_linhas": total_rows,
+            "amostragem_ativa": sampling_active,
+        }
+
+    stats_desc = numeric_df.describe().transpose()
+    target_cols = [c for c in ("count", "mean", "std", "min", "25%", "50%", "75%", "max") if c in stats_desc.columns]
+    stats_table = stats_desc[target_cols].dropna(how="all")
+
+    null_counts: list[int] = []
+    outlier_counts: list[int] = []
+
+    for col in stats_table.index:
+        col_series = numeric_df[col].dropna()
+        null_counts.append(int(numeric_df[col].isna().sum()))
+        if len(col_series) > 0:
+            q1 = float(col_series.quantile(0.25))
+            q3 = float(col_series.quantile(0.75))
+            iqr = q3 - q1
+            lower_bound = q1 - 1.5 * iqr
+            upper_bound = q3 + 1.5 * iqr
+            outliers_mask = (col_series < lower_bound) | (col_series > upper_bound)
+            outlier_counts.append(int(outliers_mask.sum()))
+        else:
+            outlier_counts.append(0)
+
+    stats_table["nulos"] = null_counts
+    stats_table["outliers_iqr"] = outlier_counts
+
+    try:
+        markdown_representation = stats_table.round(2).to_markdown()
+    except Exception:
+        markdown_representation = stats_table.round(2).to_string()
+
+    if sampling_active:
+        markdown_representation += f"\n\n*(Nota: estatísticas calculadas sobre amostra de {sample_size} linhas)*"
+
+    metrics_by_column: dict[str, dict[str, Any]] = {}
+    for col in stats_table.index:
+        row = stats_table.loc[col]
+        metrics_by_column[str(col)] = {k: (round(float(v), 4) if isinstance(v, (int, float)) else v) for k, v in row.items()}
+
+    return {
+        "vazio": False,
+        "total_linhas_avaliadas": total_rows,
+        "amostragem_ativa": sampling_active,
+        "limite_amostral": sample_size,
+        "colunas_numericas": list(stats_table.index),
+        "total_outliers_identificados": int(sum(outlier_counts)),
+        "tabela_markdown": markdown_representation,
+        "metricas_por_coluna": metrics_by_column,
+    }
+

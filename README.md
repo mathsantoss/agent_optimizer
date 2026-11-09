@@ -1,6 +1,6 @@
-# 🐙 Kraken IA
+# 🐙 Kraken Copilot
 
-O **Kraken IA** é um copiloto autônomo de **Análise de Dados e Engenharia de Pipelines**, inspirado na experiência do **Databricks Genie**.
+O **Kraken Copilot** é um copiloto autônomo de **Análise de Dados e Engenharia de Pipelines**, inspirado na experiência do **Databricks Genie**.
 
 Ele permite que cientistas, engenheiros e analistas interajam em linguagem natural para explorar bases de dados, responder perguntas de negócio com consultas SQL reais, investigar insights e criar, refatorar ou otimizar pipelines de dados e *Feature Engineering* diretamente no projeto — validando a execução do código de ponta a ponta.
 
@@ -12,7 +12,7 @@ O produto opera em uma arquitetura multi-agentes composta pelo **Orquestrador Ce
 
 ```mermaid
 flowchart TB
-    U(["👤 Usuário"]) --> O["🧠 Kraken IA (Orquestrador)"]
+    U(["👤 Usuário"]) --> O["🧠 Kraken Copilot (Orquestrador)"]
     O -->|Solicitações Complexas / Decomposição| P["🗺️ Kraken Planner"]
     P -->|Etapas Analíticas| A["📊 Kraken Analyst"]
     P -->|Etapas de Features e Código| F["🔬 Kraken Code"]
@@ -22,7 +22,7 @@ flowchart TB
     O -->|Otimização Direta| C
 ```
 
-- **Kraken IA (`kraken_ia`)**: Orquestrador principal. Interpreta a intenção do usuário e direciona solicitações complexas para o Planner ou demandas pontuais diretamente para o especialista adequado.
+- **Kraken Copilot (`kraken_copilot`)**: Orquestrador principal. Interpreta a intenção do usuário e direciona solicitações complexas para o Planner ou demandas pontuais diretamente para o especialista adequado.
 - **Kraken Planner (`kraken_planner`)**: Agente de planejamento estratégico. Decompõe solicitações complexas em etapas estruturadas com dependências e critérios de sucesso, coordena os especialistas em sequência e realiza replanejamento automático em caso de falhas ou imprevistos (`create_execution_plan`, `get_plan_status`, `update_plan_step`, `replan_execution`).
 - **Kraken Analyst (`kraken_analyst`)**: Explora os datasets em `pipeline/dados/`, gera diagnósticos de qualidade, estatística descritiva, consulta o Dicionário de Dados e executa queries SQL analíticas em memória (`analyze_dataset`, `query_dataset`, `search_knowledge_base`).
 - **Kraken Code (`kraken_code`)**: Projeta pipelines completos e adiciona novas features para Machine Learning agnósticas a qualquer dataset, suportando nativamente Pandas e PySpark (`generate_feature_pipeline`, `add_feature_to_pipeline`, `preview_features`).
@@ -101,7 +101,7 @@ Caso utilize o **Google Cloud Vertex AI** (Opção 1), as bibliotecas Python nec
 
 ```bash
 # 1. Ative seu ambiente python (se aplicável)
-conda activate kraken-ia  # ou seu ambiente configurado
+conda activate kraken-copilot  # ou seu ambiente configurado
 
 # 2. Autentique as credenciais padrão de aplicação (ADC)
 gcloud auth application-default login
@@ -132,7 +132,7 @@ adk web .
 ```
 *(Ou simplesmente `adk web`)*
 
-Abra no navegador em **`http://localhost:8000`** e o agente selecionado será diretamente o **`kraken_ia`**.
+Abra no navegador em **`http://localhost:8000`** e o agente selecionado será diretamente o **`kraken_copilot`**.
 
 ---
 

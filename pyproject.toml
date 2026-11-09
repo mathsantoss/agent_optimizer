@@ -1,5 +1,5 @@
 [project]
-name = "kraken-ia"
+name = "kraken-copilot"
 version = "0.1.0"
 description = "Assistente inteligente de Ciência de Dados, Analytics e Engenharia de Pipelines com Google ADK e LiteLLM"
 readme = "README.md"

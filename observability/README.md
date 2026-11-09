@@ -1,4 +1,4 @@
-# Observabilidade Local — Kraken IA (Grafana OTel LGTM)
+# Observabilidade Local — Kraken Copilot (Grafana OTel LGTM)
 
 Stack open source local baseada em `grafana/otel-lgtm` (Grafana OSS + OpenTelemetry Collector + Prometheus + Tempo + Loki) integrada ao **Google ADK** e **LiteLLM / Ollama**.
 
@@ -11,9 +11,9 @@ docker compose -f docker-compose.observability.yml up -d
 ## 2. Acessar interfaces locais e Dashboards
 
 - **Grafana OSS**: http://localhost:3000 (acesso anônimo habilitado como Admin ou `admin` / `admin`)
-- No menu lateral, clique em **Dashboards** → pasta **Kraken IA**:
-  1. **Google ADK — Kraken IA Observability**: Visão geral da saúde da aplicação, contadores, latência média LLM, tokens, durações de ferramentas, guardrails, waterfall de traces e logs.
-  2. **Kraken IA — Ferramentas, Benchmarks & Auditoria**: Visão detalhada de engenharia de código e dados:
+- No menu lateral, clique em **Dashboards** → pasta **Kraken Copilot**:
+  1. **Google ADK — Kraken Copilot Observability**: Visão geral da saúde da aplicação, contadores, latência média LLM, tokens, durações de ferramentas, guardrails, waterfall de traces e logs.
+  2. **Kraken Copilot — Ferramentas, Benchmarks & Auditoria**: Visão detalhada de engenharia de código e dados:
      - Tabela comparativa de **Benchmarks** (Antes vs Depois, Speedup %, Redução de memória %, Equivalência).
      - Tabela de **Profiling** (`profile_pipeline`: tempo, memória MB, linhas, colunas, hash determinístico).
      - Tabela de **Validações e Testes de Código** (`analyze_pipeline_code`, `run_tests`, `save_file`, `rollback_pipeline`).
@@ -27,7 +27,7 @@ Os traces distribuídos do Google ADK e LiteLLM são exportados para o Tempo via
 
 1. **Pelo Dashboard Principal**: Na tabela inferior *"Traces Distribuídos Recentes"*, basta clicar em qualquer `Trace ID` para abrir a cascata completa com a árvore hierárquica de spans da interação.
 2. **Menu Explore → Tempo (Modo Search)**:
-   - **Service Name**: `kraken-ia`
+   - **Service Name**: `kraken-copilot`
    - **Span Name**: `execute_tool`, `call_llm`, `agent_run`, `guardrail.*`
    - **Tags**: filtre por `status = error`, `tool.name = profile_pipeline`, `agent.name = kraken_optimizer`, etc.
 3. **Menu Explore → Tempo (Modo TraceQL)**:
@@ -37,7 +37,7 @@ Os traces distribuídos do Google ADK e LiteLLM são exportados para o Tempo via
    - Traces de delegação: `{ span.agent.delegated_to = "kraken_analyst" }`
 4. **Correlação Trace ↔ Logs**: Ao inspecionar qualquer span no Tempo, clique no botão **"Related logs"** para ver imediatamente os logs do Loki correspondentes àquela exata execução.
 
-## 4. Executar o Kraken IA com telemetria ativa
+## 4. Executar o Kraken Copilot com telemetria ativa
 
 ```bash
 # Interface Web do Google ADK
@@ -47,8 +47,8 @@ adk web .
 Variáveis opcionais de ambiente (já possuem valores padrão locais):
 
 ```env
-KRAKEN_IA_OTEL_ENABLED=true
-OTEL_SERVICE_NAME=kraken-ia
+KRAKEN_COPILOT_OTEL_ENABLED=true
+OTEL_SERVICE_NAME=kraken-copilot
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 ```
 
