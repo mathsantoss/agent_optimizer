@@ -14,7 +14,7 @@ from kraken_copilot.tools.code_optimizer.services.file_service import resolve_pi
 
 PROFILING_DEFAULT_TIMEOUT_SECONDS = 120
 
-# Script Python executado em subprocesso isolado para medição precisa de memória e tempo
+# Script Python executado em subprocesso isolado para medição precisa de memória, tempo e extração dinâmica de schema
 ISOLATED_PROFILER_SCRIPT = """
 import contextlib
 import hashlib
@@ -23,20 +23,60 @@ import json
 import runpy
 import sys
 import time
+import traceback
 import tracemalloc
 from pathlib import Path
 
 target_file = Path(sys.argv[1]).resolve()
+sample_limit = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 sys.path.insert(0, str(target_file.parent))
 
 stdout_buffer = io.StringIO()
 stderr_buffer = io.StringIO()
 rows_processed = None
+full_dataset_rows = None
 column_count = None
 output_columns = []
 output_signature_hash = None
 column_hashes = {}
 return_code = 0
+
+if sample_limit > 0:
+    # Modo de amostragem dinâmica para baselines lentos (O(N^2) / iterrows / sleep):
+    # Neutraliza sleeps e amostra leituras do pandas preservando a contagem real de linhas do dataset
+    time.sleep = lambda *a, **kw: None
+    try:
+        import pandas as pd
+        _orig_read_csv = pd.read_csv
+        _orig_read_parquet = pd.read_parquet
+        _orig_read_json = pd.read_json
+
+        def _sampled_read_csv(*args, **kwargs):
+            global full_dataset_rows
+            df_full = _orig_read_csv(*args, **kwargs)
+            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
+                full_dataset_rows = int(len(df_full))
+            return df_full.head(sample_limit).copy()
+
+        def _sampled_read_parquet(*args, **kwargs):
+            global full_dataset_rows
+            df_full = _orig_read_parquet(*args, **kwargs)
+            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
+                full_dataset_rows = int(len(df_full))
+            return df_full.head(sample_limit).copy()
+
+        def _sampled_read_json(*args, **kwargs):
+            global full_dataset_rows
+            df_full = _orig_read_json(*args, **kwargs)
+            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
+                full_dataset_rows = int(len(df_full))
+            return df_full.head(sample_limit).copy()
+
+        pd.read_csv = _sampled_read_csv
+        pd.read_parquet = _sampled_read_parquet
+        pd.read_json = _sampled_read_json
+    except Exception:
+        pass
 
 tracemalloc.start()
 start_time = time.perf_counter()
@@ -47,19 +87,27 @@ try:
         module_globals = runpy.run_path(str(target_file), run_name="__main__")
 
         returned_value = None
-        # Se definiu run() e não foi executado automaticamente
-        if "run" in module_globals and callable(module_globals["run"]):
-            try:
-                returned_value = module_globals["run"]()
-            except Exception:
-                pass
-        elif "executar_pipeline" in module_globals and callable(module_globals["executar_pipeline"]):
-            try:
-                returned_value = module_globals["executar_pipeline"]()
-            except Exception:
-                pass
+        # 1. Verifica se a execução de __main__ já gerou um DataFrame nas variáveis globais (evita dupla execução)
+        for preferred_key in ("resultado", "df_features", "df_final", "resultado_final", "df"):
+            cand_val = module_globals.get(preferred_key)
+            if cand_val is not None and type(cand_val).__name__ == "DataFrame" and len(cand_val) > 0:
+                returned_value = cand_val
+                break
 
-        # Se não retornou diretamente de run(), localiza DataFrame nas variáveis globais
+        if returned_value is None:
+            for val in reversed(list(module_globals.values())):
+                if type(val).__name__ == "DataFrame" and len(val) > 0:
+                    returned_value = val
+                    break
+
+        # 2. Se nenhum DataFrame foi produzido no __main__, aciona o entrypoint explicitamente
+        if returned_value is None:
+            if "run" in module_globals and callable(module_globals["run"]):
+                returned_value = module_globals["run"]()
+            elif "executar_pipeline" in module_globals and callable(module_globals["executar_pipeline"]):
+                returned_value = module_globals["executar_pipeline"]()
+
+        # 3. Fallback caso o entrypoint tenha retornado DataFrame vazio ou populado global
         if returned_value is None:
             for val in reversed(list(module_globals.values())):
                 if type(val).__name__ == "DataFrame":
@@ -67,8 +115,9 @@ try:
                     break
 
         if returned_value is not None and type(returned_value).__name__ == "DataFrame":
-            rows_processed = int(len(returned_value))
-            output_columns = [str(c) for c in returned_value.columns]
+            rows_processed = int(full_dataset_rows) if (sample_limit > 0 and full_dataset_rows is not None) else int(len(returned_value))
+            # Ignora coluna residual 'index' ou 'level_0' gerada por reset_index() sem drop=True
+            output_columns = [str(c) for c in returned_value.columns if str(c) not in ("index", "level_0")]
             column_count = len(output_columns)
             try:
                 import pandas as pd
@@ -88,7 +137,8 @@ try:
 
 except Exception as err:
     return_code = 1
-    stderr_buffer.write(f"{type(err).__name__}: {err}\\n")
+    tb_str = traceback.format_exc(limit=4)
+    stderr_buffer.write(f"{tb_str}\\n{type(err).__name__}: {err}\\n")
 
 duration_seconds = round(time.perf_counter() - start_time, 4)
 _, peak_bytes = tracemalloc.get_traced_memory()
@@ -102,8 +152,8 @@ payload = {
     "rows_processed": rows_processed,
     "column_count": column_count,
     "output_columns": output_columns,
-    "output_signature_hash": output_signature_hash,
-    "column_hashes": column_hashes,
+    "output_signature_hash": output_signature_hash if sample_limit == 0 else None,
+    "column_hashes": column_hashes if sample_limit == 0 else {},
     "standard_output": stdout_buffer.getvalue().strip(),
     "standard_error": stderr_buffer.getvalue().strip(),
 }
@@ -117,6 +167,7 @@ sys.exit(return_code)
 def execute_and_profile_pipeline(
     resolved_path: Path,
     timeout_seconds: int = PROFILING_DEFAULT_TIMEOUT_SECONDS,
+    sample_rows: int = 0,
 ) -> PipelineProfileResult:
     """
     Executa o script de pipeline em processo isolado capturando métricas de performance,
@@ -131,9 +182,13 @@ def execute_and_profile_pipeline(
     data_snapshot_before = capture_data_dir_snapshot()
     start_time = time.perf_counter()
 
+    cmd = [sys.executable, "-c", ISOLATED_PROFILER_SCRIPT, str(resolved_path)]
+    if sample_rows > 0:
+        cmd.append(str(sample_rows))
+
     try:
         completed = subprocess.run(
-            [sys.executable, "-c", ISOLATED_PROFILER_SCRIPT, str(resolved_path)],
+            cmd,
             cwd=config.PROJECT_ROOT,
             capture_output=True,
             text=True,

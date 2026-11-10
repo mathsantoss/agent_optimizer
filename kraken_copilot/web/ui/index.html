@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Kraken Copilot | Data Science & Pipeline AI</title>
+  <link rel="icon" type="image/svg+xml" href="/web/ui/kraken-copilot.svg">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/open-sans@5/400.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/open-sans@5/400-italic.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/recursive@5/index.css" />
+  <link rel="stylesheet" href="/web/ui/app.css">
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@12/dist/mermaid.esm.min.mjs';
+    window.mermaid = mermaid;
+    try {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose'
+      });
+    } catch (_) {}
+  </script>
+  <script type="module">
+    try {
+      import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs').then((pdfjsLib) => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+        window.pdfjsLib = pdfjsLib;
+      });
+    } catch (_) {}
+  </script>
+  <script src="/web/ui/app.js" defer></script>
+</head>
+
+<body data-view="chat">
+  <a class="skip" href="#principal">Ir para a conversa</a>
+  <div class="app-shell" id="app-shell">
+
+    <!-- Sidebar de Conversas -->
+    <aside class="sidebar" id="sidebar" aria-labelledby="titulo-historico">
+      <a class="brand" href="/" aria-label="Kraken Copilot, início">
+        <img class="brand-mark" src="/web/ui/kraken-copilot.svg" alt="" width="40" height="40">
+        <span>Kraken <strong>Copilot</strong><small>Analytics & Pipelines</small></span>
+      </a>
+      <button class="new-conversation" type="button" id="nova-conversa">
+        <span aria-hidden="true">+</span> Nova conversa
+      </button>
+      <nav class="conversation-nav" aria-labelledby="titulo-historico">
+        <h2 class="eyebrow" id="titulo-historico">Sessões Recentes</h2>
+        <div id="historico">
+          <p class="empty">Carregando sessões…</p>
+        </div>
+      </nav>
+      <p class="sidebar-footer">
+        <span class="signal" aria-hidden="true"></span> Vertex AI · <span id="sidebar-model-badge">gemini-2.5-flash</span>
+      </p>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- Área Principal de Chat -->
+    <main class="conversation" id="principal" tabindex="-1" aria-labelledby="titulo">
+      <header class="conversation-header">
+        <button class="button mobile-history-btn" id="alternar-historico" type="button" aria-controls="sidebar"
+          aria-expanded="false">☰ Conversas</button>
+        <div class="header-title">
+          <p class="eyebrow">Assistente Multi-Agente Inteligente</p>
+          <h1 id="titulo">Nova conversa</h1>
+        </div>
+        <div class="nav-tabs" role="tablist">
+          <button class="nav-tab" id="tab-chat" role="tab" aria-selected="true" type="button">💬 Chat</button>
+          <button class="nav-tab" id="tab-dados" role="tab" aria-selected="false" type="button">📊 Dados &amp;
+            Documentos</button>
+        </div>
+        <span class="corpus-label">📁 pipeline/dados · ⚡ pipeline_prep.py</span>
+      </header>
+
+      <!-- Painel 1: Chat -->
+      <div id="view-chat" class="conversation-view">
+        <div class="conversation-scroll" id="conversation-scroll" tabindex="0" aria-label="Mensagens da conversa">
+          <div class="conversation-content" id="chat-messages">
+            <div class="welcome" id="welcome-card">
+              <p class="eyebrow">Kraken Copilot</p>
+              <h2>Como posso ajudar hoje?</h2>
+              <p>Explore datasets, gere features para Machine Learning ou inspecione e otimize pipelines de dados com
+                equivalência estrita.</p>
+
+              <div class="prompt-suggestions">
+                <button class="suggestion-btn" type="button" data-prompt="quais dados temos disponíveis?">
+                  <strong>📊 Análise de Dados</strong>
+                  <span>Quais datasets temos disponíveis e suas características?</span>
+                </button>
+                <button class="suggestion-btn" type="button"
+                  data-prompt="mostre o resumo estatístico e nulos da base de dados_vendas">
+                  <strong>📈 Estatísticas Descritivas</strong>
+                  <span>Resumo numérico, nulos e distribuição de dados_vendas</span>
+                </button>
+                <button class="suggestion-btn" type="button"
+                  data-prompt="adicione uma feature de ticket médio por cliente em Pandas no pipeline_prep.py">
+                  <strong>⚡ Engenharia de Features</strong>
+                  <span>Adicionar feature de ticket médio em pipeline_prep.py</span>
+                </button>
+                <button class="suggestion-btn" type="button"
+                  data-prompt="inspecione os gargalos do pipeline_prep.py e mostre a tabela de benchmark antes vs depois">
+                  <strong>🚀 Otimização de Código</strong>
+                  <span>Inspecionar gargalos AST e rodar benchmark comparativo</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Composer de Envio de Mensagem -->
+        <div class="composer">
+          <form id="consulta-form" class="composer-inner">
+            <p id="aviso" class="notice" role="status" hidden></p>
+            <label class="sr-only" for="pergunta">Mensagem para o Kraken Copilot</label>
+            <div class="composer-field">
+              <textarea id="pergunta" name="pergunta" rows="2" required maxlength="5000"
+                placeholder="Pergunte sobre os dados, solicite features ou autorize otimização de pipeline…"></textarea>
+              <div class="composer-toolbar">
+                <div class="model-selector-wrapper">
+                  <label for="select-modelo" class="model-selector-label" title="Escolher modelo da família Gemini">
+                    <span class="gemini-sparkle" aria-hidden="true">✨</span>
+                    <select id="select-modelo" class="model-selector-select" aria-label="Versão do modelo Gemini">
+                      <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Padrão)</option>
+                      <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Lite)</option>
+                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Geração 3)</option>
+                      <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (Lite 3.1)</option>
+                      <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (Pro 3.1)</option>
+                      <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Lite 3.5)</option>
+                      <option value="gemini-3.5-flash">Gemini 3.5 Flash (Flash 3.5)</option>
+                      <option value="gemini-3.6-flash">Gemini 3.6 Flash (Flash 3.6)</option>
+                      <option value="gemini-3.7-flash">Gemini 3.7 Flash (Flash 3.7)</option>
+                      <option value="gemini-3.8-flash">Gemini 3.8 Flash (Flash 3.8)</option>
+                      <option value="gemini-4-argon">Gemini 4 Argon (Argon)</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="composer-actions">
+                  <span class="composer-hint-inline" aria-hidden="true">Enter ↵</span>
+                  <button class="button primary btn-enviar" id="enviar" type="submit" title="Enviar mensagem">
+                    <span>Enviar</span> <span class="send-icon" aria-hidden="true">↑</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p class="hint" id="ajuda-pergunta">Enter para enviar · Shift+Enter para quebrar a linha.</p>
+          </form>
+        </div>
+      </div>
+
+      <!-- Painel 2: Explorador de Dados & Documentos (CSV, PDF, JSON) -->
+      <div id="view-dados" class="data-explorer-container" hidden>
+        <aside class="data-sidebar">
+          <h3>Arquivos do Projeto</h3>
+          <ul class="file-list" id="lista-arquivos-dados">
+            <li class="empty">Carregando arquivos…</li>
+          </ul>
+        </aside>
+        <section class="data-viewer-pane" id="painel-visualizador-dados">
+          <div class="welcome" style="margin-top: 4rem;">
+            <h2>Visualizador de Dados &amp; Documentos</h2>
+            <p>Selecione um arquivo CSV, PDF ou JSON ao lado para inspecionar registros, colunas ou especificações
+              técnicas.</p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+  </div>
+</body>
+
+</html>

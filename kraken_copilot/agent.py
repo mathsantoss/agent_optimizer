@@ -28,16 +28,16 @@ language_model = LiteLlm(
 )
 
 # 1. Agente Analista de Dados (Kraken Analyst - 3 ferramentas públicas)
-kraken_analyst_agent = create_kraken_analyst_agent(language_model)
+kraken_analyst = create_kraken_analyst_agent(language_model)
 
 # 2. Agente Especialista em Feature Engineering e Pipelines (Kraken Code - 3 ferramentas públicas)
-kraken_code_agent = create_kraken_code_agent(language_model)
+kraken_code = create_kraken_code_agent(language_model)
 
 # 3. Agente Especialista em Otimização de Código e Benchmarks (Kraken Optimizer - 3 ferramentas públicas)
-kraken_optimizer_agent = create_kraken_optimizer_agent(language_model)
+kraken_optimizer = create_kraken_optimizer_agent(language_model)
 
 # 4. Agente Principal Orquestrador (Kraken Copilot)
-root_agent = Agent(
+kraken_copilot = Agent(
     name="kraken_copilot",
     model=language_model,
     description=(
@@ -50,15 +50,13 @@ root_agent = Agent(
     before_tool_callback=before_tool_guardrail,
     after_tool_callback=after_tool_guardrail,
     sub_agents=[
-        kraken_analyst_agent,
-        kraken_code_agent,
-        kraken_optimizer_agent,
+        kraken_analyst,
+        kraken_code,
+        kraken_optimizer,
     ],
 )
 
-# Aliases de conveniência
-kraken_copilot = root_agent
-data_analyst_agent = kraken_analyst_agent
-feature_engineer_agent = kraken_code_agent
-code_optimizer_agent = kraken_optimizer_agent
+# Exportação compatível com o loader do Google ADK CLI
+root_agent = kraken_copilot
+
 

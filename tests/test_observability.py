@@ -11,7 +11,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from kraken_copilot.agent import kraken_analyst_agent, kraken_optimizer_agent, root_agent
+from kraken_copilot.agent import kraken_analyst, kraken_copilot, kraken_optimizer
 import kraken_copilot.observability as obs
 
 
@@ -122,37 +122,37 @@ def test_agent_callbacks_delegation_tools_guardrails_and_metrics():
     obs._init_metrics(meter)
 
     # Garante que os agentes foram instrumentados
-    obs.setup_observability(root_agent)
-    assert id(root_agent) in obs._INSTRUMENTED_AGENTS
-    assert id(kraken_analyst_agent) in obs._INSTRUMENTED_AGENTS
-    assert id(kraken_optimizer_agent) in obs._INSTRUMENTED_AGENTS
+    obs.setup_observability(kraken_copilot)
+    assert id(kraken_copilot) in obs._INSTRUMENTED_AGENTS
+    assert id(kraken_analyst) in obs._INSTRUMENTED_AGENTS
+    assert id(kraken_optimizer) in obs._INSTRUMENTED_AGENTS
 
     # 1. Simula ciclo de execução do agente principal e delegação para kraken_analyst
     dummy_ctx = SimpleNamespace(agent_name="kraken_copilot")
-    root_agent.before_agent_callback(callback_context=dummy_ctx)
+    kraken_copilot.before_agent_callback(callback_context=dummy_ctx)
 
     transfer_tool = SimpleNamespace(name="transfer_to_agent")
-    root_agent.before_tool_callback(
+    kraken_copilot.before_tool_callback(
         tool=transfer_tool,
         args={"agent_name": "kraken_analyst"},
         tool_context=None,
     )
-    root_agent.after_tool_callback(
+    kraken_copilot.after_tool_callback(
         tool=transfer_tool,
         args={"agent_name": "kraken_analyst"},
         tool_context=None,
         tool_response={"result": "ok"},
     )
-    root_agent.after_agent_callback(callback_context=dummy_ctx)
+    kraken_copilot.after_agent_callback(callback_context=dummy_ctx)
 
-    # 2. Simula bloqueio de guardrail de SQL proibido no kraken_analyst_agent
+    # 2. Simula bloqueio de guardrail de SQL proibido no kraken_analyst
     sql_tool = SimpleNamespace(name="query_dataset")
-    kraken_analyst_agent.before_tool_callback(
+    kraken_analyst.before_tool_callback(
         tool=sql_tool,
         args={"query": "DROP TABLE pedidos"},
         tool_context=None,
     )
-    kraken_analyst_agent.after_tool_callback(
+    kraken_analyst.after_tool_callback(
         tool=sql_tool,
         args={"query": "DROP TABLE pedidos"},
         tool_context=None,

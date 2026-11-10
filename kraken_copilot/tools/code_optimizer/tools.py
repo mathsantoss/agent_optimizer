@@ -114,6 +114,8 @@ def inspect_pipeline(
         f"{len(report.issues)} apontamento(s) identificado(s): {by_severity}."
     )
 
+    ast_contracts = _extract_ast_function_contracts(content)
+
     return ToolResult.ok(
         summary=summary_text,
         operation="inspect_pipeline",
@@ -122,14 +124,57 @@ def inspect_pipeline(
             "line_count": report.line_count,
             "imported_modules": report.imported_modules,
             "defined_functions": report.defined_functions,
+            "contratos_funcoes_ast": ast_contracts,
             "has_run_entrypoint": report.has_run_entrypoint,
             "has_main_guard": report.has_main_guard,
             "issues": [issue.model_dump() for issue in report.issues],
             "resumo_apontamentos": {"por_severidade": by_severity, "por_categoria": by_category},
-            "conteudo_atual": content if report.line_count <= 250 else "(conteúdo extenso omitido no sumário)",
+            "conteudo_atual": content if len(content) <= 300_000 else content[:300_000] + "\n# (truncado)",
+            "dica_otimizacao": (
+                "Para otimizar o pipeline: analise o 'conteudo_atual', 'contratos_funcoes_ast' e os apontamentos acima. "
+                "Reescreva o código Python completo vetorizado preservando os caminhos de leitura originais, as funções "
+                "e exatamente todos os nomes de colunas de saída (atenção a renomeações após merge/groupby). "
+                "Em seguida, chame 'optimize_pipeline(file_path=..., proposed_code=..., confirmed_by_user=False)'."
+            ),
         },
         warnings=[f"{cnt} apontamento(s) de severidade '{sev}'" for sev, cnt in by_severity.items() if sev in ("high", "medium")],
     ).to_json()
+
+
+def _extract_ast_function_contracts(source_code: str) -> dict[str, Any]:
+    """Extrai dinamicamente via AST os parâmetros e chaves/colunas manipuladas por cada função de qualquer script Python."""
+    contracts: dict[str, Any] = {}
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError:
+        return contracts
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            params = [arg.arg for arg in node.args.args]
+            created_keys: list[str] = []
+            for sub in ast.walk(node):
+                # Captura chaves de dicionários literais (ex: resultados.append({"col": val}))
+                if isinstance(sub, ast.Dict):
+                    for k in sub.keys:
+                        if isinstance(k, ast.Constant) and isinstance(k.value, str) and k.value not in created_keys:
+                            created_keys.append(k.value)
+                # Captura atribuições de colunas em DataFrames (ex: df["col"] = ... ou df.loc[i, "col"] = ...)
+                elif isinstance(sub, ast.Assign):
+                    for target in sub.targets:
+                        if isinstance(target, ast.Subscript):
+                            sl = target.slice
+                            if isinstance(sl, ast.Constant) and isinstance(sl.value, str) and sl.value not in created_keys:
+                                created_keys.append(sl.value)
+                            elif isinstance(sl, ast.Tuple):
+                                for elt in sl.elts:
+                                    if isinstance(elt, ast.Constant) and isinstance(elt.value, str) and elt.value not in created_keys:
+                                        created_keys.append(elt.value)
+            contracts[node.name] = {
+                "parametros": params,
+                "colunas_ou_chaves_criadas": created_keys,
+            }
+    return contracts
 
 
 def optimize_pipeline(
@@ -163,15 +208,24 @@ def optimize_pipeline(
     # 1. Fase de Proposta (sem confirmação explícita): NÃO altera arquivos no disco!
     if not confirmed_by_user:
         if not clean_code:
-            payload = {
-                "success": False,
-                "operation": "optimize_pipeline:proposal",
-                "summary": "Para propor uma otimização, forneça o 'proposed_code'.",
-                "data": {"file_path": rel_path},
-                "warnings": ["Nenhum código proposto fornecido."],
-                "errors": ["Código proposto vazio."],
-            }
-            return json.dumps(payload, ensure_ascii=False, indent=2)
+            tmp_opt_file = get_pipeline_tmp_dir() / "pipeline_prep_otimizado.bak"
+            if tmp_opt_file.is_file() and tmp_opt_file.stat().st_size > 0:
+                clean_code = tmp_opt_file.read_text(encoding="utf-8").strip()
+            else:
+                payload = {
+                    "success": False,
+                    "operation": "optimize_pipeline:proposal",
+                    "summary": (
+                        "Para propor uma otimização, você (kraken_optimizer) deve fornecer o código Python completo reescrito "
+                        "no parâmetro 'proposed_code'. Obtenha o código original via 'inspect_pipeline' (campo 'conteudo_atual'), "
+                        "reescreva-o de forma vetorizada preservando os arquivos de entrada, funções e colunas originais, "
+                        "e envie 'optimize_pipeline(file_path=..., proposed_code=..., confirmed_by_user=False)'."
+                    ),
+                    "data": {"file_path": rel_path},
+                    "warnings": ["Nenhum código proposto fornecido."],
+                    "errors": ["Código proposto vazio."],
+                }
+                return json.dumps(payload, ensure_ascii=False, indent=2)
 
         # Validação sintática prévia da proposta
         try:
@@ -212,6 +266,30 @@ def optimize_pipeline(
                     candidate_file_path=str(tmp_opt_path),
                 )
                 benchmark_proposal_data = bench_res.get("data")
+                if benchmark_proposal_data:
+                    cand_status = benchmark_proposal_data.get("candidate_status")
+                    comp = benchmark_proposal_data.get("comparison", {})
+                    if cand_status == "error" or not comp.get("results_equivalent", True):
+                        cand_err = benchmark_proposal_data.get("candidate_error") or comp.get("equivalence_details", "Erro na validação")
+                        err_msg = (
+                            f"O código proposto falhou durante o teste de execução/equivalência:\n{cand_err}\n\n"
+                            f"Corrija imediatamente o problema no seu 'proposed_code' (verifique os nomes das colunas após merge/groupby) "
+                            f"e chame 'optimize_pipeline(file_path=\"{rel_path}\", proposed_code=..., confirmed_by_user=False)' novamente "
+                            f"antes de apresentar a proposta ao usuário."
+                        )
+                        payload = {
+                            "success": False,
+                            "operation": "optimize_pipeline:proposal",
+                            "summary": err_msg,
+                            "data": {
+                                "file_path": rel_path,
+                                "benchmark": benchmark_proposal_data,
+                                "requer_correcao": True,
+                            },
+                            "warnings": proposal_warnings,
+                            "errors": [cand_err],
+                        }
+                        return json.dumps(payload, ensure_ascii=False, indent=2)
             except Exception as bench_err:
                 proposal_warnings.append(f"Benchmark prévio não pôde ser concluído: {bench_err}")
 
@@ -253,14 +331,19 @@ def optimize_pipeline(
 
     # 2. Fase de Aplicação Autorizada (confirmed_by_user=True)
     if not clean_code:
-        payload = {
-            "success": False,
-            "operation": "optimize_pipeline:apply",
-            "summary": "Não é possível aplicar alteração com código proposto vazio.",
-            "data": None,
-            "errors": ["Código proposto vazio."],
-        }
-        return json.dumps(payload, ensure_ascii=False, indent=2)
+        # Se clean_code não foi fornecido na confirmação, utiliza a proposta salva previamente em pipeline/tmp/
+        tmp_opt_file = get_pipeline_tmp_dir() / "pipeline_prep_otimizado.bak"
+        if tmp_opt_file.is_file() and tmp_opt_file.stat().st_size > 0:
+            clean_code = tmp_opt_file.read_text(encoding="utf-8").strip()
+        else:
+            payload = {
+                "success": False,
+                "operation": "optimize_pipeline:apply",
+                "summary": "Não é possível aplicar: nenhum código proposto foi fornecido e não há proposta salva em 'pipeline/tmp/pipeline_prep_otimizado.bak'.",
+                "data": None,
+                "errors": ["Código proposto vazio."],
+            }
+            return json.dumps(payload, ensure_ascii=False, indent=2)
 
     # Validação AST e de Segurança antes de tocar no disco
     try:

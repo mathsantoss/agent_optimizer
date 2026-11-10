@@ -126,7 +126,9 @@ Você pode utilizar a **Interface Web Própria do Kraken Copilot** (recomendada 
 #### Opção A: Interface Própria do Kraken Copilot (Recomendado)
 Inicie o servidor web dedicado do Kraken Copilot:
 ```bash
-python -m kraken_copilot.server
+python -m kraken_copilot.web.server
+# ou
+kraken-web
 ```
 Abra no navegador em **`http://localhost:8080`**:
 - **Chat com Especialistas**: Identificação visual automática de qual especialista respondeu (`📊 Kraken Analyst`, `⚡ Kraken Code` ou `🚀 Kraken Optimizer`).

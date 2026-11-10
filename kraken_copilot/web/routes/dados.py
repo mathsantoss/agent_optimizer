@@ -1,0 +1,233 @@
+"""Rotas da API para exploração de dados, outputs do pipeline e documentação técnica."""
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import List
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
+
+router = APIRouter(prefix="/api/dados", tags=["dados"])
+
+
+def _diretorios_permitidos() -> List[Path]:
+    from kraken_copilot.config import REPOSITORY_ROOT
+    return [
+        (REPOSITORY_ROOT / "pipeline" / "dados").resolve(),
+        (REPOSITORY_ROOT / "pipeline" / "saida").resolve(),
+        (REPOSITORY_ROOT / "docs").resolve(),
+    ]
+
+
+@router.get("/arquivos")
+async def listar_arquivos_dados():
+    """Lista e categoriza os arquivos em estrutura hierárquica dinâmica:
+    - DATALAKE (CSV, JSON, PARQUET - apenas tipos existentes)
+    - OUTPUTS (CSV, JSON, PARQUET - apenas tipos existentes)
+    - DOCUMENTAÇÕES (MARKDOWN, PDF - apenas tipos existentes)
+    """
+    from kraken_copilot.config import REPOSITORY_ROOT
+    arquivos = []
+    diretorios = _diretorios_permitidos()
+
+    extensoes_permitidas = (".csv", ".pdf", ".json", ".parquet", ".md", ".markdown", ".txt")
+
+    for d in diretorios:
+        if not d.exists():
+            continue
+        for p in d.rglob("*"):
+            if p.is_file() and p.suffix.lower() in extensoes_permitidas:
+                rel = p.relative_to(REPOSITORY_ROOT).as_posix()
+                ext = p.suffix.lower().lstrip(".")
+                stat = p.stat()
+
+                if rel.startswith("pipeline/saida"):
+                    secao = "OUTPUTS"
+                    secao_ordem = 2
+                    subcategoria = ext.upper()
+                    sub_ordem = 1 if ext == "csv" else (2 if ext == "json" else 3)
+                    categoria = "dados_saida"
+                    categoria_nome = "⚡ Saída do Pipeline (Gerados)"
+
+                elif rel.startswith("docs"):
+                    secao = "DOCUMENTAÇÕES"
+                    secao_ordem = 3
+                    if ext in ("md", "markdown"):
+                        subcategoria = "MARKDOWN"
+                        sub_ordem = 1
+                    else:
+                        subcategoria = ext.upper()
+                        sub_ordem = 2 if ext == "pdf" else 3
+                    categoria = "documentacao"
+                    categoria_nome = "📕 Documentação Técnica"
+
+                else:
+                    secao = "DATALAKE"
+                    secao_ordem = 1
+                    subcategoria = ext.upper()
+                    sub_ordem = 1 if ext == "csv" else (2 if ext == "json" else (3 if ext == "parquet" else 4))
+                    categoria = "dados_entrada"
+                    categoria_nome = "📥 Dados Brutos de Entrada"
+
+                is_metadados = (ext == "json" and ("dicionario" in rel.lower() or "conhecimento" in rel.lower() or "schema" in rel.lower()))
+
+                arquivos.append({
+                    "nome": p.name,
+                    "caminho": rel,
+                    "tipo": ext,
+                    "secao": secao,
+                    "secao_ordem": secao_ordem,
+                    "subcategoria": subcategoria,
+                    "sub_ordem": sub_ordem,
+                    "is_metadados": is_metadados,
+                    "categoria": categoria,
+                    "categoria_nome": categoria_nome,
+                    "tamanho_kb": round(stat.st_size / 1024, 2),
+                    "modificado_em": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                })
+
+    arquivos.sort(key=lambda x: (x["secao_ordem"], x["sub_ordem"], x["nome"]))
+
+    arvore = {}
+    for a in arquivos:
+        sec = a.get("secao")
+        sub = a.get("subcategoria")
+        if sec not in arvore:
+            arvore[sec] = {}
+        if sub not in arvore[sec]:
+            arvore[sec][sub] = []
+        arvore[sec][sub].append(a)
+
+    return {"arquivos": arquivos, "arvore": arvore}
+
+
+@router.get("/arquivo")
+async def obter_conteudo_arquivo(caminho: str, limite: int = 50):
+    """Retorna o conteúdo estruturado de um arquivo CSV, PARQUET, JSON ou MARKDOWN."""
+    from kraken_copilot.config import REPOSITORY_ROOT
+    p = (REPOSITORY_ROOT / caminho).resolve()
+
+    # Validação de segurança contra directory traversal
+    permitido = any(p == d or d in p.parents for d in _diretorios_permitidos())
+    if not permitido or not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado ou fora do escopo permitido.")
+
+    ext = p.suffix.lower()
+
+    # 1. Arquivos Markdown / Texto
+    if ext in (".md", ".markdown", ".txt"):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                conteudo = f.read()
+            return {
+                "tipo": "markdown",
+                "caminho": caminho,
+                "nome": p.name,
+                "conteudo": conteudo,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao ler markdown: {e}")
+
+    # 2. Arquivos JSON
+    if ext == ".json":
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+            return {
+                "tipo": "json",
+                "caminho": caminho,
+                "nome": p.name,
+                "dados": dados,
+                "conteudo": dados,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao ler JSON: {e}")
+
+    # 3. Arquivos CSV
+    if ext == ".csv":
+        try:
+            import pandas as pd
+            df = pd.read_csv(p, nrows=limite)
+            total_linhas = sum(1 for _ in open(p, "r", encoding="utf-8", errors="ignore")) - 1
+            colunas = list(df.columns)
+            linhas = df.fillna("").to_dict(orient="records")
+            return {
+                "tipo": "csv",
+                "caminho": caminho,
+                "nome": p.name,
+                "total_linhas": max(total_linhas, len(linhas)),
+                "limite": limite,
+                "colunas": colunas,
+                "linhas": linhas,
+                "amostrado": total_linhas > limite,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao ler CSV: {e}")
+
+    # 4. Arquivos Parquet
+    if ext == ".parquet":
+        try:
+            import pandas as pd
+            df = pd.read_parquet(p)
+            total_linhas = len(df)
+            df_amostra = df.head(limite)
+            colunas = list(df_amostra.columns)
+            linhas = df_amostra.fillna("").to_dict(orient="records")
+            return {
+                "tipo": "parquet",
+                "caminho": caminho,
+                "nome": p.name,
+                "total_linhas": total_linhas,
+                "limite": limite,
+                "colunas": colunas,
+                "linhas": linhas,
+                "amostrado": total_linhas > limite,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao ler Parquet: {e}")
+
+    # 5. Arquivo PDF (retorna metadados básicos)
+    if ext == ".pdf":
+        return {
+            "tipo": "pdf",
+            "caminho": caminho,
+            "nome": p.name,
+            "tamanho_kb": round(p.stat().st_size / 1024, 2),
+            "url_download": f"/api/dados/download?caminho={caminho}",
+        }
+
+    raise HTTPException(status_code=400, detail="Formato de arquivo não suportado para visualização.")
+
+
+@router.get("/documento")
+async def visualizar_documento(caminho: str):
+    """Retorna o documento diretamente para visualização/leitura no navegador (ex: application/pdf)."""
+    from kraken_copilot.config import REPOSITORY_ROOT
+    p = (REPOSITORY_ROOT / caminho).resolve()
+    permitido = any(p == d or d in p.parents for d in _diretorios_permitidos())
+    if not permitido or not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
+
+    if p.suffix.lower() == ".pdf":
+        return FileResponse(
+            p,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{p.name}"'},
+        )
+    return FileResponse(
+        p,
+        headers={"Content-Disposition": f'inline; filename="{p.name}"'},
+    )
+
+
+@router.get("/download")
+async def baixar_arquivo(caminho: str):
+    """Download direto de um arquivo permitido."""
+    from kraken_copilot.config import REPOSITORY_ROOT
+    p = (REPOSITORY_ROOT / caminho).resolve()
+    permitido = any(p == d or d in p.parents for d in _diretorios_permitidos())
+    if not permitido or not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
+    return FileResponse(p, filename=p.name)

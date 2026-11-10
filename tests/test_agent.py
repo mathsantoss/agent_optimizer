@@ -2,9 +2,10 @@
 import json
 from pathlib import Path
 from kraken_copilot.agent import (
-    kraken_analyst_agent,
-    kraken_code_agent,
-    kraken_optimizer_agent,
+    kraken_analyst,
+    kraken_code,
+    kraken_copilot,
+    kraken_optimizer,
     root_agent,
 )
 from kraken_copilot.tools import (
@@ -38,17 +39,17 @@ def test_multi_agent_structure():
     assert len(root_agent.tools) == 0, "O orquestrador não deve possuir ferramentas diretas de baixo nível."
 
     # Ferramentas públicas do Agente Analista de Dados (exatamente 3)
-    analyst_tool_names = sorted(tool.__name__ for tool in kraken_analyst_agent.tools)
+    analyst_tool_names = sorted(tool.__name__ for tool in kraken_analyst.tools)
     expected_analyst_tools = sorted(["analyze_dataset", "query_dataset", "search_knowledge_base"])
     assert analyst_tool_names == expected_analyst_tools
 
     # Ferramentas públicas do Agente Engenheiro de Features (exatamente 3)
-    feature_tool_names = sorted(tool.__name__ for tool in kraken_code_agent.tools)
+    feature_tool_names = sorted(tool.__name__ for tool in kraken_code.tools)
     expected_feature_tools = sorted(["add_feature_to_pipeline", "generate_feature_pipeline", "preview_features"])
     assert feature_tool_names == expected_feature_tools
 
     # Ferramentas públicas do Agente Especialista em Otimização de Código (exatamente 3)
-    optimizer_tool_names = sorted(tool.__name__ for tool in kraken_optimizer_agent.tools)
+    optimizer_tool_names = sorted(tool.__name__ for tool in kraken_optimizer.tools)
     expected_optimizer_tools = sorted(["inspect_pipeline", "optimize_pipeline", "validate_pipeline"])
     assert optimizer_tool_names == expected_optimizer_tools, (
         f"kraken_optimizer deve expor exatamente {expected_optimizer_tools}, obteve {optimizer_tool_names}"
