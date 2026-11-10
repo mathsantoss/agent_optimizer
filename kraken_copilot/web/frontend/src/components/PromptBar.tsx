@@ -48,7 +48,7 @@ export interface CatalogDataSource {
 }
 
 export interface PromptBarProps {
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, attachedSources?: CatalogDataSource[]) => void;
   isLoading: boolean;
   models: GeminiModel[];
   currentModel: string;
@@ -415,19 +415,7 @@ export function PromptBar({
     const trimmed = text.trim();
     if ((!trimmed && attachedSources.length === 0) || isLoading) return;
 
-    let finalMessage = trimmed;
-    if (attachedSources.length > 0) {
-      const ctxList = attachedSources
-        .map((s) => `${s.nome} (${s.caminho})`)
-        .join(', ');
-      if (!finalMessage) {
-        finalMessage = `Analise e processe utilizando as fontes selecionadas: ${ctxList}`;
-      } else {
-        finalMessage = `[Fontes e contexto anexados (@): ${ctxList}]\n${finalMessage}`;
-      }
-    }
-
-    onSendMessage(finalMessage);
+    onSendMessage(trimmed, [...attachedSources]);
     setText('');
     setActiveMenu(null);
     if (textareaRef.current) {

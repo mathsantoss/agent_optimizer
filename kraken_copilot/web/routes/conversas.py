@@ -142,9 +142,14 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
     if not sessao:
         raise HTTPException(status_code=404, detail="Conversa não encontrada.")
 
-    # Registra mensagem do usuário no storage
+    # Registra mensagem limpa do usuário no storage
     agora = datetime.now(timezone.utc).isoformat()
-    storage.append_message(session_id=session_id, role="user", texto=msg.texto)
+    storage.append_message(
+        session_id=session_id,
+        role="user",
+        texto=msg.texto,
+        metadados={"anexos": msg.anexos} if msg.anexos else None,
+    )
 
     # Identificadores de observabilidade
     execucao_id = f"exec-{uuid.uuid4().hex[:12]}"
@@ -225,6 +230,8 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         context_headers = []
         if msg.arquivo_alvo and msg.arquivo_alvo not in msg.texto:
             context_headers.append(f"Script alvo ativo no workspace: krakenlake/workspace/{msg.arquivo_alvo}")
+        if msg.anexos:
+            context_headers.append(f"Fontes e dados anexados pelo usuário (@): {', '.join(msg.anexos)}")
         try:
             from kraken_copilot.tools.data_analyst.services.dataset_service import get_available_datasets_catalog
             catalog_list = get_available_datasets_catalog()

@@ -507,10 +507,10 @@ export function SidebarNav({
                           <button
                             type="button"
                             onClick={() => onAttachSource(file)}
-                            title="Anexar ao prompt do Chat (@)"
-                            className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors cursor-pointer"
+                            title="Anexar ao contexto do Chat"
+                            className="shrink-0 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-blue-700 hover:bg-blue-100/80 border border-transparent hover:border-blue-200 transition-colors cursor-pointer"
                           >
-                            +@
+                            <Plus className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>
@@ -552,10 +552,10 @@ export function SidebarNav({
                           <button
                             type="button"
                             onClick={() => onAttachSource(file)}
-                            title="Anexar ao prompt do Chat (@)"
-                            className="shrink-0 rounded-lg border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors cursor-pointer"
+                            title="Anexar ao contexto do Chat"
+                            className="shrink-0 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-purple-700 hover:bg-purple-100/80 border border-transparent hover:border-purple-200 transition-colors cursor-pointer"
                           >
-                            +@
+                            <Plus className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>
@@ -613,10 +613,10 @@ export function SidebarNav({
                                   e.stopPropagation();
                                   onAttachSource(file);
                                 }}
-                                title="Anexar ao prompt (@)"
-                                className="rounded-lg border border-emerald-200 bg-emerald-100/70 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-200 transition-colors cursor-pointer"
+                                title="Anexar ao contexto do Chat"
+                                className="shrink-0 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-100/80 border border-transparent hover:border-emerald-200 transition-colors cursor-pointer"
                               >
-                                +@
+                                <Plus className="h-3.5 w-3.5" />
                               </button>
                             )}
                           </div>

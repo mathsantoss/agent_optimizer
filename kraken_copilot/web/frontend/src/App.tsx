@@ -36,6 +36,7 @@ export interface Mensagem {
   autor?: 'user' | 'assistant' | 'sistema';
   role?: string;
   texto: string;
+  anexos?: CatalogDataSource[];
   especialista?: string;
   execucao_id?: string;
   has_approval_request?: boolean;
@@ -45,6 +46,31 @@ export interface Mensagem {
   sugestoes_acoes?: string[];
   benchmark_metrics?: BenchmarkMetrics;
   timestamp?: string;
+}
+
+// Limpa qualquer prefixo técnico ou colchetes da bolha do usuário
+function cleanUserBubbleText(text: string): string {
+  if (!text) return '';
+  return text.replace(/^\[(?:Fontes e contexto|Script alvo)[^\]]+\]\s*/i, '').trim();
+}
+
+// Extrai fontes anexadas para renderizar como badges discretos
+function extractBubbleAttachments(msg: Mensagem): string[] {
+  if (msg.anexos && msg.anexos.length > 0) {
+    return msg.anexos.map((a) => a.nome);
+  }
+  const metaAnexos = (msg as any).metadados?.anexos;
+  if (Array.isArray(metaAnexos) && metaAnexos.length > 0) {
+    return metaAnexos.map((c: string) => c.split('/').pop() || c);
+  }
+  const match = /^\[Fontes e contexto anexados \(@\):\s*([^\]]+)\]/i.exec(msg.texto || '');
+  if (match) {
+    return match[1]
+      .split(',')
+      .map((s) => s.trim().split(' ')[0])
+      .filter(Boolean);
+  }
+  return [];
 }
 
 // Helper para extrair sugestões rápidas de ação caso o backend não tenha enviado explicitamente
@@ -341,8 +367,13 @@ export function App() {
     }
   };
 
-  const handleSendMessage = async (texto: string) => {
-    if (!texto.trim() || isLoading) return;
+  const handleSendMessage = async (texto: string, anexosEnviados?: CatalogDataSource[]) => {
+    const anexosAtivos = anexosEnviados || attachedSources;
+    const cleanUserText = texto.trim() || (anexosAtivos.length > 0 ? 'Analise as fontes de dados selecionadas.' : '');
+    if (!cleanUserText || isLoading) return;
+
+    // Limpa a seleção na PromptBar
+    setAttachedSources([]);
 
     let targetConversaId = conversaAtivaId;
     if (!targetConversaId) {
@@ -368,12 +399,13 @@ export function App() {
       }
     }
 
-    // Mensagem otimista do usuário (com role e autor consistentes)
+    // Mensagem otimista do usuário (100% limpa e com anexos separados)
     const userMsg: Mensagem = {
       id: `usr-${Date.now()}`,
       autor: 'user',
       role: 'user',
-      texto,
+      texto: cleanUserText,
+      anexos: [...anexosAtivos],
       timestamp: new Date().toLocaleTimeString(),
     };
     setMensagens((prev) => [...prev, userMsg]);
@@ -381,12 +413,12 @@ export function App() {
 
     // Se o usuário solicitou otimização ou alteração de código, abre o painel lateral em tempo real
     if (
-      texto.toLowerCase().includes('otimi') ||
-      texto.toLowerCase().includes('pipeline') ||
-      texto.toLowerCase().includes('pyspark') ||
-      texto.toLowerCase().includes('feature') ||
-      texto.toLowerCase().includes('reescrev') ||
-      texto.toLowerCase().includes('benchmark')
+      cleanUserText.toLowerCase().includes('otimi') ||
+      cleanUserText.toLowerCase().includes('pipeline') ||
+      cleanUserText.toLowerCase().includes('pyspark') ||
+      cleanUserText.toLowerCase().includes('feature') ||
+      cleanUserText.toLowerCase().includes('reescrev') ||
+      cleanUserText.toLowerCase().includes('benchmark')
     ) {
       setSideCodeOpen(true);
     }
@@ -405,13 +437,15 @@ export function App() {
     }, 900);
 
     try {
+      const anexosPaths = anexosAtivos.map((a) => a.caminho);
       const res = await fetch(`/api/conversas/${targetConversaId}/mensagens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          texto,
+          texto: cleanUserText,
           modelo: currentModel,
           arquivo_alvo: selectedWorkspaceFile,
+          anexos: anexosPaths,
         }),
       });
 
@@ -845,9 +879,24 @@ export function App() {
                             )}
                           >
                             {isUser ? (
-                              <p className="text-xs text-white font-medium leading-relaxed whitespace-pre-wrap select-text">
-                                {msg.texto}
-                              </p>
+                              <div className="select-text">
+                                {extractBubbleAttachments(msg).length > 0 && (
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-1.5 justify-end">
+                                    {extractBubbleAttachments(msg).map((anexoNome, aIdx) => (
+                                      <span
+                                        key={aIdx}
+                                        className="inline-flex items-center gap-1 rounded-md bg-white/20 backdrop-blur-xs px-2 py-0.5 text-[10px] font-mono font-semibold text-white shadow-2xs"
+                                      >
+                                        <Database className="h-2.5 w-2.5" />
+                                        <span>@{anexoNome.split('/').pop()}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                <p className="text-xs text-white font-medium leading-relaxed whitespace-pre-wrap">
+                                  {cleanUserBubbleText(msg.texto)}
+                                </p>
+                              </div>
                             ) : (
                               <StreamingText content={cleanDisplayText(msg.texto, sugestoes.length > 0)} />
                             )}
