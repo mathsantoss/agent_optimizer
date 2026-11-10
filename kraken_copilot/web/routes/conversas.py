@@ -222,8 +222,19 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
             )
 
         prompt_text = msg.texto
+        context_headers = []
         if msg.arquivo_alvo and msg.arquivo_alvo not in msg.texto:
-            prompt_text = f"[Script alvo no workspace krakenlake/workspace: {msg.arquivo_alvo}]\n{msg.texto}"
+            context_headers.append(f"Script alvo ativo no workspace: krakenlake/workspace/{msg.arquivo_alvo}")
+        try:
+            from kraken_copilot.tools.data_analyst.services.dataset_service import get_available_datasets_catalog
+            catalog_list = get_available_datasets_catalog()
+            if catalog_list:
+                ds_names = ", ".join(f"{d['nome']} ({d['arquivo']})" for d in catalog_list)
+                context_headers.append(f"Datasets disponíveis no KrakenLake: {ds_names}")
+        except Exception:
+            pass
+        if context_headers:
+            prompt_text = "[" + " | ".join(context_headers) + "]\n" + msg.texto
 
         content = types.Content(
             role="user",
@@ -405,7 +416,11 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
     )
 
     has_approval_request = False
-    if not called_apply and (
+    # Aprovação (Human-in-the-Loop) é ESTRITAMENTE reservada para criadores e otimizadores de código (kraken_code e kraken_optimizer).
+    # O kraken_analyst NUNCA requer aprovação para seguir com consultas analíticas e explorações.
+    is_code_specialist = especialista_ativo in ("kraken_code", "kraken_optimizer")
+
+    if is_code_specialist and not called_apply and (
         called_proposal
         or (
             asks_authorization
@@ -450,13 +465,18 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
                         if isinstance(inner, dict):
                             data_blk = inner.get("data") or {}
                             if isinstance(data_blk, dict):
-                                cand = data_blk.get("proposed_code") or data_blk.get("candidate_code") or data_blk.get("codigo_proposto")
+                                cand = (
+                                    data_blk.get("proposed_code")
+                                    or data_blk.get("codigo_gerado")
+                                    or data_blk.get("candidate_code")
+                                    or data_blk.get("codigo_proposto")
+                                )
                                 if cand:
                                     proposed_code = cand
                                     break
 
-        # Fallback de arquivo temporário gerado pelo otimizador
-        if not proposed_code:
+        # Fallback de arquivo temporário apenas quando uma ferramenta de proposta foi chamada neste turno
+        if not proposed_code and called_proposal:
             from kraken_copilot.tools.code_optimizer.services.file_service import (
                 get_default_workspace_pipeline,
                 get_file_tmp_paths,
@@ -464,6 +484,9 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
             _, opt_file = get_file_tmp_paths(msg.arquivo_alvo or get_default_workspace_pipeline())
             if opt_file.is_file() and opt_file.stat().st_size > 0:
                 proposed_code = opt_file.read_text(encoding="utf-8")
+
+        # Garante que NUNCA solicita aprovação humana se não houver código proposto real
+        has_approval_request = bool(has_approval_request and proposed_code and str(proposed_code).strip())
 
     diff_info = None
     if has_approval_request and proposed_code:
@@ -480,8 +503,8 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
             target_file_name = None
             for f in reversed(ferramentas_executadas):
                 args = f.get("argumentos") or {}
-                if isinstance(args, dict) and args.get("file_path"):
-                    target_file_name = args["file_path"]
+                if isinstance(args, dict) and (args.get("file_path") or args.get("target_file_path")):
+                    target_file_name = args.get("file_path") or args.get("target_file_path")
                     break
             if not target_file_name:
                 target_file_name = msg.arquivo_alvo

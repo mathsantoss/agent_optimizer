@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SidebarNav, ConversaItem } from './components/SidebarNav';
-import { PromptBar, GeminiModel, WorkspaceFile } from './components/PromptBar';
+import { PromptBar, GeminiModel, WorkspaceFile, CatalogDataSource } from './components/PromptBar';
 import { ThinkingState, ThinkingStep } from './components/ThinkingState';
 import { LoadingState } from './components/LoadingState';
 import { StreamingText } from './components/StreamingText';
@@ -118,9 +118,25 @@ export function App() {
   const [models, setModels] = useState<GeminiModel[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('gemini-2.5-flash');
 
-  // Workspace Python Files
+  // Workspace Python Files & Catalog Data Sources
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [selectedWorkspaceFile, setSelectedWorkspaceFile] = useState<string>('');
+  const [catalogSources, setCatalogSources] = useState<CatalogDataSource[]>([]);
+  const [attachedSources, setAttachedSources] = useState<CatalogDataSource[]>([]);
+
+  const handleAttachSource = (source: CatalogDataSource) => {
+    setAttachedSources((prev) => {
+      if (prev.some((s) => s.caminho === source.caminho)) return prev;
+      return [...prev, source];
+    });
+    if (source.secao === 'WORKSPACE' && source.nome.endsWith('.py')) {
+      setSelectedWorkspaceFile(source.nome);
+    }
+  };
+
+  const handleRemoveAttachedSource = (caminho: string) => {
+    setAttachedSources((prev) => prev.filter((s) => s.caminho !== caminho));
+  };
 
   // Side Code Panel State (Visualização lateral em tempo real)
   const [sideCodeOpen, setSideCodeOpen] = useState(false);
@@ -144,6 +160,7 @@ export function App() {
   useEffect(() => {
     carregarModelos();
     carregarWorkspaceFiles();
+    carregarCatalogSources();
     carregarConversas(false);
   }, []);
 
@@ -202,19 +219,43 @@ export function App() {
     }
   };
 
-  const carregarWorkspaceFiles = async () => {
+  const carregarWorkspaceFiles = async (keepSelection: boolean = false) => {
     try {
       const res = await fetch('/api/dados/workspace/arquivos');
       if (res.ok) {
         const data = await res.json();
         const files: WorkspaceFile[] = data.arquivos || [];
         setWorkspaceFiles(files);
-        if (files.length > 0) {
+        if (!keepSelection && files.length > 0 && !selectedWorkspaceFile) {
           setSelectedWorkspaceFile(files[0].nome);
         }
       }
     } catch (err) {
       console.warn('Erro ao carregar arquivos do workspace:', err);
+    }
+  };
+
+  const carregarCatalogSources = async () => {
+    try {
+      const res = await fetch('/api/dados/arquivos');
+      if (res.ok) {
+        const data = await res.json();
+        const rawList = data.arquivos || [];
+        const mapped: CatalogDataSource[] = rawList
+          .filter((a: any) => a.secao === 'DATALAKE' || a.secao === 'METADADOS' || a.secao === 'DOCUMENTAÇÕES')
+          .map((a: any) => ({
+            key: a.nome,
+            nome: a.nome,
+            caminho: a.caminho,
+            secao: a.secao === 'DOCUMENTAÇÕES' ? 'METADADOS' : a.secao,
+            tipo: a.tipo,
+            tamanho_kb: a.tamanho_kb,
+            descricao: `${a.categoria_nome || a.secao} · ${a.tamanho_kb ?? 0} KB`,
+          }));
+        setCatalogSources(mapped);
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar fontes do catálogo:', err);
     }
   };
 
@@ -407,6 +448,9 @@ export function App() {
           setSideCodeDiff(data.diff_info);
           setSideCodeHasApproval(Boolean(data.has_approval_request));
           setSideCodeOpen(true);
+        } else if (selectedWorkspaceFile) {
+          carregarWorkspaceCode(selectedWorkspaceFile);
+          carregarWorkspaceFiles(true);
         }
 
         setMensagens((prev) => [...prev, assistantMsg]);
@@ -523,6 +567,11 @@ export function App() {
           setActiveView('investigacao');
           setMobileMenuOpen(false);
         }}
+        catalogSources={catalogSources}
+        workspaceFiles={workspaceFiles}
+        selectedWorkspaceFile={selectedWorkspaceFile}
+        onSelectWorkspaceFile={setSelectedWorkspaceFile}
+        onAttachSource={handleAttachSource}
       />
 
       {/* Main Container */}
@@ -655,7 +704,23 @@ export function App() {
         ) : (
           /* View Padrão: Chat com Painel Lateral de Código Split */
           <div className="flex-1 flex overflow-hidden min-w-0">
-            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <div
+              className="flex-1 flex flex-col overflow-hidden min-w-0"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const raw = e.dataTransfer.getData('application/x-kraken-source');
+                if (raw) {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    handleAttachSource(parsed);
+                  } catch {}
+                }
+              }}
+            >
               <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 min-w-0 w-full">
                 <div className="mx-auto max-w-5xl w-full space-y-6 pb-8 min-w-0">
                   {mensagens.length === 0 ? (
@@ -797,22 +862,36 @@ export function App() {
                               <InsightCards metrics={msg.benchmark_metrics} />
                             )}
 
-                            {/* Card de Aprovação Nativo Beautiful UI no Chat */}
+                            {/* Card de Aprovação Nativo Beautiful UI no Chat (Exibe SOMENTE para kraken_code/kraken_optimizer quando há código proposto) */}
                             {Boolean(
-                              msg.has_approval_request ||
-                              (msg as any).metadados?.has_approval_request ||
-                              (!isUser && (
-                                msg.texto.toLowerCase().includes('deseja confirmar a aplicação') ||
-                                msg.texto.toLowerCase().includes('deseja aprovar') ||
-                                msg.texto.toLowerCase().includes('autoriza a aplicação') ||
-                                msg.texto.toLowerCase().includes('substituir definitivamente o arquivo')
-                              ))
+                              (
+                                msg.proposed_code ||
+                                (msg as any).metadados?.proposed_code ||
+                                msg.diff_info?.proposed_code ||
+                                (msg as any).metadados?.diff_info?.proposed_code
+                              )?.trim() &&
+                              !msg.especialista?.toLowerCase().includes('analyst') &&
+                              (
+                                msg.has_approval_request ||
+                                (msg as any).metadados?.has_approval_request ||
+                                (!isUser && (
+                                  msg.texto.toLowerCase().includes('deseja confirmar a aplicação') ||
+                                  msg.texto.toLowerCase().includes('deseja aprovar') ||
+                                  msg.texto.toLowerCase().includes('autoriza a aplicação') ||
+                                  msg.texto.toLowerCase().includes('substituir definitivamente o arquivo')
+                                ))
+                              )
                             ) && (
                               <ApprovalCard
                                 execucaoId={msg.execucao_id}
                                 targetFile={msg.diff_info?.arquivo || (msg as any).metadados?.diff_info?.arquivo || selectedWorkspaceFile}
                                 diffInfo={msg.diff_info || (msg as any).metadados?.diff_info}
-                                proposedCode={msg.proposed_code || (msg as any).metadados?.proposed_code}
+                                proposedCode={
+                                  msg.proposed_code ||
+                                  (msg as any).metadados?.proposed_code ||
+                                  msg.diff_info?.proposed_code ||
+                                  (msg as any).metadados?.diff_info?.proposed_code
+                                }
                                 onApprove={handleApprove}
                                 onReject={handleReject}
                               />
@@ -921,6 +1000,10 @@ export function App() {
                 workspaceFiles={workspaceFiles}
                 selectedWorkspaceFile={selectedWorkspaceFile}
                 onSelectWorkspaceFile={setSelectedWorkspaceFile}
+                catalogSources={catalogSources}
+                attachedSources={attachedSources}
+                onAttachSource={handleAttachSource}
+                onRemoveAttachedSource={handleRemoveAttachedSource}
               />
             </div>
 

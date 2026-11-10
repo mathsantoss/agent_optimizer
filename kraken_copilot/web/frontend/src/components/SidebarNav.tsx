@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, DragEvent } from 'react';
 import {
   MessageSquare,
   Plus,
@@ -9,13 +9,18 @@ import {
   Search,
   BookOpen,
   ChevronLeft,
-  ChevronRight,
   Sparkles,
   ChevronDown,
   X,
   FileCode2,
+  GripVertical,
+  Layers,
+  AtSign,
+  Eye,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CatalogDataSource, WorkspaceFile } from './PromptBar';
 
 export interface ConversaItem {
   id: string;
@@ -35,6 +40,11 @@ export interface SidebarNavProps {
   onDeleteConversa: (id: string) => void;
   onNavigate: (view: 'chat' | 'dados' | 'observabilidade') => void;
   onOpenObservability: () => void;
+  catalogSources?: CatalogDataSource[];
+  workspaceFiles?: WorkspaceFile[];
+  selectedWorkspaceFile?: string;
+  onSelectWorkspaceFile?: (filename: string) => void;
+  onAttachSource?: (source: CatalogDataSource) => void;
   className?: string;
 }
 
@@ -49,11 +59,18 @@ export function SidebarNav({
   onDeleteConversa,
   onNavigate,
   onOpenObservability,
+  catalogSources = [],
+  workspaceFiles = [],
+  selectedWorkspaceFile = '',
+  onSelectWorkspaceFile,
+  onAttachSource,
   className,
 }: SidebarNavProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'conversas' | 'arquivos'>('conversas');
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [fileQuery, setFileQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -65,6 +82,87 @@ export function SidebarNav({
   const visibleConversas = conversas.filter((c) =>
     (c.titulo || '').toLowerCase().includes(query.trim().toLowerCase())
   );
+
+  // Consolidação de arquivos para a aba "Arquivos do Projeto"
+  const projectFiles: CatalogDataSource[] = useMemo(() => {
+    const items: CatalogDataSource[] = [];
+    const seen = new Set<string>();
+
+    for (const src of catalogSources) {
+      if (!seen.has(src.caminho)) {
+        seen.add(src.caminho);
+        items.push(src);
+      }
+    }
+
+    // Default datalake e metadados
+    const defaults: CatalogDataSource[] = [
+      {
+        key: 'dados_vendas.csv',
+        nome: 'dados_vendas.csv',
+        caminho: 'krakenlake/catalog/sources/dados_vendas.csv',
+        secao: 'DATALAKE',
+        tipo: 'csv',
+        tamanho_kb: 7405.8,
+        descricao: 'Base transacional de vendas, clientes e preços',
+      },
+      {
+        key: 'dicionario_vendas.json',
+        nome: 'dicionario_vendas.json',
+        caminho: 'krakenlake/catalog/metadados/dicionario_vendas.json',
+        secao: 'METADADOS',
+        tipo: 'json',
+        tamanho_kb: 2.84,
+        descricao: 'Dicionário semântico e regras de negócio (RAG)',
+      },
+    ];
+
+    for (const d of defaults) {
+      if (!seen.has(d.caminho) && !items.some((i) => i.nome === d.nome)) {
+        seen.add(d.caminho);
+        items.push(d);
+      }
+    }
+
+    // Scripts do workspace
+    for (const wf of workspaceFiles) {
+      const p = wf.caminho || `krakenlake/workspace/${wf.nome}`;
+      if (!seen.has(p)) {
+        seen.add(p);
+        items.push({
+          key: wf.nome,
+          nome: wf.nome,
+          caminho: p,
+          secao: 'WORKSPACE',
+          tipo: 'py',
+          descricao: `Script do Workspace (${wf.linhas ?? 0} linhas)`,
+        });
+      }
+    }
+
+    return items;
+  }, [catalogSources, workspaceFiles]);
+
+  const filteredFiles = useMemo(() => {
+    const q = fileQuery.trim().toLowerCase();
+    if (!q) return projectFiles;
+    return projectFiles.filter(
+      (f) =>
+        f.nome.toLowerCase().includes(q) ||
+        f.caminho.toLowerCase().includes(q) ||
+        (f.descricao || '').toLowerCase().includes(q)
+    );
+  }, [projectFiles, fileQuery]);
+
+  const datalakeFiles = filteredFiles.filter((f) => f.secao === 'DATALAKE');
+  const metadataFiles = filteredFiles.filter((f) => f.secao === 'METADADOS');
+  const workspaceScripts = filteredFiles.filter((f) => f.secao === 'WORKSPACE');
+
+  const handleDragStart = (e: DragEvent<HTMLDivElement>, file: CatalogDataSource) => {
+    e.dataTransfer.setData('application/x-kraken-source', JSON.stringify(file));
+    e.dataTransfer.setData('text/plain', `@${file.nome}`);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
 
   return (
     <>
@@ -87,7 +185,7 @@ export function SidebarNav({
           className
         )}
       >
-        {/* Workspace Switcher / Header (Estilo Beautiful UI) */}
+        {/* Workspace Switcher / Header */}
         <div
           className={cn(
             'flex h-14 items-center border-b border-slate-100 transition-all',
@@ -137,7 +235,7 @@ export function SidebarNav({
           )}
         </div>
 
-        {/* Ação Primária: New Chat (Beautiful UI) */}
+        {/* Ação Primária: New Chat */}
         <div className="p-2.5">
           <button
             type="button"
@@ -197,117 +295,339 @@ export function SidebarNav({
                 : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
               collapsed && 'justify-center px-0'
             )}
-            title="Painel de Observabilidade (Grafana & Telemetria)"
+            title="Painel de Observabilidade"
           >
             <ShieldCheck className="h-4 w-4 shrink-0" />
             {!collapsed && <span>Observabilidade</span>}
           </button>
         </nav>
 
-        {/* Seção de Sessões Recentes com Chat Search Storyboard */}
-        <div className="flex-1 overflow-y-auto px-2 py-2">
-          {!collapsed && (
-            <div className="relative mb-2 flex items-center justify-between px-1">
-              {searchOpen ? (
-                <div className="flex w-full items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 shadow-2xs">
-                  <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setSearchOpen(false);
-                        setQuery('');
-                      }
-                    }}
-                    placeholder="Buscar histórico..."
-                    className="w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400 font-medium"
-                  />
+        {/* Seletor de Abas da Barra Lateral: Conversas vs Arquivos do Projeto (Drag & Drop) */}
+        {!collapsed && (
+          <div className="px-2 pt-2 pb-1">
+            <div className="flex items-center rounded-xl bg-slate-100/90 p-0.5 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setSidebarTab('conversas')}
+                className={cn(
+                  'flex-1 rounded-lg py-1 text-center transition-all cursor-pointer',
+                  sidebarTab === 'conversas'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-500 hover:text-slate-800 font-medium'
+                )}
+              >
+                Chats ({conversas.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSidebarTab('arquivos')}
+                className={cn(
+                  'flex-1 rounded-lg py-1 text-center transition-all cursor-pointer flex items-center justify-center gap-1',
+                  sidebarTab === 'arquivos'
+                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                    : 'text-slate-500 hover:text-slate-800 font-medium'
+                )}
+              >
+                <Layers className="h-3 w-3" />
+                <span>Arquivos ({projectFiles.length})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CONTEÚDO DA BARRA LATERAL */}
+        <div className="flex-1 overflow-y-auto px-2 py-1.5">
+          {/* ABA 1: SESSÕES RECENTES */}
+          {sidebarTab === 'conversas' && (
+            <div>
+              {!collapsed && (
+                <div className="relative mb-2 flex items-center justify-between px-1">
+                  {searchOpen ? (
+                    <div className="flex w-full items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 shadow-2xs">
+                      <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setSearchOpen(false);
+                            setQuery('');
+                          }
+                        }}
+                        placeholder="Buscar histórico..."
+                        className="w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400 font-medium"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchOpen(false);
+                          setQuery('');
+                        }}
+                        className="text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Histórico de Conversas
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Buscar chats"
+                        onClick={() => setSearchOpen(true)}
+                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                      >
+                        <Search className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Lista de Sessões Recentes */}
+              <div className="space-y-0.5">
+                {visibleConversas.length === 0 ? (
+                  !collapsed && (
+                    <div className="px-2 py-4 text-center text-xs text-slate-400">
+                      {query ? 'Nenhum chat encontrado' : 'Nenhuma conversa ativa'}
+                    </div>
+                  )
+                ) : (
+                  (collapsed ? visibleConversas.slice(0, 3) : visibleConversas).map((c) => {
+                    const isSelected = c.id === conversaAtivaId;
+                    return (
+                      <div
+                        key={c.id}
+                        className={cn(
+                          'group relative flex items-center justify-between rounded-xl px-2.5 py-1.5 text-xs transition-colors cursor-pointer',
+                          isSelected
+                            ? 'bg-blue-50/80 font-semibold text-blue-900 border border-blue-200/60 shadow-2xs'
+                            : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900',
+                          collapsed && 'justify-center px-0'
+                        )}
+                        onClick={() => onSelectConversa(c.id)}
+                        title={c.titulo}
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <MessageSquare
+                            className={cn(
+                              'h-3.5 w-3.5 shrink-0',
+                              isSelected ? 'text-blue-600' : 'text-slate-400'
+                            )}
+                          />
+                          {!collapsed && (
+                            <span className="truncate text-[12px]">{c.titulo}</span>
+                          )}
+                        </div>
+
+                        {!collapsed && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteConversa(c.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition-opacity"
+                            title="Excluir conversa"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ABA 2: ARQUIVOS DO PROJETO (DRAG & DROP PARA O CHAT) */}
+          {sidebarTab === 'arquivos' && !collapsed && (
+            <div className="space-y-3">
+              {/* Busca rápida de arquivos */}
+              <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 shadow-2xs">
+                <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  value={fileQuery}
+                  onChange={(e) => setFileQuery(e.target.value)}
+                  placeholder="Filtrar arquivos..."
+                  className="w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400 font-medium"
+                />
+                {fileQuery && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setSearchOpen(false);
-                      setQuery('');
-                    }}
+                    onClick={() => setFileQuery('')}
                     className="text-slate-400 hover:text-slate-600"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
+                )}
+              </div>
+
+              <div className="text-[10px] text-slate-400 font-mono px-1 flex items-center gap-1">
+                <GripVertical className="h-3 w-3 text-blue-500 shrink-0" />
+                <span>Arraste qualquer item para o Chat ou clique em @ para anexar.</span>
+              </div>
+
+              {/* 1. DATA SOURCES / DATALAKE */}
+              {datalakeFiles.length > 0 && (
+                <div>
+                  <div className="px-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
+                    <Database className="h-3 w-3" />
+                    <span>Data Sources ({datalakeFiles.length})</span>
+                  </div>
+                  <div className="space-y-1">
+                    {datalakeFiles.map((file) => (
+                      <div
+                        key={file.caminho}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, file)}
+                        className="group flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2 text-xs hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-2xs transition-all cursor-grab active:cursor-grabbing select-none"
+                        title="Arraste para o chat ou use o botão @"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
+                          <GripVertical className="h-3 w-3 text-slate-300 group-hover:text-blue-500 shrink-0" />
+                          <Database className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-mono text-[11px] font-bold text-slate-800 truncate">
+                              {file.nome}
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate">
+                              {file.tamanho_kb ? `${file.tamanho_kb} KB` : 'CSV / Parquet'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {onAttachSource && (
+                          <button
+                            type="button"
+                            onClick={() => onAttachSource(file)}
+                            title="Anexar ao prompt do Chat (@)"
+                            className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors cursor-pointer"
+                          >
+                            +@
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Sessões Recentes
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Buscar chats"
-                    onClick={() => setSearchOpen(true)}
-                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-                  >
-                    <Search className="h-3.5 w-3.5" />
-                  </button>
-                </>
+              )}
+
+              {/* 2. METADADOS & RAG */}
+              {metadataFiles.length > 0 && (
+                <div>
+                  <div className="px-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-purple-600 flex items-center gap-1.5">
+                    <BookOpen className="h-3 w-3" />
+                    <span>Metadados &amp; RAG ({metadataFiles.length})</span>
+                  </div>
+                  <div className="space-y-1">
+                    {metadataFiles.map((file) => (
+                      <div
+                        key={file.caminho}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, file)}
+                        className="group flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2 text-xs hover:border-purple-300 hover:bg-purple-50/40 hover:shadow-2xs transition-all cursor-grab active:cursor-grabbing select-none"
+                        title="Arraste para o chat ou use o botão @"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
+                          <GripVertical className="h-3 w-3 text-slate-300 group-hover:text-purple-500 shrink-0" />
+                          <BookOpen className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-mono text-[11px] font-bold text-slate-800 truncate">
+                              {file.nome}
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate">
+                              {file.tipo?.toUpperCase() || 'DOC'} · RAG
+                            </div>
+                          </div>
+                        </div>
+
+                        {onAttachSource && (
+                          <button
+                            type="button"
+                            onClick={() => onAttachSource(file)}
+                            title="Anexar ao prompt do Chat (@)"
+                            className="shrink-0 rounded-lg border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors cursor-pointer"
+                          >
+                            +@
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. SCRIPTS DO WORKSPACE */}
+              {workspaceScripts.length > 0 && (
+                <div>
+                  <div className="px-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                    <FileCode2 className="h-3 w-3" />
+                    <span>Scripts do Workspace ({workspaceScripts.length})</span>
+                  </div>
+                  <div className="space-y-1">
+                    {workspaceScripts.map((file) => {
+                      const isSelected = file.nome === selectedWorkspaceFile;
+                      return (
+                        <div
+                          key={file.caminho}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, file)}
+                          onClick={() => {
+                            if (onSelectWorkspaceFile) {
+                              onSelectWorkspaceFile(file.nome);
+                            }
+                          }}
+                          className={cn(
+                            'group flex items-center justify-between rounded-xl border p-2 text-xs transition-all cursor-grab active:cursor-grabbing select-none',
+                            isSelected
+                              ? 'border-emerald-300 bg-emerald-50/80 text-emerald-950 font-semibold shadow-2xs'
+                              : 'border-slate-200/80 bg-white hover:border-emerald-300 hover:bg-emerald-50/30'
+                          )}
+                          title="Clique para selecionar ou arraste para o chat"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
+                            <GripVertical className="h-3 w-3 text-slate-300 group-hover:text-emerald-500 shrink-0" />
+                            <FileCode2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-mono text-[11px] font-bold truncate">
+                                {file.nome}
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate">
+                                Python · {isSelected ? 'Script Ativo' : 'Workspace'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {onAttachSource && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAttachSource(file);
+                                }}
+                                title="Anexar ao prompt (@)"
+                                className="rounded-lg border border-emerald-200 bg-emerald-100/70 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-200 transition-colors cursor-pointer"
+                              >
+                                +@
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           )}
-
-          {/* Lista de Sessões Recentes */}
-          <div className="space-y-0.5">
-            {visibleConversas.length === 0 ? (
-              !collapsed && (
-                <div className="px-2 py-4 text-center text-xs text-slate-400">
-                  {query ? 'Nenhum chat encontrado' : 'Nenhuma conversa ativa'}
-                </div>
-              )
-            ) : (
-              (collapsed ? visibleConversas.slice(0, 3) : visibleConversas).map((c) => {
-                const isSelected = c.id === conversaAtivaId;
-                return (
-                  <div
-                    key={c.id}
-                    className={cn(
-                      'group relative flex items-center justify-between rounded-xl px-2.5 py-1.5 text-xs transition-colors cursor-pointer',
-                      isSelected
-                        ? 'bg-blue-50/80 font-semibold text-blue-900 border border-blue-200/60 shadow-2xs'
-                        : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900',
-                      collapsed && 'justify-center px-0'
-                    )}
-                    onClick={() => onSelectConversa(c.id)}
-                    title={c.titulo}
-                  >
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <MessageSquare
-                        className={cn(
-                          'h-3.5 w-3.5 shrink-0',
-                          isSelected ? 'text-blue-600' : 'text-slate-400'
-                        )}
-                      />
-                      {!collapsed && (
-                        <span className="truncate text-[12px]">{c.titulo}</span>
-                      )}
-                    </div>
-
-                    {!collapsed && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteConversa(c.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition-opacity"
-                        title="Excluir conversa"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
         </div>
 
         {/* Footer com Links Externos */}

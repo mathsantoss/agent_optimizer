@@ -1,11 +1,58 @@
 """Serviço de geração dinâmica e agnóstica de pipelines de Feature Engineering em Pandas e PySpark."""
 from pathlib import Path
+import re
 from typing import Any
 import pandas as pd
 
 from kraken_copilot import config
 from kraken_copilot.schemas import FeaturePipelinePlan, FeatureSpec
-from kraken_copilot.tools.data_analyst.services.dataset_service import resolve_dataset_file
+from kraken_copilot.tools.data_analyst.services.dataset_service import (
+    get_available_datasets_catalog,
+    list_dataset_files,
+    resolve_dataset_file,
+)
+
+
+def resolve_dataset_smart(dataset_name: str, fallback_if_empty: bool = False) -> tuple[Path | None, str | None]:
+    """
+    Resolve o arquivo de dataset com suporte a linguagem natural (ex: 'dados de venda' -> 'dados_vendas.csv').
+    Preserva o comportamento exato para nomes explícitos de outras bases (ex: 'clientes_telecom').
+    """
+    clean = (dataset_name or "").strip()
+    if clean:
+        exact_path, err = resolve_dataset_file(clean)
+        if exact_path is not None:
+            return exact_path, None
+
+    files = list_dataset_files()
+    if not files:
+        return None, "Nenhum dataset encontrado no catálogo."
+
+    if not clean or clean.lower() in ("auto", "default", "padrao", "padrão", "catalogo", "catálogo"):
+        if fallback_if_empty:
+            return files[0], None
+        return None, "Dataset não especificado."
+
+    stopwords = {"de", "da", "do", "das", "dos", "no", "na", "em", "base", "dataset", "tabela", "arquivo", "csv", "parquet"}
+    raw_tokens = [t.rstrip("s") for t in re.split(r"[\s_\-./]+", clean.lower()) if t and t not in stopwords]
+    if raw_tokens:
+        best_file = None
+        best_score = 0
+        for f in files:
+            f_tokens = [ft.rstrip("s") for ft in re.split(r"[\s_\-./]+", f.stem.lower()) if ft]
+            # Exige correspondência de token significativo (não apenas 'dado')
+            matched = [t for t in raw_tokens if any(t == ft or (len(t) >= 4 and (t in ft or ft in t)) for ft in f_tokens)]
+            meaningful = [t for t in matched if t not in ("dado", "data")]
+            if meaningful and len(matched) > best_score:
+                best_score = len(matched)
+                best_file = f
+        if best_file is not None:
+            return best_file, None
+
+    if fallback_if_empty and len(files) == 1:
+        return files[0], None
+
+    return None, f"Dataset '{dataset_name}' não encontrado."
 
 
 def infer_candidate_features_from_schema(
@@ -141,8 +188,15 @@ def infer_candidate_features_from_schema(
                     name=f"ratio_{col_a}_{col_b}",
                     category="ratio",
                     framework="pandas",
-                    expression=f"np.where(df['{col_b}'] == 0, 0, df['{col_a}'] / df['{col_b}'].replace(0, np.nan)).fillna(0)",
+                    expression=f"(df['{col_a}'] / df['{col_b}'].replace(0, np.nan)).fillna(0.0)",
                     description=f"Razão normalizada com proteção contra divisão por zero ({col_a} / {col_b})",
+                ),
+                FeatureSpec(
+                    name=f"interacao_{col_a}_x_{col_b}",
+                    category="interaction",
+                    framework="pandas",
+                    expression=f"df['{col_a}'].fillna(0) * df['{col_b}'].fillna(0)",
+                    description=f"Produto de interação multiplicativa ({col_a} * {col_b}, ex: volume financeiro/transacional)",
                 ),
             ])
 
@@ -401,17 +455,18 @@ def create_feature_pipeline_plan(
                     )
                 )
 
-    resolved_file, _ = resolve_dataset_file(dataset_name)
+    resolved_file, _ = resolve_dataset_smart(dataset_name, fallback_if_empty=not bool(selected_features))
     data_filename = resolved_file.name if resolved_file else f"{dataset_name}.csv"
+    resolved_stem = resolved_file.stem if resolved_file else dataset_name
 
     # Se nenhuma feature foi especificada, infere dinamicamente a partir do schema real do arquivo
     if not selected_features:
         if resolved_file and resolved_file.exists():
             try:
                 if resolved_file.suffix.lower() == ".parquet":
-                    sample_df = pd.read_parquet(resolved_file).head(10)
+                    sample_df = pd.read_parquet(resolved_file).head(200)
                 else:
-                    sample_df = pd.read_csv(resolved_file, nrows=10)
+                    sample_df = pd.read_csv(resolved_file, nrows=200)
                 selected_features = infer_candidate_features_from_schema(sample_df, framework=fw)
             except Exception:
                 selected_features = []
@@ -430,15 +485,15 @@ def create_feature_pipeline_plan(
             ]
 
     if fw == "pyspark":
-        code = generate_pyspark_pipeline_code(dataset_name, selected_features, data_filename)
+        code = generate_pyspark_pipeline_code(resolved_stem, selected_features, data_filename)
     else:
-        code = generate_pandas_pipeline_code(dataset_name, selected_features, data_filename)
+        code = generate_pandas_pipeline_code(resolved_stem, selected_features, data_filename)
 
     return FeaturePipelinePlan(
         pipeline_name=f"pipeline_features_{fw}",
         framework=fw,
         target_file_path=target_file_path,
-        source_dataset=dataset_name,
+        source_dataset=resolved_stem,
         features=selected_features,
         code=code,
     )

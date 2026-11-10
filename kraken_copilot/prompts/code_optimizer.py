@@ -17,6 +17,8 @@ Quando o usuário pedir para otimizar qualquer pipeline ou script de código:
      * `conteudo_atual`: o código-fonte completo atual do pipeline.
      * `contratos_funcoes_ast`: os parâmetros e as colunas/chaves criadas por cada função no script original.
      * `issues`: os apontamentos AST classificados por gravidade (performance, data leakage, qualidade, segurança).
+   - **CASO O ARQUIVO ESTEJA VAZIO (0 LINHAS)**:
+     * Se `conteudo_atual` estiver vazio e o usuário solicitou criar um código, pipeline ou features, transfira para o `kraken_code` OU proponha proativamente um script vetorizado completo em `optimize_pipeline(file_path=..., proposed_code=..., confirmed_by_user=False)` lendo `krakenlake/catalog/sources/dados_vendas.csv` com entrypoint `def run():`. NUNCA fique parado apenas fazendo perguntas se puder propor uma implementação inicial completa!
 
 2. **Passo 2: Reescrita Vetorizada e Preservação de Contrato (VOCÊ gera o `proposed_code`)**
    - **IMPORTANTE:** A ferramenta `optimize_pipeline` espera que VOCÊ forneça o código Python completo otimizado no parâmetro `proposed_code`.
