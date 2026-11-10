@@ -25,6 +25,9 @@ CURRENT_DIR = Path(__file__).resolve().parent
 UI_DIR = CURRENT_DIR / "ui"
 INDEX_HTML = UI_DIR / "index.html"
 INVESTIGACAO_HTML = UI_DIR / "investigacao.html"
+DIST_DIR = UI_DIR / "dist"
+DIST_INDEX_HTML = DIST_DIR / "index.html"
+DIST_ASSETS_DIR = DIST_DIR / "assets"
 
 
 @asynccontextmanager
@@ -39,6 +42,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Monta assets do bundle React compilado se existirem
+if DIST_ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=DIST_ASSETS_DIR, check_dir=False), name="dist_assets")
 
 # Monta arquivos estáticos do frontend em /web/ui, /ui e /web (retrocompatibilidade)
 app.mount("/web/ui", StaticFiles(directory=UI_DIR, check_dir=False), name="web_ui")
@@ -67,6 +74,8 @@ async def obter_modelos_api():
 @app.get("/")
 async def rota_raiz():
     """Página principal de chat do Kraken Copilot."""
+    if DIST_INDEX_HTML.exists():
+        return FileResponse(DIST_INDEX_HTML)
     return FileResponse(INDEX_HTML)
 
 

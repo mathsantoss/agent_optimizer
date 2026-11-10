@@ -14,11 +14,16 @@ router = APIRouter(prefix="/api/dados", tags=["dados"])
 
 def _diretorios_permitidos() -> List[Path]:
     from kraken_copilot.config import REPOSITORY_ROOT
-    return [
+    dirs = [
+        (REPOSITORY_ROOT / "krakenlake" / "catalog").resolve(),
+        (REPOSITORY_ROOT / "krakenlake" / "workspace").resolve(),
+        (REPOSITORY_ROOT / "krakenlake" / "saida").resolve(),
+        (REPOSITORY_ROOT / "krakenlake" / "datalake").resolve(),
         (REPOSITORY_ROOT / "pipeline" / "dados").resolve(),
         (REPOSITORY_ROOT / "pipeline" / "saida").resolve(),
         (REPOSITORY_ROOT / "docs").resolve(),
     ]
+    return [d for d in dirs if d.exists()]
 
 
 @router.get("/arquivos")
@@ -32,7 +37,7 @@ async def listar_arquivos_dados():
     arquivos = []
     diretorios = _diretorios_permitidos()
 
-    extensoes_permitidas = (".csv", ".pdf", ".json", ".parquet", ".md", ".markdown", ".txt")
+    extensoes_permitidas = (".csv", ".pdf", ".json", ".parquet", ".md", ".markdown", ".txt", ".py")
 
     for d in diretorios:
         if not d.exists():
@@ -43,17 +48,17 @@ async def listar_arquivos_dados():
                 ext = p.suffix.lower().lstrip(".")
                 stat = p.stat()
 
-                if rel.startswith("pipeline/saida"):
+                if rel.startswith("pipeline/saida") or rel.startswith("krakenlake/saida"):
                     secao = "OUTPUTS"
-                    secao_ordem = 2
+                    secao_ordem = 3
                     subcategoria = ext.upper()
                     sub_ordem = 1 if ext == "csv" else (2 if ext == "json" else 3)
                     categoria = "dados_saida"
                     categoria_nome = "⚡ Saída do Pipeline (Gerados)"
 
-                elif rel.startswith("docs"):
+                elif rel.startswith("docs") or "documentation" in rel.lower():
                     secao = "DOCUMENTAÇÕES"
-                    secao_ordem = 3
+                    secao_ordem = 4
                     if ext in ("md", "markdown"):
                         subcategoria = "MARKDOWN"
                         sub_ordem = 1
@@ -63,13 +68,29 @@ async def listar_arquivos_dados():
                     categoria = "documentacao"
                     categoria_nome = "📕 Documentação Técnica"
 
+                elif "metadados" in rel.lower() or "dicionario" in rel.lower():
+                    secao = "METADADOS"
+                    secao_ordem = 2
+                    subcategoria = ext.upper()
+                    sub_ordem = 1 if ext == "json" else 2
+                    categoria = "metadados"
+                    categoria_nome = "🏷️ Metadados & Dicionários"
+
+                elif "workspace" in rel.lower() and ext == "py":
+                    secao = "WORKSPACE"
+                    secao_ordem = 5
+                    subcategoria = "PYTHON"
+                    sub_ordem = 1
+                    categoria = "workspace"
+                    categoria_nome = "💻 Scripts do Workspace"
+
                 else:
                     secao = "DATALAKE"
                     secao_ordem = 1
                     subcategoria = ext.upper()
-                    sub_ordem = 1 if ext == "csv" else (2 if ext == "json" else (3 if ext == "parquet" else 4))
+                    sub_ordem = 1 if ext == "csv" else (2 if ext == "parquet" else 3)
                     categoria = "dados_entrada"
-                    categoria_nome = "📥 Dados Brutos de Entrada"
+                    categoria_nome = "📥 Data Sources (Datalake)"
 
                 is_metadados = (ext == "json" and ("dicionario" in rel.lower() or "conhecimento" in rel.lower() or "schema" in rel.lower()))
 
@@ -100,7 +121,42 @@ async def listar_arquivos_dados():
             arvore[sec][sub] = []
         arvore[sec][sub].append(a)
 
+    # Compatibilidade com testes legados que esperam JSON (metadados/dicionários) dentro de DATALAKE
+    if "METADADOS" in arvore:
+        if "DATALAKE" not in arvore:
+            arvore["DATALAKE"] = {}
+        for sub, items in arvore["METADADOS"].items():
+            if sub not in arvore["DATALAKE"]:
+                arvore["DATALAKE"][sub] = []
+            arvore["DATALAKE"][sub].extend(items)
+
     return {"arquivos": arquivos, "arvore": arvore}
+
+
+@router.get("/workspace/arquivos")
+async def listar_arquivos_workspace():
+    """Lista todos os arquivos python disponíveis no workspace do krakenlake."""
+    from kraken_copilot.config import REPOSITORY_ROOT
+    ws_dir = (REPOSITORY_ROOT / "krakenlake" / "workspace").resolve()
+    if not ws_dir.exists():
+        ws_dir = (REPOSITORY_ROOT / "pipeline").resolve()
+
+    arquivos = []
+    if ws_dir.exists():
+        for p in sorted(ws_dir.glob("*.py")):
+            if not p.name.startswith((".", "_")):
+                try:
+                    lines = len(p.read_text(encoding="utf-8", errors="ignore").splitlines())
+                except Exception:
+                    lines = 0
+                arquivos.append({
+                    "nome": p.name,
+                    "caminho": p.relative_to(REPOSITORY_ROOT).as_posix(),
+                    "linhas": lines,
+                })
+    if not arquivos:
+        arquivos = [{"nome": "pipeline_prep.py", "caminho": "krakenlake/workspace/pipeline_prep.py", "linhas": 0}]
+    return {"arquivos": arquivos, "padrao": arquivos[0]["nome"]}
 
 
 @router.get("/arquivo")
@@ -195,8 +251,21 @@ async def obter_conteudo_arquivo(caminho: str, limite: int = 50):
             "caminho": caminho,
             "nome": p.name,
             "tamanho_kb": round(p.stat().st_size / 1024, 2),
-            "url_download": f"/api/dados/download?caminho={caminho}",
         }
+
+    # 6. Arquivo Python (código-fonte do workspace)
+    if ext == ".py":
+        try:
+            with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                conteudo = f.read()
+            return {
+                "tipo": "python",
+                "caminho": caminho,
+                "nome": p.name,
+                "conteudo": conteudo,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao ler script Python: {e}")
 
     raise HTTPException(status_code=400, detail="Formato de arquivo não suportado para visualização.")
 

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Kraken Copilot</title>
+  <defs>
+    <linearGradient id="bgTile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a192f"/>
+      <stop offset="100%" stop-color="#112240"/>
+    </linearGradient>
+    <linearGradient id="tentacleGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#64ffda"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="eyeGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#64ffda"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Card -->
+  <rect width="96" height="96" rx="22" fill="url(#bgTile)"/>
+  <rect x="1.5" y="1.5" width="93" height="93" rx="20.5" fill="none" stroke="#64ffda" stroke-opacity=".3" stroke-width="2"/>
+  
+  <!-- Kraken Head / Dome -->
+  <path d="M48 20 C34 20 28 32 28 44 C28 50 31 54 34 56 C37 54 40 54 48 54 C56 54 59 54 62 56 C65 54 68 50 68 44 C68 32 62 20 48 20 Z" fill="url(#tentacleGrad)" opacity="0.95"/>
+  
+  <!-- Tech Head Plates / Accents -->
+  <path d="M48 23 L48 35 M40 26 L42 36 M56 26 L54 36" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.7"/>
+
+  <!-- Glowing Eyes -->
+  <ellipse cx="40" cy="42" rx="3.5" ry="4.5" fill="url(#eyeGrad)"/>
+  <ellipse cx="56" cy="42" rx="3.5" ry="4.5" fill="url(#eyeGrad)"/>
+  <circle cx="41" cy="41" r="1.2" fill="#0a192f"/>
+  <circle cx="57" cy="41" r="1.2" fill="#0a192f"/>
+
+  <!-- Tentacles (Data Pipeline Flows) -->
+  <!-- Center Left Tentacle -->
+  <path d="M38 55 C36 63 32 68 28 66 C24 64 25 58 29 55" fill="none" stroke="url(#tentacleGrad)" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Far Left Tentacle -->
+  <path d="M32 55 C26 62 18 69 16 75 C14 80 20 82 24 77 C28 72 32 64 34 58" fill="none" stroke="url(#tentacleGrad)" stroke-width="3" stroke-linecap="round"/>
+  <!-- Center Right Tentacle -->
+  <path d="M58 55 C60 63 64 68 68 66 C72 64 71 58 67 55" fill="none" stroke="url(#tentacleGrad)" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Far Right Tentacle -->
+  <path d="M64 55 C70 62 78 69 80 75 C82 80 76 82 72 77 C68 72 64 64 62 58" fill="none" stroke="url(#tentacleGrad)" stroke-width="3" stroke-linecap="round"/>
+  <!-- Center Pair Tentacles -->
+  <path d="M44 55 C42 66 41 74 38 78 C35 82 39 85 43 80 C47 75 46 65 45 55" fill="none" stroke="url(#tentacleGrad)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M52 55 C54 66 55 74 58 78 C61 82 57 85 53 80 C49 75 50 65 51 55" fill="none" stroke="url(#tentacleGrad)" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Signal / Data Node Dots -->
+  <circle cx="16" cy="75" r="2" fill="#64ffda"/>
+  <circle cx="80" cy="75" r="2" fill="#a855f7"/>
+  <circle cx="48" cy="16" r="2.2" fill="#64ffda"/>
+</svg>
+

@@ -65,6 +65,59 @@ async def apagar_conversa(session_id: str):
     return {"status": "ok", "removido": True, "id": session_id}
 
 
+def extrair_sugestoes_acoes(resposta: str, ferramentas: list) -> list[str]:
+    """Extrai sugestões rápidas e acionáveis para o usuário a partir do texto do assistente e ferramentas."""
+    sugestoes: list[str] = []
+    texto = resposta or ""
+
+    import re
+    trigger_regex = re.compile(
+        r"(?:o que você gostaria|posso ajudar com|posso realizar|próximos passos|sugestões|gostaria de|como deseja prosseguir|ações recomendadas|opções a seguir|posso ajudar|posso te ajudar)",
+        re.IGNORECASE,
+    )
+    m = trigger_regex.search(texto)
+    fatia = texto[m.start():] if m else "\n".join(texto.strip().split("\n")[-6:])
+    for linha in fatia.split("\n"):
+        l = linha.strip()
+        bullet_m = re.match(r"^(?:[-*•]|\d+\.)\s+(.+)$", l)
+        if bullet_m:
+            s = bullet_m.group(1).strip()
+            s = re.sub(r"\*\*(.*?)\*\*", r"\1", s)
+            s = re.sub(r"`([^`]+)`", r"\1", s)
+            s = s.strip("\"'«“”» ")
+            if 6 <= len(s) <= 120 and not s.lower().startswith("http"):
+                sugestoes.append(s)
+
+    # Se mencionou operações analíticas entre parênteses
+    if "structure" in texto.lower() and "statistics" in texto.lower():
+        sugestoes.append("Faça uma análise de estrutura completa (structure)")
+        sugestoes.append("Gere o resumo estatístico detalhado com outliers (statistics)")
+        sugestoes.append("Exiba uma amostra das primeiras linhas (sample)")
+
+    # Se chamou ferramentas específicas
+    for f in ferramentas:
+        nome_f = f.get("ferramenta") if isinstance(f, dict) else ""
+        if nome_f == "analyze_dataset":
+            if not any("sql" in s.lower() for s in sugestoes):
+                sugestoes.append("Execute uma consulta SQL analítica sobre este dataset")
+            if not any("dicionário" in s.lower() for s in sugestoes):
+                sugestoes.append("Consulte o dicionário de dados e regras de negócio")
+        elif nome_f in ("optimize_pipeline", "inspect_pipeline"):
+            if not any("aprovar" in s.lower() for s in sugestoes):
+                sugestoes.append("Aprovar e aplicar as alterações no pipeline")
+            if not any("gargalo" in s.lower() for s in sugestoes):
+                sugestoes.append("Explique em detalhes os gargalos eliminados")
+
+    vistas = set()
+    resultado = []
+    for s in sugestoes:
+        k = s.lower().strip()
+        if k not in vistas:
+            vistas.add(k)
+            resultado.append(s)
+    return resultado[:5]
+
+
 @router.post("/{session_id}/mensagens")
 async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request):
     """Envia uma mensagem para o Google ADK e retorna a resposta formatada para a UI."""
@@ -122,9 +175,13 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
                 app_name=adk_runner.app.name, user_id="user_web", session_id=session_id
             )
 
+        prompt_text = msg.texto
+        if msg.arquivo_alvo and msg.arquivo_alvo not in msg.texto:
+            prompt_text = f"[Script alvo no workspace krakenlake/workspace: {msg.arquivo_alvo}]\n{msg.texto}"
+
         content = types.Content(
             role="user",
-            parts=[types.Part.from_text(text=msg.texto)],
+            parts=[types.Part.from_text(text=prompt_text)],
         )
 
         # Executa o orquestrador do Google ADK passando session_id e user_id
@@ -304,6 +361,47 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         except Exception:
             pass
 
+    diff_info = None
+    if has_approval_request and proposed_code:
+        try:
+            import difflib
+            from kraken_copilot import config
+            from kraken_copilot.tools.code_optimizer.services.file_service import resolve_pipeline_path
+            target_path = resolve_pipeline_path(msg.arquivo_alvo or "pipeline_prep.py")
+            orig_text = target_path.read_text(encoding="utf-8") if target_path.exists() else ""
+            orig_lines = orig_text.splitlines(keepends=True)
+            prop_lines = proposed_code.splitlines(keepends=True)
+            diff_lines = list(difflib.unified_diff(orig_lines, prop_lines, fromfile=target_path.name, tofile=f"{target_path.name} (otimizado)"))
+
+            adicoes = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
+            remocoes = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+
+            linhas_estruturadas = []
+            for l in diff_lines:
+                clean_l = l.rstrip("\r\n")
+                if clean_l.startswith("@@"):
+                    tipo = "hunk"
+                elif clean_l.startswith("+") and not clean_l.startswith("+++"):
+                    tipo = "add"
+                elif clean_l.startswith("-") and not clean_l.startswith("---"):
+                    tipo = "del"
+                else:
+                    tipo = "ctx"
+                linhas_estruturadas.append({"tipo": tipo, "texto": clean_l})
+
+            diff_info = {
+                "arquivo": target_path.name,
+                "caminho": str(target_path.relative_to(config.PROJECT_ROOT)),
+                "adicoes": adicoes,
+                "remocoes": remocoes,
+                "linhas": linhas_estruturadas[:80],
+            }
+        except Exception:
+            pass
+
+    # 5. Extração de sugestões de ações clicáveis
+    sugestoes_acoes = extrair_sugestoes_acoes(resposta_final, ferramentas_executadas)
+
     # Salva resposta do assistente no storage
     assistant_msg = storage.append_message(
         session_id=session_id,
@@ -313,8 +411,10 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         metadados={
             "has_approval_request": has_approval_request,
             "proposed_code": proposed_code,
+            "diff_info": diff_info,
             "especialista": especialista_ativo,
             "modelo": modelo_utilizado,
+            "sugestoes_acoes": sugestoes_acoes,
         },
     )
 
@@ -338,6 +438,8 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         "decisao_humana": None,
         "has_approval_request": has_approval_request,
         "proposed_code": proposed_code,
+        "diff_info": diff_info,
+        "sugestoes_acoes": sugestoes_acoes,
         "criado_em": agora_fim,
         "concluido_em": agora_fim,
     }
@@ -352,4 +454,7 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         "latencia_segundos": latencia,
         "has_approval_request": has_approval_request,
         "proposed_code": proposed_code,
+        "diff_info": diff_info,
+        "ferramentas_executadas": ferramentas_executadas,
+        "sugestoes_acoes": sugestoes_acoes,
     }

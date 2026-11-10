@@ -24,13 +24,32 @@ except Exception:
 
 # Diretórios do projeto
 PROJECT_ROOT = Path(os.getenv("KRAKEN_COPILOT_ROOT", REPOSITORY_ROOT)).resolve()
-DATA_DIR = (PROJECT_ROOT / os.getenv("KRAKEN_COPILOT_DATA_DIR", "pipeline/dados")).resolve()
-KNOWLEDGE_DIR = DATA_DIR / "conhecimento"
+
+_catalog_sources = PROJECT_ROOT / "krakenlake" / "catalog" / "sources"
+_datalake = PROJECT_ROOT / "krakenlake" / "datalake"
+_pipeline_dados = PROJECT_ROOT / "pipeline" / "dados"
+
+if _catalog_sources.exists():
+    _default_data_dir = "krakenlake/catalog/sources"
+elif _datalake.exists():
+    _default_data_dir = "krakenlake/datalake"
+else:
+    _default_data_dir = "pipeline/dados"
+
+DATA_DIR = (PROJECT_ROOT / os.getenv("KRAKEN_COPILOT_DATA_DIR", _default_data_dir)).resolve()
+
+_catalog_meta = PROJECT_ROOT / "krakenlake" / "catalog" / "metadados"
+if _catalog_meta.exists():
+    KNOWLEDGE_DIR = _catalog_meta.resolve()
+else:
+    KNOWLEDGE_DIR = (DATA_DIR / "conhecimento").resolve()
+
 LOGS_DIR = (PROJECT_ROOT / os.getenv("KRAKEN_COPILOT_LOGS_DIR", "logs")).resolve()
+WORKSPACE_DIR = (PROJECT_ROOT / "krakenlake" / "workspace").resolve()
 
 # Diretórios autorizados para leitura e escrita pelo agente
-READ_DIRS = [PROJECT_ROOT / directory for directory in ("pipeline", "kraken_copilot", "tests", "docs", "logs")]
-WRITE_DIRS = [PROJECT_ROOT / directory for directory in ("pipeline", "tests")]
+READ_DIRS = [PROJECT_ROOT / directory for directory in ("krakenlake", "pipeline", "kraken_copilot", "tests", "docs", "logs")]
+WRITE_DIRS = [PROJECT_ROOT / directory for directory in ("krakenlake", "pipeline", "tests")]
 
 # Configurações do Google Cloud / Vertex AI (autenticação via ADC gcloud)
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("VERTEXAI_PROJECT")

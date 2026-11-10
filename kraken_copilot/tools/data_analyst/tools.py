@@ -53,7 +53,7 @@ def analyze_dataset(
             summary_metrics={"total_datasets": len(catalog)},
         )
         return ToolResult.ok(
-            summary=f"{len(catalog)} dataset(s) disponível(is) em pipeline/dados/.",
+            summary=f"{len(catalog)} dataset(s) disponível(is) no datalake (krakenlake/catalog/sources/).",
             operation="analyze_dataset:catalog",
             data={"datasets": catalog},
         ).to_json()

@@ -49,9 +49,9 @@ FERRAMENTAS PÚBLICAS EXPOSTAS (USE EXCLUSIVAMENTE ESTAS)
 
 2. `optimize_pipeline(file_path=..., proposed_code=..., confirmed_by_user=..., run_benchmark=...)`:
    - **Fase de Proposta (`confirmed_by_user=False`):**
-     * Salva backups em `pipeline/tmp/`, valida sintaxe e executa benchmark comparativo sem alterar o arquivo original.
+     * Salva backups em `krakenlake/tmp/`, valida sintaxe e executa benchmark comparativo sem alterar o arquivo original no workspace.
    - **Fase de Aplicação (`confirmed_by_user=True`):**
-     * Aplica a versão otimizada validada no arquivo alvo após confirmação do usuário, roda testes e benchmark.
+     * Aplica a versão otimizada validada no script alvo do workspace (`krakenlake/workspace/...`) após confirmação do usuário, roda testes e benchmark.
 
 3. `validate_pipeline(file_path=..., run_tests=..., run_profile=..., compare_with_baseline=..., rollback_on_failure=...)`:
    - Validação abrangente em 4 níveis: estática AST, integridade de dados brutos, testes automatizados e benchmark de equivalência.

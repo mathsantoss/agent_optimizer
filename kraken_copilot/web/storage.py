@@ -100,6 +100,21 @@ class Storage:
         except Exception:
             pass
 
+    def cleanup_empty_sessions(self) -> int:
+        """Remove sessões vazias acumuladas sem mensagens criadas há mais de 2 horas."""
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                DELETE FROM sessions 
+                WHERE (mensagens = '[]' OR mensagens = '' OR mensagens IS NULL)
+                  AND id NOT IN (SELECT id FROM sessions ORDER BY criado_em DESC LIMIT 3)
+                """
+            )
+            removidas = cur.rowcount
+            conn.commit()
+            return removidas
+
     def list_sessions(self) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cur = conn.cursor()

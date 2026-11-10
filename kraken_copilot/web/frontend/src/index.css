@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --page: #fafbfd;
+    --canvas: #f1f4f9;
+    --surface: #ffffff;
+    --inset: #f8fafc;
+    --hover: #f1f5f9;
+    --hover-2: #e2e8f0;
+
+    --ink: #0f172a;
+    --ink-2: #475569;
+    --ink-3: #94a3b8;
+
+    --line: #e2e8f0;
+    --line-strong: #cbd5e1;
+    --line-soft: #f1f5f9;
+
+    --accent: #2563eb;
+    --accent-ink: #1d4ed8;
+    --accent-tint: #eff6ff;
+
+    --green: #10b981;
+    --green-tint: #ecfdf5;
+    --orange: #f59e0b;
+    --orange-tint: #fffbeb;
+    --red: #ef4444;
+    --red-tint: #fef2f2;
+  }
+
+  body {
+    background-color: var(--page);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animations from Beautiful UI */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+.animate-glow {
+  animation: pulseGlow 2.4s ease-in-out infinite;
+}
+

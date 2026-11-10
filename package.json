@@ -1,0 +1,13 @@
+{
+  "name": "agent-fiap",
+  "version": "1.0.0",
+  "description": "Kraken Copilot - Multi-Agent & UI Architecture",
+  "scripts": {
+    "start": "./start.sh",
+    "dev:all": "./start.sh --dev",
+    "dev": "npm --prefix kraken_copilot/web/frontend run dev",
+    "build": "npm --prefix kraken_copilot/web/frontend run build",
+    "preview": "npm --prefix kraken_copilot/web/frontend run preview"
+  }
+}
+
