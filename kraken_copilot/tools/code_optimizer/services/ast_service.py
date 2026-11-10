@@ -143,7 +143,7 @@ def verify_pipeline_contract_preservation(original_code: str, new_code: str) -> 
     return None
 
 
-def inspect_source_code_ast(source_code: str, relative_path: str = "pipeline/pipeline_prep.py") -> CodeAnalysisReport:
+def inspect_source_code_ast(source_code: str, relative_path: str = "script.py") -> CodeAnalysisReport:
     """Realiza o diagnóstico estático completo do código Python gerando relatório estruturado."""
     syntax_tree = ast.parse(source_code)
     imported_modules: list[str] = []

@@ -176,7 +176,7 @@ export function PromptBar({
               >
                 <FileCode2 className="h-3.5 w-3.5 text-emerald-600" />
                 <span className="font-mono text-emerald-800 truncate max-w-[150px] sm:max-w-none">
-                  {selectedWorkspaceFile || 'pipeline_prep.py'}
+                  {selectedWorkspaceFile || (workspaceFiles[0]?.nome ?? 'Selecionar script')}
                 </span>
                 <ChevronDown className="h-3 w-3 text-slate-400" />
               </button>

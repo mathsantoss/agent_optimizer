@@ -27,7 +27,7 @@ export interface SideCodePanelProps {
 export function SideCodePanel({
   isOpen,
   onClose,
-  filename = 'pipeline_prep.py',
+  filename = '',
   code = '',
   isOptimizing = false,
   diffInfo,
@@ -37,18 +37,29 @@ export function SideCodePanel({
   const [isMaximized, setIsMaximized] = useState(false);
   const [fetchedDiff, setFetchedDiff] = useState<DiffInfo | undefined>(undefined);
 
+  // Limpa diff cacheado ao alternar de arquivo
+  useEffect(() => {
+    setFetchedDiff(undefined);
+  }, [filename]);
+
   // Busca diff sob demanda se não tiver sido injetado via prop
   useEffect(() => {
-    if (isOpen && filename && !diffInfo) {
-      fetch(`/api/dados/diff?caminho=${encodeURIComponent(filename)}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data && (data.linhas?.length > 0 || data.raw_diff)) {
-            setFetchedDiff(data);
-          }
-        })
-        .catch(() => {});
+    if (!isOpen || !filename || diffInfo) {
+      if (diffInfo) setFetchedDiff(undefined);
+      return;
     }
+    fetch(`/api/dados/diff?caminho=${encodeURIComponent(filename)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && (data.adicoes > 0 || data.remocoes > 0) && (data.linhas?.length > 0 || (data.raw_diff && data.raw_diff.trim().length > 0))) {
+          setFetchedDiff(data);
+        } else {
+          setFetchedDiff(undefined);
+        }
+      })
+      .catch(() => {
+        setFetchedDiff(undefined);
+      });
   }, [isOpen, filename, diffInfo, code]);
 
   const effectiveDiff = diffInfo || fetchedDiff;
@@ -175,7 +186,7 @@ export function SideCodePanel({
 
       {/* Code / Diff Body — Ocupa 100% da altura e largura sem margens inúteis */}
       <div className="flex-1 overflow-hidden bg-[#0c1222] flex flex-col min-h-0">
-        {code || effectiveDiff ? (
+        {code.trim().length > 0 || (effectiveDiff && (effectiveDiff.adicoes > 0 || effectiveDiff.remocoes > 0 || (effectiveDiff.raw_diff && effectiveDiff.raw_diff.trim().length > 0))) ? (
           <CodeBlock
             code={code || effectiveDiff?.proposed_code}
             oldCode={effectiveDiff?.original_code}
@@ -183,16 +194,20 @@ export function SideCodePanel({
             diffInfo={effectiveDiff}
             language="python"
             filename={filename}
-            isDiff={Boolean(effectiveDiff && (effectiveDiff.adicoes > 0 || effectiveDiff.remocoes > 0 || effectiveDiff.raw_diff))}
+            isDiff={Boolean(effectiveDiff && (effectiveDiff.adicoes > 0 || effectiveDiff.remocoes > 0 || (effectiveDiff.raw_diff && effectiveDiff.raw_diff.trim().length > 0)))}
             fullHeight={true}
             className="h-full flex flex-col my-0 rounded-none border-none shadow-none flex-1"
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center text-center text-xs text-slate-400 gap-2 p-6">
             <FileCode2 className="h-8 w-8 text-slate-600" />
-            <p className="font-semibold text-slate-300">Nenhum código para inspecionar no momento</p>
+            <p className="font-semibold text-slate-300">
+              {filename ? `${filename} está vazio (0 linhas)` : 'Nenhum script selecionado'}
+            </p>
             <p className="max-w-xs text-slate-500">
-              Inicie uma otimização ou selecione um script do workspace para acompanhar em tempo real.
+              {filename
+                ? 'Este arquivo no workspace ainda não possui código. Solicite ao Kraken Copilot para gerar ou otimizar seu pipeline aqui.'
+                : 'Selecione um script do workspace para acompanhar em tempo real.'}
             </p>
           </div>
         )}

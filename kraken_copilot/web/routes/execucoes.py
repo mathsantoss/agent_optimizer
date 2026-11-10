@@ -39,6 +39,13 @@ async def registrar_decisao(exec_id: str, decisao: DecisaoInput):
     dados["decisao_humana"] = registro_decisao
     dados["status_decisao"] = status_decisao
 
+    # Atualiza status do guardrail HITL na auditoria
+    if "guardrails_audit" in dados and isinstance(dados["guardrails_audit"], list):
+        for g in dados["guardrails_audit"]:
+            if g.get("id") == "hitl_governance":
+                g["status"] = "aprovado" if decisao.aprovar else "rejeitado"
+                g["detalhes"] = f"Decisão humana registrada: {status_decisao.upper()}. Motivo: {decisao.motivo or 'Nenhum'}"
+
     etapa = {
         "tipo": "decisao_humana",
         "titulo": f"Decisão Humana: {'Aprovado ✅' if decisao.aprovar else 'Rejeitado ❌'}",

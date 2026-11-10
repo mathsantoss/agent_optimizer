@@ -120,7 +120,7 @@ export function App() {
 
   // Workspace Python Files
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
-  const [selectedWorkspaceFile, setSelectedWorkspaceFile] = useState<string>('pipeline_prep.py');
+  const [selectedWorkspaceFile, setSelectedWorkspaceFile] = useState<string>('');
 
   // Side Code Panel State (Visualização lateral em tempo real)
   const [sideCodeOpen, setSideCodeOpen] = useState(false);
@@ -154,15 +154,24 @@ export function App() {
   }, [selectedWorkspaceFile]);
 
   const carregarWorkspaceCode = async (filename: string) => {
+    if (!filename) {
+      setSideCodeContent('');
+      setSideCodeDiff(undefined);
+      return;
+    }
     try {
+      setSideCodeDiff(undefined);
+      setSideCodeHasApproval(false);
       const res = await fetch(`/api/dados/arquivo?caminho=krakenlake/workspace/${filename}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.conteudo) {
-          setSideCodeContent(data.conteudo);
-        }
+        setSideCodeContent(typeof data.conteudo === 'string' ? data.conteudo : '');
+      } else {
+        setSideCodeContent('');
       }
-    } catch {}
+    } catch {
+      setSideCodeContent('');
+    }
   };
 
   // Atalho global Ctrl+N / Cmd+N
@@ -432,7 +441,7 @@ export function App() {
     }
   };
 
-  const handleApprove = async (execucaoId?: string) => {
+  const handleApprove = async (execucaoId?: string, fileToApply?: string) => {
     if (execucaoId) {
       try {
         await fetch(`/api/execucoes/${execucaoId}/decisao`, {
@@ -444,10 +453,11 @@ export function App() {
         console.warn('Erro ao enviar aprovação:', err);
       }
     }
-    handleSendMessage(`Aprovado. Por favor, aplique o código proposto em krakenlake/workspace/${selectedWorkspaceFile} e valide os resultados.`);
+    const target = fileToApply || selectedWorkspaceFile;
+    handleSendMessage(`Aprovado. Por favor, aplique o código proposto em krakenlake/workspace/${target} e valide os resultados.`);
   };
 
-  const handleReject = async (execucaoId?: string) => {
+  const handleReject = async (execucaoId?: string, fileToApply?: string) => {
     if (execucaoId) {
       try {
         await fetch(`/api/execucoes/${execucaoId}/decisao`, {
@@ -800,9 +810,9 @@ export function App() {
                             ) && (
                               <ApprovalCard
                                 execucaoId={msg.execucao_id}
-                                targetFile={selectedWorkspaceFile}
+                                targetFile={msg.diff_info?.arquivo || (msg as any).metadados?.diff_info?.arquivo || selectedWorkspaceFile}
                                 diffInfo={msg.diff_info || (msg as any).metadados?.diff_info}
-                                proposedCode={msg.proposed_code || (msg as any).metadados?.proposed_code || sideCodeContent}
+                                proposedCode={msg.proposed_code || (msg as any).metadados?.proposed_code}
                                 onApprove={handleApprove}
                                 onReject={handleReject}
                               />

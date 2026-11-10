@@ -13,7 +13,7 @@ PIPELINE_EXECUTION_TIMEOUT_SECONDS = 60
 
 
 def execute_pipeline_script(
-    file_path: str = "pipeline/pipeline_prep.py",
+    file_path: str | None = None,
     timeout_seconds: int = PIPELINE_EXECUTION_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     """

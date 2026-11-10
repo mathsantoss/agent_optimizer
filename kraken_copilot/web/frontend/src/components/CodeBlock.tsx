@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, type ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { File, PatchDiff, MultiFileDiff } from '@pierre/diffs/react';
 import { cn } from '@/lib/utils';
 import { Copy, Check, FileCode, GitCompare, Columns, AlignJustify } from 'lucide-react';
@@ -129,19 +129,6 @@ export function CodeBlock({
   const effectiveOldCode = oldCode || diffInfo?.original_code;
   const effectiveNewCode = code || diffInfo?.proposed_code || (rawCode.startsWith('---') ? '' : rawCode);
 
-  const hasDiffContent = useMemo(() => {
-    if (isDiff) return true;
-    if (unifiedPatch.length > 0) return true;
-    if (effectiveOldCode && effectiveNewCode && effectiveOldCode.trim() !== effectiveNewCode.trim()) return true;
-    if (diffInfo && (diffInfo.adicoes > 0 || diffInfo.remocoes > 0)) return true;
-    if (customDiff && customDiff.length > 0) return true;
-    return false;
-  }, [isDiff, unifiedPatch, effectiveOldCode, effectiveNewCode, diffInfo, customDiff]);
-
-  const [activeVariant, setActiveVariant] = useState<'Code' | 'Diff'>(
-    initialVariant || (hasDiffContent ? 'Diff' : 'Code')
-  );
-
   // Estatísticas de adições e remoções
   const { added, removed } = useMemo(() => {
     if (diffInfo && (diffInfo.adicoes > 0 || diffInfo.remocoes > 0)) {
@@ -166,6 +153,29 @@ export function CodeBlock({
     return { added: 0, removed: 0 };
   }, [diffInfo, unifiedPatch, customDiff]);
 
+  const hasDiffContent = useMemo(() => {
+    if (unifiedPatch.length > 0) return true;
+    if (effectiveOldCode && effectiveNewCode && effectiveOldCode.trim() !== effectiveNewCode.trim()) return true;
+    if (diffInfo && (diffInfo.adicoes > 0 || diffInfo.remocoes > 0 || (diffInfo.raw_diff && diffInfo.raw_diff.trim().length > 0))) return true;
+    if (customDiff && customDiff.length > 0) return true;
+    if (isDiff && (added > 0 || removed > 0)) return true;
+    return false;
+  }, [isDiff, unifiedPatch, effectiveOldCode, effectiveNewCode, diffInfo, customDiff, added, removed]);
+
+  const [activeVariant, setActiveVariant] = useState<'Code' | 'Diff'>(
+    initialVariant || (hasDiffContent ? 'Diff' : 'Code')
+  );
+
+  useEffect(() => {
+    if (initialVariant) {
+      setActiveVariant(initialVariant);
+    } else if (!hasDiffContent) {
+      setActiveVariant('Code');
+    } else {
+      setActiveVariant('Diff');
+    }
+  }, [initialVariant, hasDiffContent, filename]);
+
   const copy = useCallback(() => {
     const textToCopy =
       activeVariant === 'Diff' && unifiedPatch
@@ -180,6 +190,35 @@ export function CodeBlock({
 
   // Conteúdo de código simples caso necessário
   const displayCode = effectiveNewCode || rawCode || (unifiedPatch ? '# Selecione a aba Diff para visualizar as alterações' : '');
+
+  // Se não houver diff e o arquivo estiver vazio
+  if (!hasDiffContent && displayCode.trim().length === 0) {
+    return (
+      <div
+        className={cn(
+          'my-3 w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0c1222] shadow-md font-mono text-xs select-text flex flex-col',
+          className
+        )}
+      >
+        <div className="flex h-11 items-center justify-between border-b border-slate-800/80 bg-[#080d1a] px-4 text-[12px] select-none shrink-0">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <FileCode className="h-4 w-4 text-slate-500 shrink-0" />
+            <span className="truncate font-semibold text-slate-400">
+              {filename || `${language}.py`}
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-500 font-sans">0 linhas (Vazio)</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-slate-500 gap-2 font-sans min-h-[160px]">
+          <FileCode className="h-8 w-8 text-slate-700" />
+          <p className="font-semibold text-slate-300 font-mono text-xs">{filename || 'Arquivo'} está vazio (0 bytes)</p>
+          <p className="text-xs text-slate-500 max-w-sm">
+            Nenhum conteúdo ou alteração para exibir neste script.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

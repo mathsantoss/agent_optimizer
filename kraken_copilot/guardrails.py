@@ -301,7 +301,7 @@ def _build_fallback_for_empty_response(agent_name: str, callback_context: Any = 
     """Gera uma resposta de fallback válida e informativa quando o modelo encerra sem conteúdo de texto ou apenas com pensamentos."""
     if "optimizer" in agent_name:
         return (
-            "Diagnóstico do pipeline executado. Proposta de otimização registrada em `krakenlake/tmp/pipeline_prep_otimizado.bak`. "
+            "Diagnóstico do pipeline executado. Proposta de otimização registrada na pasta `krakenlake/tmp/`. "
             "Aguardando confirmação explícita do usuário para aplicação no arquivo oficial."
         )
 

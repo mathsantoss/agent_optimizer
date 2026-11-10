@@ -20,15 +20,15 @@ export interface ApprovalCardProps {
   targetFile?: string;
   diffInfo?: DiffInfo;
   proposedCode?: string;
-  onApprove: (execucaoId?: string) => void;
-  onReject: (execucaoId?: string) => void;
+  onApprove: (execucaoId?: string, targetFile?: string) => void;
+  onReject: (execucaoId?: string, targetFile?: string) => void;
   isProcessing?: boolean;
   className?: string;
 }
 
 export function ApprovalCard({
   execucaoId,
-  targetFile = 'pipeline_prep.py',
+  targetFile = '',
   diffInfo,
   proposedCode,
   onApprove,
@@ -39,16 +39,16 @@ export function ApprovalCard({
   const [showCode, setShowCode] = useState(false);
   const [decided, setDecided] = useState<'approved' | 'rejected' | null>(null);
 
-  const effectiveTargetFile = diffInfo?.arquivo || targetFile;
+  const effectiveTargetFile = diffInfo?.arquivo || targetFile || 'script.py';
 
   const handleApprove = () => {
     setDecided('approved');
-    onApprove(execucaoId);
+    onApprove(execucaoId, effectiveTargetFile);
   };
 
   const handleReject = () => {
     setDecided('rejected');
-    onReject(execucaoId);
+    onReject(execucaoId, effectiveTargetFile);
   };
 
   if (decided === 'approved') {

@@ -45,7 +45,7 @@ FERRAMENTAS PÚBLICAS EXPOSTAS (USE EXCLUSIVAMENTE ESTAS)
 ==================================================
 DIRETRIZES DE ARQUIVO E ENGENHARIA
 ==================================================
-- Os scripts de pipeline residem no diretório flexível `krakenlake/workspace/` (como `pipeline_prep.py` ou novos scripts definidos pelo usuário). Respeite sempre o arquivo alvo selecionado pelo usuário.
+- Os scripts de pipeline residem no diretório flexível `krakenlake/workspace/` (qualquer script `.py` selecionado ou criado pelo usuário). Respeite sempre o arquivo alvo indicado na solicitação.
 - Se o usuário solicitar otimizar código, refatorar performance, inspecionar gargalos ou rodar benchmark do pipeline, transfira imediatamente para o `kraken_optimizer`.
 
 ==================================================

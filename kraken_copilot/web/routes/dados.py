@@ -142,7 +142,7 @@ async def listar_arquivos_workspace():
     arquivos = []
     if ws_dir.exists():
         for p in sorted(ws_dir.glob("*.py")):
-            if not p.name.startswith((".", "_")):
+            if not p.name.startswith((".", "_")) and not p.name.endswith(".bak"):
                 try:
                     lines = len(p.read_text(encoding="utf-8", errors="ignore").splitlines())
                 except Exception:
@@ -152,9 +152,7 @@ async def listar_arquivos_workspace():
                     "caminho": p.relative_to(REPOSITORY_ROOT).as_posix(),
                     "linhas": lines,
                 })
-    if not arquivos:
-        arquivos = [{"nome": "pipeline_prep.py", "caminho": "krakenlake/workspace/pipeline_prep.py", "linhas": 0}]
-    return {"arquivos": arquivos, "padrao": arquivos[0]["nome"]}
+    return {"arquivos": arquivos, "padrao": arquivos[0]["nome"] if arquivos else ""}
 
 
 @router.get("/arquivo")
@@ -256,6 +254,15 @@ async def obter_conteudo_arquivo(caminho: str, limite: int = 50):
         try:
             with open(p, "r", encoding="utf-8", errors="ignore") as f:
                 conteudo = f.read()
+
+            # Se o arquivo estiver no workspace, garante snapshot inicial em tmp/<stem>_original.bak
+            if "workspace" in str(p.parent) and conteudo.strip():
+                try:
+                    from kraken_copilot.tools.code_optimizer.services.file_service import snapshot_workspace_file
+                    snapshot_workspace_file(p, content=conteudo)
+                except Exception:
+                    pass
+
             return {
                 "tipo": "python",
                 "caminho": caminho,
@@ -301,31 +308,55 @@ async def baixar_arquivo(caminho: str):
 
 
 @router.get("/diff")
-async def obter_diff_arquivo(caminho: str = "pipeline_prep.py"):
-    """Gera o diff comparativo entre o script atual e seu backup (.bak ou tmp)."""
+async def obter_diff_arquivo(caminho: str = ""):
+    """Gera o diff comparativo entre o snapshot original e o código atual ou proposta otimizada."""
     import difflib
     from kraken_copilot.config import PROJECT_ROOT
-    from kraken_copilot.tools.code_optimizer.services.file_service import resolve_pipeline_path
+    from kraken_copilot.tools.code_optimizer.services.file_service import (
+        get_default_workspace_pipeline,
+        get_file_tmp_paths,
+        resolve_pipeline_path,
+        snapshot_workspace_file,
+    )
 
     try:
+        if not caminho or not str(caminho).strip():
+            return {
+                "arquivo": "",
+                "caminho": "",
+                "adicoes": 0,
+                "remocoes": 0,
+                "linhas": [],
+                "raw_diff": "",
+                "original_code": "",
+                "current_code": "",
+                "proposed_code": "",
+            }
         resolved = resolve_pipeline_path(caminho, allow_write=False)
         curr_text = resolved.read_text(encoding="utf-8") if resolved.is_file() else ""
 
-        # Procura backup em krakenlake/tmp/ ou no mesmo diretório
-        bak_file = PROJECT_ROOT / "krakenlake" / "tmp" / "pipeline_prep_original.bak"
-        if not bak_file.is_file():
-            bak_file = resolved.with_suffix(resolved.suffix + ".bak")
+        tmp_orig, tmp_opt = get_file_tmp_paths(resolved)
 
-        orig_text = bak_file.read_text(encoding="utf-8") if bak_file.is_file() else ""
+        # 1. Recupera o código baseline (original congelado no contexto)
+        if tmp_orig.is_file() and tmp_orig.stat().st_size > 0:
+            orig_text = tmp_orig.read_text(encoding="utf-8")
+        else:
+            orig_text = curr_text
+            if curr_text.strip():
+                snapshot_workspace_file(resolved, content=curr_text)
 
-        # Se o backup original for idêntico ao atual mas existir proposta otimizada no tmp
-        tmp_opt = PROJECT_ROOT / "krakenlake" / "tmp" / "pipeline_prep_otimizado.bak"
-        if curr_text == orig_text and tmp_opt.is_file():
+        # 2. Recupera a proposta candidata em tmp/<stem>_otimizado.bak se houver
+        if tmp_opt.is_file() and tmp_opt.stat().st_size > 0:
             prop_text = tmp_opt.read_text(encoding="utf-8")
+        else:
+            prop_text = curr_text
+
+        # 3. Compara baseline vs proposta (se houver proposta pendente), ou baseline vs atual
+        if prop_text.strip() and prop_text.strip() != orig_text.strip():
             diff_lines = list(difflib.unified_diff(
                 orig_text.splitlines(keepends=True),
                 prop_text.splitlines(keepends=True),
-                fromfile=f"a/{resolved.name}",
+                fromfile=f"a/{resolved.name} (original)",
                 tofile=f"b/{resolved.name} (proposta)",
             ))
         else:
@@ -333,7 +364,7 @@ async def obter_diff_arquivo(caminho: str = "pipeline_prep.py"):
                 orig_text.splitlines(keepends=True),
                 curr_text.splitlines(keepends=True),
                 fromfile=f"a/{resolved.name} (original)",
-                tofile=f"b/{resolved.name} (atual)",
+                tofile=f"b/{resolved.name} (workspace)",
             ))
 
         adicoes = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
@@ -361,7 +392,7 @@ async def obter_diff_arquivo(caminho: str = "pipeline_prep.py"):
             "raw_diff": "".join(diff_lines),
             "original_code": orig_text,
             "current_code": curr_text,
-            "proposed_code": prop_text if (curr_text == orig_text and tmp_opt.is_file()) else curr_text,
+            "proposed_code": prop_text,
         }
     except Exception as err:
         return {

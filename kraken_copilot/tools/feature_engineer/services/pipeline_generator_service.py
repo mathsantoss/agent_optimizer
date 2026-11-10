@@ -374,10 +374,14 @@ def generate_pyspark_pipeline_code(
 def create_feature_pipeline_plan(
     dataset_name: str,
     framework: str = "pandas",
-    target_file_path: str = "krakenlake/workspace/pipeline_prep.py",
+    target_file_path: str | None = None,
     features: list[FeatureSpec] | list[dict[str, Any]] | None = None,
 ) -> FeaturePipelinePlan:
     """Monta o plano de construção de pipeline de features com código e especificações completas para qualquer dataset."""
+    from kraken_copilot.tools.code_optimizer.services.file_service import get_default_workspace_pipeline
+
+    if not target_file_path:
+        target_file_path = get_default_workspace_pipeline()
     fw = framework.strip().lower()
 
     # Normaliza features fornecidas

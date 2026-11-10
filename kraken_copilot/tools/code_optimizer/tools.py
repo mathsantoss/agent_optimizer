@@ -20,9 +20,11 @@ from kraken_copilot.tools.code_optimizer.services.benchmark_service import run_p
 from kraken_copilot.tools.code_optimizer.services.execution_service import execute_pipeline_script
 from kraken_copilot.tools.code_optimizer.services.file_service import (
     get_default_workspace_pipeline,
+    get_file_tmp_paths,
     get_pipeline_tmp_dir,
     read_source_file,
     resolve_pipeline_path,
+    snapshot_workspace_file,
     sync_pipeline_tmp_files,
     write_source_file,
 )
@@ -62,6 +64,10 @@ def inspect_pipeline(
 
     content = read_res.get("content", "")
     rel_path = read_res.get("file_path", file_path)
+
+    # Congela snapshot no tmp/<stem>_original.bak assim que entra no contexto
+    if content:
+        snapshot_workspace_file(rel_path, content=content)
 
     if read_res.get("is_empty"):
         payload = {
@@ -211,11 +217,12 @@ def optimize_pipeline(
     rel_path = read_res.get("file_path", clean_target)
 
     # 1. Fase de Proposta (sem confirmação explícita): NÃO altera arquivos no disco!
+    orig_file, opt_file = get_file_tmp_paths(clean_target)
+
     if not confirmed_by_user:
         if not clean_code:
-            tmp_opt_file = get_pipeline_tmp_dir() / "pipeline_prep_otimizado.bak"
-            if tmp_opt_file.is_file() and tmp_opt_file.stat().st_size > 0:
-                clean_code = tmp_opt_file.read_text(encoding="utf-8").strip()
+            if opt_file.is_file() and opt_file.stat().st_size > 0:
+                clean_code = opt_file.read_text(encoding="utf-8").strip()
             else:
                 payload = {
                     "success": False,
@@ -252,14 +259,13 @@ def optimize_pipeline(
         if contract_violation:
             proposal_warnings.append(contract_violation)
 
-        # 1. Salva e sincroniza fisicamente os 2 arquivos fixos na pasta pipeline/tmp/:
-        #    - pipeline/tmp/pipeline_prep_original.bak (backup do original)
-        #    - pipeline/tmp/pipeline_prep_otimizado.bak (pipeline otimizado)
-        #    Ambos permanecem fisicamente no disco e são sobrescritos conforme novas propostas.
-        #    Nenhum arquivo .bak é criado na raiz de pipeline/.
+        # 1. Salva e sincroniza fisicamente os 2 arquivos dinâmicos na pasta krakenlake/tmp/:
+        #    - krakenlake/tmp/<stem>_original.bak (backup do original congelado)
+        #    - krakenlake/tmp/<stem>_otimizado.bak (pipeline otimizado / proposta atual)
         tmp_original_path, tmp_opt_path = sync_pipeline_tmp_files(
             original_content=current_code,
             optimized_content=clean_code,
+            target_file=clean_target,
         )
 
         # Executa benchmark comparativo da proposta sem alterar o arquivo original
@@ -300,7 +306,7 @@ def optimize_pipeline(
 
         summary_proposal = (
             f"Proposta de otimização para '{rel_path}' elaborada com sucesso.\n"
-            f"Arquivos físicos salvos e sincronizados na pasta 'pipeline/tmp/':\n"
+            f"Arquivos físicos salvos e sincronizados na pasta 'krakenlake/tmp/':\n"
             f"  1. Backup do original: '{tmp_original_path.relative_to(config.PROJECT_ROOT)}'\n"
             f"  2. Pipeline otimizado: '{tmp_opt_path.relative_to(config.PROJECT_ROOT)}'\n\n"
             f"O arquivo original '{rel_path}' NÃO foi alterado no disco e permanece com o código original até sua confirmação explícita.\n\n"
@@ -336,15 +342,14 @@ def optimize_pipeline(
 
     # 2. Fase de Aplicação Autorizada (confirmed_by_user=True)
     if not clean_code:
-        # Se clean_code não foi fornecido na confirmação, utiliza a proposta salva previamente em pipeline/tmp/
-        tmp_opt_file = get_pipeline_tmp_dir() / "pipeline_prep_otimizado.bak"
-        if tmp_opt_file.is_file() and tmp_opt_file.stat().st_size > 0:
-            clean_code = tmp_opt_file.read_text(encoding="utf-8").strip()
+        # Se clean_code não foi fornecido na confirmação, utiliza a proposta salva previamente em krakenlake/tmp/<stem>_otimizado.bak
+        if opt_file.is_file() and opt_file.stat().st_size > 0:
+            clean_code = opt_file.read_text(encoding="utf-8").strip()
         else:
             payload = {
                 "success": False,
                 "operation": "optimize_pipeline:apply",
-                "summary": "Não é possível aplicar: nenhum código proposto foi fornecido e não há proposta salva em 'pipeline/tmp/pipeline_prep_otimizado.bak'.",
+                "summary": f"Não é possível aplicar: nenhum código proposto foi fornecido e não há proposta salva em '{opt_file.name}'.",
                 "data": None,
                 "errors": ["Código proposto vazio."],
             }
@@ -423,7 +428,7 @@ def optimize_pipeline(
             apply_warnings.append(f"Atenção: Testes automatizados falharam após a otimização.")
 
         # Executa benchmark comparativo Antes vs Depois
-        base_file = "pipeline/tmp/pipeline_prep_original.bak" if Path("pipeline/tmp/pipeline_prep_original.bak").is_file() else f"{clean_target}.bak"
+        base_file = str(orig_file) if orig_file.is_file() else f"{clean_target}.bak"
         bench_res = run_pipeline_benchmark(
             baseline_file_path=base_file,
             candidate_file_path=clean_target,
@@ -435,7 +440,7 @@ def optimize_pipeline(
     summary_final = (
         f"Pipeline '{rel_path}' otimizado e gravado com SUCESSO no disco "
         f"({write_res.get('line_count')} linhas). "
-        f"Arquivos físicos salvos em 'pipeline/tmp/': 'pipeline_prep_original.bak' e 'pipeline_prep_otimizado.bak'. "
+        f"Arquivos físicos mantidos em 'krakenlake/tmp/': '{orig_file.name}' e '{opt_file.name}'. "
         f"{'Benchmark executado.' if run_benchmark else ''}"
     )
     if benchmark_data and benchmark_data.get("tabela_markdown"):
@@ -539,12 +544,12 @@ def validate_pipeline(
         except Exception:
             has_bak_file = False
 
-        tmp_base = config.PROJECT_ROOT / "pipeline" / "tmp" / "pipeline_prep_original.bak"
-        has_tmp_base = tmp_base.is_file() and tmp_base.stat().st_size > 0
+        orig_file, opt_file = get_file_tmp_paths(clean_path)
+        has_tmp_base = orig_file.is_file() and orig_file.stat().st_size > 0
         has_baseline = has_tmp_base or has_bak_file or load_profile_snapshot(f"baseline::{clean_key}") is not None
 
         if has_baseline:
-            base_choice = "pipeline/tmp/pipeline_prep_original.bak" if has_tmp_base else f"{clean_path}.bak"
+            base_choice = str(orig_file) if has_tmp_base else f"{clean_path}.bak"
             benchmark_output = run_pipeline_benchmark(
                 baseline_file_path=base_choice,
                 candidate_file_path=clean_path,

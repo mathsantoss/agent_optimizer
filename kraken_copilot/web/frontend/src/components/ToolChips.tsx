@@ -145,7 +145,7 @@ export function ToolChips({ tools, className }: ToolChipsProps) {
                   ) : tool.codigo_proposto ? (
                     <CodeBlock
                       code={tool.codigo_proposto}
-                      filename={tool.argumentos?.file_path || 'pipeline_prep_otimizado.py'}
+                      filename={tool.argumentos?.file_path || 'codigo_otimizado.py'}
                       language="python"
                     />
                   ) : (

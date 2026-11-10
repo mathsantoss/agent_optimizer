@@ -11,6 +11,7 @@
   "dependencies": {
     "@graphysdk/react": "^1.9.0-beta.1794247804028",
     "@pierre/diffs": "^1.6.4",
+    "@xyflow/react": "^12.12.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
     "mermaid": "^12.3.0",

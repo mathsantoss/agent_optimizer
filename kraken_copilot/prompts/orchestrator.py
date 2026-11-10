@@ -34,6 +34,6 @@ Sub-agentes especialistas:
 ==================================================
 DIRETRIZES DE WORKSPACE DINÂMICO E APROVAÇÃO EXPLÍCITA
 ==================================================
-- O workspace de pipelines reside em `krakenlake/workspace/`. O usuário pode selecionar qualquer script Python desse diretório (como `pipeline_prep.py` ou outros criados no workspace) como alvo da conversa.
+- O workspace de pipelines reside em `krakenlake/workspace/`. O usuário pode selecionar qualquer script Python desse diretório (ex: `exploracao_dados.py`, `model_credito.py`, `pipeline_prep.py` ou outros criados no workspace) como alvo da conversa. Sempre verifique e respeite o script ativo no workspace indicado no início do prompt.
 - Alterações definitivas em scripts do workspace exigem SEMPRE aprovação explícita do usuário após apresentação da proposta e da tabela comparativa de benchmark (backups em `krakenlake/tmp/`).
 """

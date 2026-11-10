@@ -11,18 +11,15 @@ from typing import Any, Dict, List, Optional
 from kraken_copilot.config import LOGS_DIR
 
 DB_FILE = LOGS_DIR / "kraken_copilot.db"
-LEGACY_SESSIONS_FILE = LOGS_DIR / "sessoes_web.json"
-LEGACY_EXECUTIONS_FILE = LOGS_DIR / "execucoes_web.json"
 
 
 class Storage:
-    """Persistência segura em SQLite para sessões, histórico de chat e telemetria de auditoria."""
+    """Persistência segura em SQLite para sessões, histórico de chat, execuções e auditoria de guardrails."""
 
     def __init__(self, db_path: Path = DB_FILE) -> None:
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
-        self._migrate_legacy_json()
 
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=15.0)
@@ -57,48 +54,54 @@ class Storage:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_executions_atualizado ON executions(atualizado_em DESC);"
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    details TEXT
+                );
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);"
+            )
 
-    def _migrate_legacy_json(self) -> None:
-        """Migra de forma transparente registros de arquivos JSON antigos para o SQLite."""
+    def append_audit_log(
+        self,
+        category: str,
+        action: str,
+        status: str,
+        details: str | dict[str, Any] = "",
+    ) -> None:
+        """Registra um evento de auditoria/guardrail no SQLite."""
+        agora = datetime.now(timezone.utc).isoformat()
+        det_str = json.dumps(details, ensure_ascii=False) if isinstance(details, (dict, list)) else str(details)
         try:
-            if LEGACY_SESSIONS_FILE.exists():
-                with open(LEGACY_SESSIONS_FILE, "r", encoding="utf-8") as f:
-                    legacy_sessions = json.load(f)
-                if isinstance(legacy_sessions, dict) and legacy_sessions:
-                    with self._get_connection() as conn:
-                        for s_id, s in legacy_sessions.items():
-                            conn.execute(
-                                """
-                                INSERT OR IGNORE INTO sessions (id, titulo, criado_em, atualizado_em, mensagens)
-                                VALUES (?, ?, ?, ?, ?)
-                                """,
-                                (
-                                    s.get("id", s_id),
-                                    s.get("titulo", "Nova conversa"),
-                                    s.get("criado_em", datetime.now(timezone.utc).isoformat()),
-                                    s.get("atualizado_em", datetime.now(timezone.utc).isoformat()),
-                                    json.dumps(s.get("mensagens", []), ensure_ascii=False),
-                                ),
-                            )
-            if LEGACY_EXECUTIONS_FILE.exists():
-                with open(LEGACY_EXECUTIONS_FILE, "r", encoding="utf-8") as f:
-                    legacy_execs = json.load(f)
-                if isinstance(legacy_execs, dict) and legacy_execs:
-                    with self._get_connection() as conn:
-                        for e_id, e in legacy_execs.items():
-                            conn.execute(
-                                """
-                                INSERT OR IGNORE INTO executions (id, dados, atualizado_em)
-                                VALUES (?, ?, ?)
-                                """,
-                                (
-                                    e_id,
-                                    json.dumps(e, ensure_ascii=False),
-                                    e.get("concluido_em") or datetime.now(timezone.utc).isoformat(),
-                                ),
-                            )
+            with self._get_connection() as conn:
+                conn.execute(
+                    "INSERT INTO audit_logs (timestamp, category, action, status, details) VALUES (?, ?, ?, ?, ?)",
+                    (agora, category, action, status, det_str),
+                )
         except Exception:
             pass
+
+    def list_audit_logs(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Lista os eventos de auditoria e guardrails mais recentes gravados no SQLite."""
+        try:
+            with self._get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id, timestamp, category, action, status, details FROM audit_logs ORDER BY timestamp DESC LIMIT ?",
+                    (limit,),
+                )
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
+        except Exception:
+            return []
 
     def cleanup_empty_sessions(self) -> int:
         """Remove sessões vazias acumuladas sem mensagens criadas há mais de 2 horas."""

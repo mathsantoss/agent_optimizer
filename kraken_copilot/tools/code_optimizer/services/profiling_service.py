@@ -295,7 +295,7 @@ def execute_and_profile_pipeline(
 
 
 def profile_pipeline_service(
-    file_path: str = "pipeline/pipeline_prep.py",
+    file_path: str | None = None,
     timeout_seconds: int = PROFILING_DEFAULT_TIMEOUT_SECONDS,
 ) -> PipelineProfileResult:
     """Perfilamento seguro de pipeline resolvendo o caminho relativo."""

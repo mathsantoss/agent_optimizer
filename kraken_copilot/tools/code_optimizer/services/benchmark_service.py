@@ -24,8 +24,18 @@ def clean_snapshot_key(raw_path: str) -> str:
         clean = clean[len("baseline::"):]
     while clean.startswith("latest::"):
         clean = clean[len("latest::"):]
-    if "pipeline_prep_original" in clean or "pipeline_prep_otimizado" in clean:
-        return "krakenlake/workspace/pipeline_prep.py"
+    name = Path(clean).name
+    if "_original.bak" in name:
+        stem = name.split("_original.bak")[0]
+        return f"krakenlake/workspace/{stem}.py"
+    if "_otimizado.bak" in name:
+        stem = name.split("_otimizado.bak")[0]
+        return f"krakenlake/workspace/{stem}.py"
+    if "_original" in clean or "_otimizado" in clean:
+        clean = clean.replace("_original", "").replace("_otimizado", "")
+        if not clean.endswith(".py"):
+            clean += ".py"
+        return clean
     for suffix in (".candidate.py", ".candidate", ".opt.py", ".opt", ".bak"):
         if clean.endswith(suffix):
             clean = clean[:-len(suffix)]
@@ -70,13 +80,24 @@ def load_profile_snapshot(key: str) -> PipelineProfileResult | None:
 
 
 def run_pipeline_benchmark(
-    baseline_file_path: str = "krakenlake/workspace/pipeline_prep.py.bak",
-    candidate_file_path: str = "krakenlake/workspace/pipeline_prep.py",
+    baseline_file_path: str | None = None,
+    candidate_file_path: str | None = None,
 ) -> dict[str, Any]:
     """
     Executa o benchmark comparativo entre a versão baseline (.bak ou snapshot) e a versão candidata (otimizada).
     Avalia speedup, redução de memória e equivalência funcional estrita por coluna.
     """
+    from kraken_copilot.tools.code_optimizer.services.file_service import (
+        get_default_workspace_pipeline,
+        get_file_tmp_paths,
+    )
+
+    if not candidate_file_path:
+        candidate_file_path = get_default_workspace_pipeline()
+
+    if not baseline_file_path:
+        tmp_orig, _ = get_file_tmp_paths(candidate_file_path)
+        baseline_file_path = str(tmp_orig) if tmp_orig.is_file() else f"{candidate_file_path}.bak"
     try:
         candidate_resolved = resolve_pipeline_path(candidate_file_path, allow_write=False)
         if not candidate_resolved.is_file() or candidate_resolved.stat().st_size == 0:
