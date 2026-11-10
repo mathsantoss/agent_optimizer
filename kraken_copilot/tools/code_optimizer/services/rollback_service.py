@@ -7,11 +7,11 @@ from kraken_copilot.schemas import ToolResult
 from kraken_copilot.tools.code_optimizer.services.file_service import resolve_pipeline_path
 
 
-def execute_pipeline_rollback(file_path: str = "pipeline/pipeline_prep.py") -> dict[str, Any]:
+def execute_pipeline_rollback(file_path: str = "krakenlake/workspace/pipeline_prep.py") -> dict[str, Any]:
     """Restaura o arquivo a partir da cópia de segurança (.bak)."""
     try:
         resolved_path = resolve_pipeline_path(file_path, allow_write=True)
-        tmp_backup_path = config.PROJECT_ROOT / "pipeline" / "tmp" / "pipeline_prep_original.bak"
+        tmp_backup_path = config.PROJECT_ROOT / "krakenlake" / "tmp" / "pipeline_prep_original.bak"
         backup_path = resolved_path.with_suffix(resolved_path.suffix + ".bak")
 
         chosen_backup = None
@@ -22,7 +22,7 @@ def execute_pipeline_rollback(file_path: str = "pipeline/pipeline_prep.py") -> d
 
         if chosen_backup is None:
             return ToolResult.fail(
-                summary=f"Erro de rollback: nenhum backup válido encontrado em 'pipeline/tmp/pipeline_prep_original.bak'.",
+                summary=f"Erro de rollback: nenhum backup válido encontrado em 'krakenlake/tmp/pipeline_prep_original.bak'.",
                 operation="rollback_pipeline",
                 errors=f"Arquivo de backup não encontrado ou vazio.",
                 data={"file_path": file_path, "backup_file": str(tmp_backup_path.name)},

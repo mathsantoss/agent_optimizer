@@ -25,7 +25,7 @@ def clean_snapshot_key(raw_path: str) -> str:
     while clean.startswith("latest::"):
         clean = clean[len("latest::"):]
     if "pipeline_prep_original" in clean or "pipeline_prep_otimizado" in clean:
-        return "pipeline/pipeline_prep.py"
+        return "krakenlake/workspace/pipeline_prep.py"
     for suffix in (".candidate.py", ".candidate", ".opt.py", ".opt", ".bak"):
         if clean.endswith(suffix):
             clean = clean[:-len(suffix)]
@@ -70,8 +70,8 @@ def load_profile_snapshot(key: str) -> PipelineProfileResult | None:
 
 
 def run_pipeline_benchmark(
-    baseline_file_path: str = "pipeline/pipeline_prep.py.bak",
-    candidate_file_path: str = "pipeline/pipeline_prep.py",
+    baseline_file_path: str = "krakenlake/workspace/pipeline_prep.py.bak",
+    candidate_file_path: str = "krakenlake/workspace/pipeline_prep.py",
 ) -> dict[str, Any]:
     """
     Executa o benchmark comparativo entre a versão baseline (.bak ou snapshot) e a versão candidata (otimizada).

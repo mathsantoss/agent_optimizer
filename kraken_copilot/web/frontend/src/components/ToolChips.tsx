@@ -21,9 +21,13 @@ export interface DiffRowData {
 
 export interface DiffInfo {
   arquivo: string;
+  caminho?: string;
   adicoes: number;
   remocoes: number;
   linhas: DiffRowData[];
+  raw_diff?: string;
+  original_code?: string;
+  proposed_code?: string;
 }
 
 export interface ToolCallItem {
@@ -129,24 +133,19 @@ export function ToolChips({ tools, className }: ToolChipsProps) {
                     )}
                   </div>
 
-                  {tool.diff_info?.linhas && tool.diff_info.linhas.length > 0 ? (
-                    <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-[#0f172a] p-2.5 font-mono text-[11px]">
-                      {tool.diff_info.linhas.map((l, lIdx) => {
-                        let rowStyle = 'text-slate-300';
-                        if (l.tipo === 'add') rowStyle = 'bg-emerald-950/40 text-emerald-300 px-1 rounded-xs';
-                        if (l.tipo === 'del') rowStyle = 'bg-rose-950/40 text-rose-300 px-1 rounded-xs';
-                        if (l.tipo === 'hunk') rowStyle = 'text-blue-400 font-bold';
-                        return (
-                          <div key={lIdx} className={cn('whitespace-pre py-0.5', rowStyle)}>
-                            {l.texto}
-                          </div>
-                        );
-                      })}
-                    </div>
+                  {tool.diff_info ? (
+                    <CodeBlock
+                      code={tool.codigo_proposto}
+                      rawDiff={tool.diff_info.raw_diff}
+                      diffInfo={tool.diff_info}
+                      filename={tool.diff_info.arquivo}
+                      language="python"
+                      isDiff={true}
+                    />
                   ) : tool.codigo_proposto ? (
                     <CodeBlock
                       code={tool.codigo_proposto}
-                      filename={tool.diff_info?.arquivo || 'pipeline_prep_otimizado.py'}
+                      filename={tool.argumentos?.file_path || 'pipeline_prep_otimizado.py'}
                       language="python"
                     />
                   ) : (

@@ -49,8 +49,20 @@ def sync_pipeline_tmp_files(
     return original_file, optimized_file
 
 
-def resolve_pipeline_path(file_path: str | Path = "pipeline_prep.py", allow_write: bool = False) -> Path:
+def get_default_workspace_pipeline() -> str:
+    """Descobre dinamicamente o arquivo Python principal no workspace do krakenlake."""
+    ws_dir = config.PROJECT_ROOT / "krakenlake" / "workspace"
+    if ws_dir.is_dir():
+        py_files = sorted([f for f in ws_dir.glob("*.py") if not f.name.endswith(".bak") and not f.name.startswith(".")])
+        if py_files:
+            return f"krakenlake/workspace/{py_files[0].name}"
+    return "krakenlake/workspace/pipeline_prep.py"
+
+
+def resolve_pipeline_path(file_path: str | Path | None = None, allow_write: bool = False) -> Path:
     """Resolve caminhos relativos do projeto, aceitando arquivos no workspace krakenlake e atalhos de tmp."""
+    if not file_path or not str(file_path).strip():
+        file_path = get_default_workspace_pipeline()
     clean_path = str(file_path).strip()
 
     # Atalhos de arquivos de backup/temporários
@@ -87,8 +99,10 @@ def resolve_pipeline_path(file_path: str | Path = "pipeline_prep.py", allow_writ
     return resolve_safe_path(clean_path, allow_write=allow_write)
 
 
-def read_source_file(file_path: str = "pipeline/pipeline_prep.py") -> dict[str, Any]:
+def read_source_file(file_path: str | None = None) -> dict[str, Any]:
     """Lê o conteúdo de um arquivo do projeto de forma segura."""
+    if not file_path or not str(file_path).strip():
+        file_path = get_default_workspace_pipeline()
     try:
         resolved_path = resolve_pipeline_path(file_path, allow_write=False)
         if not resolved_path.is_file():
@@ -156,7 +170,7 @@ def create_backup_file(resolved_path: Path) -> Path | None:
 
 
 def write_source_file(
-    file_path: str = "pipeline/pipeline_prep.py",
+    file_path: str | None = None,
     content: str = "",
     create_backup: bool = True,
 ) -> dict[str, Any]:
@@ -165,6 +179,8 @@ def write_source_file(
     e sincronizando fisicamente os arquivos fixos em pipeline/tmp/.
     Garante que o diretório de destino exista e respeite os diretórios permitidos.
     """
+    if not file_path or not str(file_path).strip():
+        file_path = get_default_workspace_pipeline()
     if not content or not content.strip():
         return {
             "success": False,

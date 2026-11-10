@@ -65,6 +65,23 @@ async def apagar_conversa(session_id: str):
     return {"status": "ok", "removido": True, "id": session_id}
 
 
+def _deep_parse_json(val: Any) -> Any:
+    """Recursivamente converte strings JSON escapadas em dicionários/listas reais."""
+    if isinstance(val, str):
+        s = val.strip()
+        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+            try:
+                return _deep_parse_json(json.loads(s))
+            except Exception:
+                return val
+        return val
+    elif isinstance(val, dict):
+        return {k: _deep_parse_json(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_deep_parse_json(x) for x in val]
+    return val
+
+
 def extrair_sugestoes_acoes(resposta: str, ferramentas: list) -> list[str]:
     """Extrai sugestões rápidas e acionáveis para o usuário a partir do texto do assistente e ferramentas."""
     sugestoes: list[str] = []
@@ -135,12 +152,41 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
     etapas: List[Dict[str, Any]] = []
     ferramentas_executadas: List[Dict[str, Any]] = []
 
-    # 1. Guardrail de Entrada e Sanitização
+    # 1. Guardrail de Entrada e Sanitização (Conteúdo Sexual, Comandos e Prompt Injection)
+    from kraken_copilot.guardrails import check_input_guardrails
+    guard_check = check_input_guardrails(msg.texto)
+    if not guard_check.allowed:
+        resposta_guardrail = guard_check.polite_response or "Conteúdo não autorizado."
+        storage.append_message(session_id=session_id, role="user", texto=msg.texto)
+        storage.append_message(
+            session_id=session_id,
+            role="assistant",
+            texto=resposta_guardrail,
+            metadados={"guardrail_category": guard_check.category},
+        )
+        return {
+            "resposta": resposta_guardrail,
+            "especialista": "kraken_guardrail",
+            "modelo": modelo_utilizado,
+            "execucao_id": execucao_id,
+            "latencia_segundos": 0.01,
+            "has_approval_request": False,
+            "proposed_code": None,
+            "diff_info": None,
+            "ferramentas_executadas": [],
+            "sugestoes_acoes": [
+                "Faça uma análise exploratória do dataset de vendas",
+                "Inspecione os gargalos de performance do pipeline",
+                "Gere um pipeline de features em PySpark",
+            ],
+        }
+
     t0_guard = time.time()
     guardrail_entrada = {
         "status": "passed",
         "input_chars": len(msg.texto),
         "sanitizado": True,
+        "categoria": "permitido",
     }
     etapa_guard_in = {
         "tipo": "guardrail_entrada",
@@ -212,11 +258,7 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
                     if fn_call:
                         call_name = getattr(fn_call, "name", "desconhecida")
                         call_args = getattr(fn_call, "args", {})
-                        if isinstance(call_args, str):
-                            try:
-                                call_args = json.loads(call_args)
-                            except Exception:
-                                pass
+                        call_args = _deep_parse_json(call_args)
                         ferramenta_info = {
                             "agente": especialista_ativo,
                             "ferramenta": call_name,
@@ -237,11 +279,7 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
                     if fn_resp:
                         resp_name = getattr(fn_resp, "name", "desconhecida")
                         resp_out = getattr(fn_resp, "response", {})
-                        if isinstance(resp_out, str):
-                            try:
-                                resp_out = json.loads(resp_out)
-                            except Exception:
-                                pass
+                        resp_out = _deep_parse_json(resp_out)
                         etapas.append({
                             "tipo": "tool_response",
                             "titulo": f"Retorno de Ferramenta: {resp_name}",
@@ -322,18 +360,32 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
 
     # 4. Detecta se a resposta contém proposta aguardando aprovação humana (fluxo de otimização, criação ou alteração de código)
     proposed_code: Optional[str] = None
+
+    called_apply = any(
+        f.get("ferramenta") in ("optimize_pipeline", "add_feature_to_pipeline", "generate_feature_pipeline")
+        and bool((f.get("argumentos") or {}).get("confirmed_by_user") or (f.get("argumentos") or {}).get("save_to_disk"))
+        for f in ferramentas_executadas
+    )
+
     called_proposal = any(
-        f.get("ferramenta") in ("optimize_pipeline", "add_feature_to_pipeline")
-        and not bool((f.get("argumentos") or {}).get("confirmed_by_user"))
+        (f.get("ferramenta") in ("optimize_pipeline", "add_feature_to_pipeline") and not bool((f.get("argumentos") or {}).get("confirmed_by_user")))
+        or (f.get("ferramenta") == "generate_feature_pipeline" and not bool((f.get("argumentos") or {}).get("save_to_disk")))
         for f in ferramentas_executadas
     )
 
     asks_authorization = any(
         phrase in resposta_final.lower()
         for phrase in (
-            "deseja autorizar",
-            "deseja que eu aplique",
+            "deseja confirmar",
+            "deseja aprovar",
             "deseja aplicar",
+            "deseja que eu salve",
+            "gostaria que eu salve",
+            "gostaria de confirmar",
+            "gostaria que eu aplique",
+            "gostaria de aplicar",
+            "você gostaria",
+            "você autoriza",
             "autoriza a aplicação",
             "autorização para aplicar",
             "aguardo sua autorização",
@@ -341,6 +393,14 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
             "posso aplicar as alterações",
             "posso aplicar a otimização",
             "posso aplicar o código",
+            "posso salvar",
+            "substituir definitivamente o arquivo",
+            "se sim, por favor, me diga",
+            "me diga 'sim'",
+            'me diga "sim"',
+            "me diga sim",
+            "confirmar a aplicação",
+            "deseja confirmar a aplicação",
         )
     )
 
@@ -349,17 +409,58 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         called_proposal
         or (
             asks_authorization
-            and ("```python" in resposta_final or "pipeline" in resposta_final.lower())
+            and ("```" in resposta_final or "pipeline" in resposta_final.lower() or "código" in resposta_final.lower())
         )
     ):
         has_approval_request = True
-        try:
-            parts = resposta_final.split("```python")
-            if len(parts) > 1:
-                code_part = parts[1].split("```")[0]
-                proposed_code = code_part.strip()
-        except Exception:
-            pass
+
+        # Extrai código proposto: primeiro da resposta Markdown
+        if "```python" in resposta_final:
+            try:
+                parts = resposta_final.split("```python")
+                if len(parts) > 1:
+                    code_part = parts[1].split("```")[0]
+                    proposed_code = code_part.strip()
+            except Exception:
+                pass
+        elif "```" in resposta_final:
+            try:
+                parts = resposta_final.split("```")
+                if len(parts) > 1:
+                    code_candidate = parts[1].strip()
+                    lines = code_candidate.splitlines()
+                    if lines and lines[0].strip().isalpha():
+                        code_candidate = "\n".join(lines[1:]).strip()
+                    proposed_code = code_candidate
+            except Exception:
+                pass
+
+        # Se não achou na resposta, extrai dos argumentos ou retornos das ferramentas
+        if not proposed_code:
+            for f in reversed(ferramentas_executadas):
+                args = f.get("argumentos") or {}
+                if isinstance(args, dict) and args.get("proposed_code"):
+                    proposed_code = args["proposed_code"]
+                    break
+            for etapa in reversed(etapas):
+                if etapa.get("tipo") == "tool_response":
+                    res = etapa.get("resultado") or {}
+                    if isinstance(res, dict):
+                        inner = res.get("resultado") or {}
+                        if isinstance(inner, dict):
+                            data_blk = inner.get("data") or {}
+                            if isinstance(data_blk, dict):
+                                cand = data_blk.get("proposed_code") or data_blk.get("candidate_code") or data_blk.get("codigo_proposto")
+                                if cand:
+                                    proposed_code = cand
+                                    break
+
+        # Fallback de arquivo temporário gerado pelo otimizador
+        if not proposed_code:
+            from kraken_copilot import config
+            tmp_opt = config.PROJECT_ROOT / "krakenlake" / "tmp" / "pipeline_prep_otimizado.bak"
+            if tmp_opt.is_file() and tmp_opt.stat().st_size > 0:
+                proposed_code = tmp_opt.read_text(encoding="utf-8")
 
     diff_info = None
     if has_approval_request and proposed_code:
@@ -367,11 +468,26 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
             import difflib
             from kraken_copilot import config
             from kraken_copilot.tools.code_optimizer.services.file_service import resolve_pipeline_path
-            target_path = resolve_pipeline_path(msg.arquivo_alvo or "pipeline_prep.py")
+
+            target_file_name = msg.arquivo_alvo
+            if not target_file_name:
+                for f in reversed(ferramentas_executadas):
+                    args = f.get("argumentos") or {}
+                    if isinstance(args, dict) and args.get("file_path"):
+                        target_file_name = args["file_path"]
+                        break
+
+            target_path = resolve_pipeline_path(target_file_name or "pipeline_prep.py")
             orig_text = target_path.read_text(encoding="utf-8") if target_path.exists() else ""
+            
+            # Se o arquivo original for idêntico ao código proposto ou vazio, recupera o backup inicial
+            orig_bak = config.PROJECT_ROOT / "krakenlake" / "tmp" / "pipeline_prep_original.bak"
+            if (not orig_text or orig_text.strip() == proposed_code.strip()) and orig_bak.is_file():
+                orig_text = orig_bak.read_text(encoding="utf-8")
+
             orig_lines = orig_text.splitlines(keepends=True)
             prop_lines = proposed_code.splitlines(keepends=True)
-            diff_lines = list(difflib.unified_diff(orig_lines, prop_lines, fromfile=target_path.name, tofile=f"{target_path.name} (otimizado)"))
+            diff_lines = list(difflib.unified_diff(orig_lines, prop_lines, fromfile=f"a/{target_path.name}", tofile=f"b/{target_path.name}"))
 
             adicoes = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
             remocoes = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
@@ -394,7 +510,10 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
                 "caminho": str(target_path.relative_to(config.PROJECT_ROOT)),
                 "adicoes": adicoes,
                 "remocoes": remocoes,
-                "linhas": linhas_estruturadas[:80],
+                "linhas": linhas_estruturadas,
+                "raw_diff": "".join(diff_lines),
+                "original_code": orig_text,
+                "proposed_code": proposed_code,
             }
         except Exception:
             pass

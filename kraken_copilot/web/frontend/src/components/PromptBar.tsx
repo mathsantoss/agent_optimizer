@@ -102,7 +102,7 @@ export function PromptBar({
   };
 
   return (
-    <div className={cn('relative w-full max-w-6xl mx-auto px-4 pb-4 select-none', className)}>
+    <div className={cn('relative w-full max-w-5xl mx-auto px-4 sm:px-6 pb-4 select-none', className)}>
       {/* Container Principal */}
       <div className="relative rounded-2xl border border-slate-300/90 bg-white shadow-xs transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100/80">
         {/* Barra Superior com Controles: Seletor de Modelo Gemini + Seletor de Arquivo Workspace */}
@@ -224,7 +224,7 @@ export function PromptBar({
           {/* Badge Informativo de Datalake Ativo */}
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>krakenlake/datalake</span>
+            <span>krakenlake/catalog</span>
           </div>
         </div>
 

@@ -73,7 +73,7 @@ def _is_raw_data_write_call(call_node: ast.Call) -> str | None:
         first_arg = call_node.args[0]
         if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
             norm_target = first_arg.value.replace("\\", "/").lower()
-            if "pipeline/dados" in norm_target or ("dados_vendas" in norm_target and norm_target.endswith(".csv")):
+            if "krakenlake/catalog" in norm_target or "catalog/sources" in norm_target or "pipeline/dados" in norm_target or ("dados_vendas" in norm_target and norm_target.endswith(".csv")):
                 return f"Tentativa de sobrescrever dados brutos protegidos via `.{method_name}('{first_arg.value}')`."
 
     if qualified_call == "open" and len(call_node.args) >= 1:
@@ -88,7 +88,7 @@ def _is_raw_data_write_call(call_node: ast.Call) -> str | None:
         if any(f in mode for f in ("w", "a", "x", "+")):
             if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
                 norm_target = first_arg.value.replace("\\", "/").lower()
-                if "pipeline/dados" in norm_target or ("dados_vendas" in norm_target and norm_target.endswith(".csv")):
+                if "krakenlake/catalog" in norm_target or "catalog/sources" in norm_target or "pipeline/dados" in norm_target or ("dados_vendas" in norm_target and norm_target.endswith(".csv")):
                     return f"Tentativa de abrir dados brutos em modo escrita (`open('{first_arg.value}', '{mode}')`)."
     return None
 

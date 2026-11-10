@@ -1,5 +1,6 @@
 """Exportação centralizada dos schemas e contratos de dados estruturados."""
 from kraken_copilot.schemas.common import ToolResult
+from kraken_copilot.schemas.guardrail import GuardrailCheckResult
 from kraken_copilot.schemas.dataset import (
     ColumnProfile,
     DatasetProfile,

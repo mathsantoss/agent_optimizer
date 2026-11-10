@@ -191,14 +191,21 @@ class Storage:
             session_id = sessao["id"]
 
         agora = datetime.now(timezone.utc).isoformat()
+        meta = metadados or {}
         msg = {
             "id": f"msg-{uuid.uuid4().hex[:8]}",
             "role": role,
             "texto": texto,
-            "especialista": (metadados or {}).get("especialista"),
+            "especialista": meta.get("especialista"),
             "timestamp": agora,
             "execucao_id": execucao_id,
-            "metadados": metadados or {},
+            "has_approval_request": meta.get("has_approval_request", False),
+            "proposed_code": meta.get("proposed_code"),
+            "diff_info": meta.get("diff_info"),
+            "ferramentas_executadas": meta.get("ferramentas_executadas", []),
+            "sugestoes_acoes": meta.get("sugestoes_acoes", []),
+            "benchmark_metrics": meta.get("benchmark_metrics"),
+            "metadados": meta,
         }
         mensagens = sessao.get("mensagens", [])
         mensagens.append(msg)

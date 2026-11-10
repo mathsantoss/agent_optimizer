@@ -35,9 +35,9 @@ FERRAMENTAS PÚBLICAS EXPOSTAS (USE EXCLUSIVAMENTE ESTAS)
    - Se `save_to_disk=False`, elabora a proposta e exibe o código detalhado para aprovação do usuário.
    - Se `save_to_disk=True`, grava no disco no script alvo do workspace (em `krakenlake/workspace/`) com entrypoint padrão `run()`.
 
-2. `add_feature_to_pipeline(file_path=..., feature_name=..., expression=..., framework=..., description=..., confirmed_by_user=...)`:
-   - Insere o cálculo de uma nova feature no script selecionado pelo usuário no workspace (`krakenlake/workspace/pipeline_prep.py` ou outro indicado).
-   - Se `confirmed_by_user=False`, mostra o trecho gerado. Se `True`, aplica a alteração criando backup `.bak` em `krakenlake/tmp/`.
+2. `add_feature_to_pipeline(file_path=..., feature_name=..., expression=..., proposed_code=..., framework=..., description=..., confirmed_by_user=...)`:
+   - Compreenda o código existente do script no workspace e reescreva o script fornecendo `proposed_code` com a nova feature incorporada de forma limpa, elegante e sem dead code.
+   - Se `confirmed_by_user=False`, gera a proposta para o usuário inspecionar e aprovar no chat. Se `True`, aplica a alteração definitiva criando backup seguro.
 
 3. `preview_features(dataset_name=..., framework=..., feature_name=..., expression=..., sample_rows=...)`:
    - Executa uma amostra de qualquer dataset para calcular e demonstrar as novas features, tipos e contagem de nulos.

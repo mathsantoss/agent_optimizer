@@ -28,7 +28,17 @@ export function MermaidBlock({ chart, className }: MermaidBlockProps) {
 
     const renderChart = async () => {
       try {
-        const cleanCode = chart.trim();
+        let cleanCode = chart.trim();
+        // Remove cercas markdown ou diretivas ::: mermaid se presentes
+        cleanCode = cleanCode
+          .replace(/^:::\s*mermaid/i, '')
+          .replace(/:::\s*$/i, '')
+          .replace(/^```(?:mermaid)?/i, '')
+          .replace(/```$/i, '')
+          .trim();
+        // Ajusta sintaxe de pipes com espaços no mermaid (ex: --> |Sim| -> -->|Sim|)
+        cleanCode = cleanCode.replace(/-->\s+\|/g, '-->|');
+
         const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
         const { svg } = await mermaid.render(id, cleanCode);
         if (isMounted) {

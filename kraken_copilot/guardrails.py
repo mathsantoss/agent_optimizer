@@ -11,9 +11,11 @@ import hashlib
 from pathlib import Path
 import re
 from typing import Any
+from pydantic import BaseModel, Field
 
 from kraken_copilot import config
 from kraken_copilot.audit_logger import record_guardrail_event
+from kraken_copilot.schemas.guardrail import GuardrailCheckResult
 
 # Limites operacionais de Circuit Breaker
 MAX_SAVE_FILE_ATTEMPTS = 5
@@ -42,6 +44,86 @@ PROMPT_INJECTION_PATTERNS = (
     re.compile(r"system\s+prompt\s+override", re.IGNORECASE),
     re.compile(r"<\s*/?\s*system\s*>", re.IGNORECASE),
 )
+
+
+# Padrões de conteúdo sexual ou adulto inadequado
+SEXUAL_CONTENT_PATTERNS = (
+    re.compile(
+        r"\b(porn\w*|sexo\w*|sexual\w*|er[oó]tic\w*|conte[uú]do\s+adulto|hentai|orgasm\w*|masturba\w*|vagina\w*|p[eê]nis|nude[zs]\w*|prostitui\w*|gemid\w*)\b",
+        re.IGNORECASE,
+    ),
+)
+
+# Padrões de comandos destrutivos ao host/sistema
+DESTRUCTIVE_COMMAND_PATTERNS = (
+    re.compile(r"(rm\s+-rf\s+[/~]|mkfs\b|dd\s+if=|:\(\)\{\s*:\|:&\s*\};:|drop\s+database\b)", re.IGNORECASE),
+)
+
+
+def check_content_safety(text: str) -> GuardrailCheckResult:
+    """
+    Verifica se a mensagem contém solicitações ou conteúdos com teor sexual/adulto
+    ou comandos destrutivos de sistema. Retorna GuardrailCheckResult com resposta educada.
+    """
+    if not text or not text.strip():
+        return GuardrailCheckResult(allowed=True)
+
+    for pattern in SEXUAL_CONTENT_PATTERNS:
+        if pattern.search(text):
+            record_guardrail_event(
+                "CONTENT_SAFETY",
+                "check_content_safety",
+                "BLOQUEADO",
+                "Conteúdo com teor sexual ou adulto bloqueado pelo guardrail.",
+            )
+            return GuardrailCheckResult(
+                allowed=False,
+                category="SEXUAL_CONTENT",
+                polite_response=(
+                    "Como assistente corporativo de engenharia de dados, analytics e pipelines da Kraken Copilot, "
+                    "meu foco é estritamente técnico e profissional. Não abordo nem processo conteúdos com teor sexual ou adulto. "
+                    "Como posso ajudar com a exploração de dados, pipelines ou métricas do seu projeto?"
+                ),
+                reason="Conteúdo com teor sexual ou adulto detectado.",
+            )
+
+    for pattern in DESTRUCTIVE_COMMAND_PATTERNS:
+        if pattern.search(text):
+            record_guardrail_event(
+                "DESTRUCTIVE_COMMAND",
+                "check_content_safety",
+                "BLOQUEADO",
+                "Comando destrutivo de sistema detectado.",
+            )
+            return GuardrailCheckResult(
+                allowed=False,
+                category="DESTRUCTIVE_COMMAND",
+                polite_response=(
+                    "Comando de alto risco não autorizado. O Kraken Copilot executa operações apenas em "
+                    "ambientes sandbox e arquivos do workspace permitidos."
+                ),
+                reason="Comando destrutivo detectado.",
+            )
+
+    return GuardrailCheckResult(allowed=True)
+
+
+def check_input_guardrails(text: str) -> GuardrailCheckResult:
+    """Executa a bateria completa de guardrails de entrada (conteúdo sexual, comandos e prompt injection)."""
+    safety = check_content_safety(text)
+    if not safety.allowed:
+        return safety
+
+    injection_msg = check_prompt_injection(text)
+    if injection_msg:
+        return GuardrailCheckResult(
+            allowed=False,
+            category="PROMPT_INJECTION",
+            polite_response=injection_msg,
+            reason="Tentativa de sobrescrever diretrizes do sistema (Prompt Injection).",
+        )
+
+    return GuardrailCheckResult(allowed=True)
 
 
 def check_prompt_injection(text: str) -> str | None:
@@ -195,8 +277,9 @@ def before_model_guardrail(
             for part in content.parts:
                 user_text = getattr(part, "text", None)
                 if user_text:
-                    violation_message = check_prompt_injection(user_text)
-                    if violation_message:
+                    guard_res = check_input_guardrails(user_text)
+                    if not guard_res.allowed:
+                        violation_message = guard_res.polite_response or "Conteúdo não autorizado."
                         try:
                             from google.adk.models import LlmResponse
                             from google.genai import types
@@ -218,7 +301,7 @@ def _build_fallback_for_empty_response(agent_name: str, callback_context: Any = 
     """Gera uma resposta de fallback válida e informativa quando o modelo encerra sem conteúdo de texto ou apenas com pensamentos."""
     if "optimizer" in agent_name:
         return (
-            "Diagnóstico do pipeline executado. Proposta de otimização registrada em `pipeline/tmp/pipeline_prep_otimizado.bak`. "
+            "Diagnóstico do pipeline executado. Proposta de otimização registrada em `krakenlake/tmp/pipeline_prep_otimizado.bak`. "
             "Aguardando confirmação explícita do usuário para aplicação no arquivo oficial."
         )
 

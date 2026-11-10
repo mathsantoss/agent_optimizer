@@ -25,6 +25,12 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
     return null;
   }
 
+  // Normaliza quebras de linha e converte blocos ::: mermaid em ```mermaid
+  const normalizedContent = content
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/:::\s*mermaid([\s\S]*?):::/gi, '```mermaid$1```');
+
   // Parse markdown code blocks, tables, and paragraphs
   const renderFormattedMarkdown = (rawText: string) => {
     // 1. Quebra blocos de código ```
@@ -33,10 +39,10 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
     return codeParts.map((part, index) => {
       if (part.startsWith('```') && part.endsWith('```')) {
         const firstLineEnd = part.indexOf('\n');
-        const lang = part.slice(3, firstLineEnd).trim().toLowerCase() || 'python';
-        const code = part.slice(firstLineEnd + 1, -3);
+        const lang = (firstLineEnd !== -1 ? part.slice(3, firstLineEnd) : '').trim().toLowerCase() || 'python';
+        const code = firstLineEnd !== -1 ? part.slice(firstLineEnd + 1, -3) : part.slice(3, -3);
 
-        if (lang === 'mermaid') {
+        if (lang === 'mermaid' || code.trim().startsWith('flowchart') || code.trim().startsWith('sequenceDiagram') || code.trim().startsWith('graph ')) {
           return <MermaidBlock key={index} chart={code} />;
         }
 
@@ -57,7 +63,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
               );
             }
           } catch (e) {
-            // Se ainda está em streaming ou json incompleto, mostra como código json
+            // Em caso de streaming incompleto, segue como CodeBlock
           }
         }
 
@@ -72,67 +78,167 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
 
       while (i < lines.length) {
         const line = lines[i];
+        const trimmed = line.trim();
 
         // Detecta início de tabela markdown (| col1 | col2 | ...)
-        if (
-          line.trim().startsWith('|') &&
-          line.trim().endsWith('|') &&
-          i + 1 < lines.length &&
-          /^\|[\s:\-|]+\|$/.test(lines[i + 1].trim())
-        ) {
-          const headerCells = line
+        const isPipeLine = trimmed.startsWith('|') && trimmed.endsWith('|');
+        const nextTrimmed = i + 1 < lines.length ? lines[i + 1].trim() : '';
+        const hasSepNext = nextTrimmed.startsWith('|') && /^\|[\s:\-|]+\|$/.test(nextTrimmed);
+        const nextIsPipe = nextTrimmed.startsWith('|') && nextTrimmed.endsWith('|');
+
+        if (isPipeLine && (hasSepNext || nextIsPipe)) {
+          const headerCells = trimmed
             .split('|')
             .map((c) => c.trim())
             .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
 
-          i += 2; // pula header e separador
+          i += hasSepNext ? 2 : 1; // pula header e separador se presente
           const tableRows: Record<string, any>[] = [];
 
           while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
-            const cells = lines[i]
+            const rowTrim = lines[i].trim();
+            // Pula separador intermediário se existir
+            if (/^\|[\s:\-|]+\|$/.test(rowTrim)) {
+              i++;
+              continue;
+            }
+
+            const cells = rowTrim
               .split('|')
               .map((c) => c.trim())
               .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
 
             const rowObj: Record<string, any> = {};
             headerCells.forEach((h, hIdx) => {
-              rowObj[h] = cells[hIdx] ?? '';
+              rowObj[h || `col_${hIdx + 1}`] = cells[hIdx] ?? '';
             });
             tableRows.push(rowObj);
             i++;
           }
 
-          renderedElements.push(
-            <div key={`tbl-${index}-${i}`} className="my-3 overflow-hidden">
-              <RecordsTable columns={headerCells} data={tableRows} maxHeight="340px" />
-            </div>
-          );
+          if (headerCells.length > 0) {
+            const isBenchmark =
+              headerCells.some((h) => /métrica|baseline|depois|variação|speedup/i.test(h)) ||
+              tableRows.some((r) =>
+                Object.values(r).some((v) =>
+                  /tempo de execução|pico de memória|equivalência/i.test(String(v))
+                )
+              );
+
+            renderedElements.push(
+              <div
+                key={`tbl-${index}-${i}`}
+                className={cn(
+                  'my-3.5 overflow-hidden rounded-2xl border shadow-2xs',
+                  isBenchmark ? 'border-blue-200/90 bg-white' : 'border-slate-200/90 bg-white'
+                )}
+              >
+                {isBenchmark && (
+                  <div className="flex items-center justify-between border-b border-blue-100 bg-gradient-to-r from-blue-50/80 via-white to-blue-50/40 px-4 py-2.5 text-xs font-bold text-blue-950">
+                    <span className="flex items-center gap-1.5">
+                      <span>📊</span>
+                      <span>Benchmark Comparativo de Performance (Antes vs Depois)</span>
+                    </span>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-800">
+                      Vetorizado
+                    </span>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className={isBenchmark ? 'bg-slate-50/80 border-b border-slate-100' : 'bg-slate-50/70 border-b border-slate-200/80'}>
+                        {headerCells.map((h, hIdx) => (
+                          <th
+                            key={hIdx}
+                            className="px-4 py-2.5 text-[11px] font-bold text-slate-700 tracking-tight select-none"
+                          >
+                            {formatInline(h)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {tableRows.map((row, rIdx) => (
+                        <tr
+                          key={rIdx}
+                          className="hover:bg-slate-50/50 transition-colors"
+                        >
+                          {headerCells.map((h, cIdx) => {
+                            const val = String(row[h] ?? '');
+                            const isSpeedup =
+                              val.includes('%') ||
+                              val.toLowerCase().includes('aprovada') ||
+                              val.toLowerCase().includes('aprovado');
+                            const isPositiveGain =
+                              val.includes('+') || val.toLowerCase().includes('aprovad');
+
+                            return (
+                              <td
+                                key={cIdx}
+                                className={cn(
+                                  'px-4 py-2.5 text-xs leading-normal',
+                                  cIdx === 0 && headerCells.length > 3
+                                    ? 'font-medium text-slate-900'
+                                    : '',
+                                  cIdx >= 1 && cIdx <= 3 && isBenchmark
+                                    ? 'font-mono text-[11.5px]'
+                                    : ''
+                                )}
+                              >
+                                {isBenchmark && isSpeedup ? (
+                                  <span
+                                    className={cn(
+                                      'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold font-mono',
+                                      isPositiveGain
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : 'bg-slate-100 text-slate-700'
+                                    )}
+                                  >
+                                    {isPositiveGain && <span>✓</span>}
+                                    {val.replace(/\*\*/g, '')}
+                                  </span>
+                                ) : (
+                                  formatInline(val)
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          }
           continue;
         }
 
         // Renderiza linha padrão
-        if (!line.trim()) {
+        if (!trimmed) {
           renderedElements.push(<div key={`empty-${index}-${i}`} className="h-2" />);
-        } else if (line.startsWith('### ')) {
+        } else if (trimmed.startsWith('### ')) {
           renderedElements.push(
             <h4 key={`h4-${index}-${i}`} className="mt-3 text-sm font-bold text-slate-900">
-              {formatInline(line.slice(4))}
+              {formatInline(trimmed.slice(4))}
             </h4>
           );
-        } else if (line.startsWith('## ')) {
+        } else if (trimmed.startsWith('## ')) {
           renderedElements.push(
             <h3 key={`h3-${index}-${i}`} className="mt-3.5 text-base font-bold text-slate-900">
-              {formatInline(line.slice(3))}
+              {formatInline(trimmed.slice(3))}
             </h3>
           );
-        } else if (line.startsWith('# ')) {
+        } else if (trimmed.startsWith('# ')) {
           renderedElements.push(
             <h2 key={`h2-${index}-${i}`} className="mt-4 text-lg font-bold text-slate-900">
-              {formatInline(line.slice(2))}
+              {formatInline(trimmed.slice(2))}
             </h2>
           );
-        } else if (/^!\[(.*?)\]\((.*?)\)$/.test(line.trim())) {
-          const match = line.trim().match(/^!\[(.*?)\]\((.*?)\)$/);
+        } else if (/^!\[(.*?)\]\((.*?)\)$/.test(trimmed)) {
+          const match = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
           if (match) {
             const alt = match[1];
             let src = match[2];
@@ -153,16 +259,24 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
               </figure>
             );
           }
-        } else if (line.startsWith('- ') || line.startsWith('* ')) {
+        } else if (trimmed.startsWith('• ') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          const bulletText = trimmed.replace(/^[•\-*]\s+/, '');
           renderedElements.push(
             <li key={`li-${index}-${i}`} className="ml-4 list-disc text-xs text-slate-700 leading-relaxed">
-              {formatInline(line.slice(2))}
+              {formatInline(bulletText)}
+            </li>
+          );
+        } else if (/^\d+\.\s+/.test(trimmed)) {
+          const numText = trimmed.replace(/^\d+\.\s+/, '');
+          renderedElements.push(
+            <li key={`ol-${index}-${i}`} className="ml-4 list-decimal text-xs text-slate-700 leading-relaxed">
+              {formatInline(numText)}
             </li>
           );
         } else {
           renderedElements.push(
             <p key={`p-${index}-${i}`} className="text-xs text-slate-700 leading-relaxed">
-              {formatInline(line)}
+              {formatInline(trimmed)}
             </p>
           );
         }
@@ -215,7 +329,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
 
   return (
     <div className={cn('relative leading-relaxed', className)}>
-      {renderFormattedMarkdown(content)}
+      {renderFormattedMarkdown(normalizedContent)}
       {isStreaming && (
         <span className="inline-block h-3.5 w-1.5 animate-pulse rounded-xs bg-blue-600 align-middle ml-1" />
       )}

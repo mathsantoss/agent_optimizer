@@ -15,7 +15,7 @@ CACHE_GLOBAL = {}
 CONTADOR_GLOBAL = 0
 
 
-def carregar_dados(caminho="pipeline/dados/dados_vendas.csv"):
+def carregar_dados(caminho="krakenlake/catalog/sources/dados_vendas.csv"):
     global DATAFRAME_GLOBAL
 
     # Verificações redundantes

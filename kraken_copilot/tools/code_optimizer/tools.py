@@ -19,6 +19,7 @@ from kraken_copilot.tools.code_optimizer.services.ast_service import (
 from kraken_copilot.tools.code_optimizer.services.benchmark_service import run_pipeline_benchmark
 from kraken_copilot.tools.code_optimizer.services.execution_service import execute_pipeline_script
 from kraken_copilot.tools.code_optimizer.services.file_service import (
+    get_default_workspace_pipeline,
     get_pipeline_tmp_dir,
     read_source_file,
     resolve_pipeline_path,
@@ -31,7 +32,7 @@ from kraken_copilot.tools.code_optimizer.services.testing_service import run_aut
 
 
 def inspect_pipeline(
-    file_path: str = "pipeline/pipeline_prep.py",
+    file_path: str | None = None,
 ) -> str:
     """
     Inspeciona um pipeline existente de forma estritamente somente-leitura.
@@ -39,11 +40,13 @@ def inspect_pipeline(
     riscos de data leakage e oportunidades de otimização sem alterar nenhum arquivo no disco.
 
     Args:
-        file_path: Caminho do script de pipeline (padrão: 'pipeline/pipeline_prep.py').
+        file_path: Caminho do script de pipeline (opcional; se omitido, descobre dinamicamente no workspace).
 
     Returns:
         JSON com diagnóstico detalhado, problemas classificados por gravidade e recomendações.
     """
+    if not file_path or not str(file_path).strip():
+        file_path = get_default_workspace_pipeline()
     read_res = read_source_file(file_path)
     if not read_res.get("success"):
         record_code_validation_event("inspect_pipeline", file_path, "ERRO_LEITURA", read_res.get("error", ""))
@@ -178,7 +181,7 @@ def _extract_ast_function_contracts(source_code: str) -> dict[str, Any]:
 
 
 def optimize_pipeline(
-    file_path: str = "pipeline/pipeline_prep.py",
+    file_path: str | None = None,
     proposed_code: str = "",
     confirmed_by_user: bool = False,
     run_benchmark: bool = True,
@@ -189,7 +192,7 @@ def optimize_pipeline(
     Cria backup (.bak), valida sintaxe/segurança AST, testa e compara equivalência funcional (benchmark).
 
     Args:
-        file_path: Caminho do pipeline alvo (padrão: 'pipeline/pipeline_prep.py').
+        file_path: Caminho do pipeline alvo (opcional; se omitido, descobre dinamicamente no workspace).
         proposed_code: Código Python otimizado proposto.
         confirmed_by_user: Confirmação do usuário. Se False, elabora e exibe a proposta sem gravar no disco.
                            Se True, aplica alterações, cria backup e roda validações.
@@ -198,6 +201,8 @@ def optimize_pipeline(
     Returns:
         JSON estruturado com o resultado da proposta ou da aplicação, métricas comparativas e alertas.
     """
+    if not file_path or not str(file_path).strip():
+        file_path = get_default_workspace_pipeline()
     clean_target = file_path.strip()
     clean_code = proposed_code.strip()
 
@@ -452,7 +457,7 @@ def optimize_pipeline(
 
 
 def validate_pipeline(
-    file_path: str = "pipeline/pipeline_prep.py",
+    file_path: str | None = None,
     run_tests: bool = True,
     run_profile: bool = True,
     compare_with_baseline: bool = True,
@@ -467,7 +472,7 @@ def validate_pipeline(
     Permite rollback automático em caso de falha crítica caso solicitado.
 
     Args:
-        file_path: Caminho do script de pipeline a validar (padrão: 'pipeline/pipeline_prep.py').
+        file_path: Caminho do script de pipeline a validar (opcional; se omitido, descobre dinamicamente no workspace).
         run_tests: Se True, executa os testes do projeto via pytest.
         run_profile: Se True, executa profiling medindo tempo e memória.
         compare_with_baseline: Se True, compara com o snapshot ou baseline (.bak).
@@ -476,6 +481,8 @@ def validate_pipeline(
     Returns:
         JSON com o diagnóstico detalhado discriminando cada nível de validação.
     """
+    if not file_path or not str(file_path).strip():
+        file_path = get_default_workspace_pipeline()
     clean_path = file_path.strip()
     read_res = read_source_file(clean_path)
     if not read_res.get("success"):

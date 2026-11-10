@@ -19,8 +19,6 @@ def _diretorios_permitidos() -> List[Path]:
         (REPOSITORY_ROOT / "krakenlake" / "workspace").resolve(),
         (REPOSITORY_ROOT / "krakenlake" / "saida").resolve(),
         (REPOSITORY_ROOT / "krakenlake" / "datalake").resolve(),
-        (REPOSITORY_ROOT / "pipeline" / "dados").resolve(),
-        (REPOSITORY_ROOT / "pipeline" / "saida").resolve(),
         (REPOSITORY_ROOT / "docs").resolve(),
     ]
     return [d for d in dirs if d.exists()]
@@ -300,3 +298,80 @@ async def baixar_arquivo(caminho: str):
     if not permitido or not p.exists() or not p.is_file():
         raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
     return FileResponse(p, filename=p.name)
+
+
+@router.get("/diff")
+async def obter_diff_arquivo(caminho: str = "pipeline_prep.py"):
+    """Gera o diff comparativo entre o script atual e seu backup (.bak ou tmp)."""
+    import difflib
+    from kraken_copilot.config import PROJECT_ROOT
+    from kraken_copilot.tools.code_optimizer.services.file_service import resolve_pipeline_path
+
+    try:
+        resolved = resolve_pipeline_path(caminho, allow_write=False)
+        curr_text = resolved.read_text(encoding="utf-8") if resolved.is_file() else ""
+
+        # Procura backup em krakenlake/tmp/ ou no mesmo diretório
+        bak_file = PROJECT_ROOT / "krakenlake" / "tmp" / "pipeline_prep_original.bak"
+        if not bak_file.is_file():
+            bak_file = resolved.with_suffix(resolved.suffix + ".bak")
+
+        orig_text = bak_file.read_text(encoding="utf-8") if bak_file.is_file() else ""
+
+        # Se o backup original for idêntico ao atual mas existir proposta otimizada no tmp
+        tmp_opt = PROJECT_ROOT / "krakenlake" / "tmp" / "pipeline_prep_otimizado.bak"
+        if curr_text == orig_text and tmp_opt.is_file():
+            prop_text = tmp_opt.read_text(encoding="utf-8")
+            diff_lines = list(difflib.unified_diff(
+                orig_text.splitlines(keepends=True),
+                prop_text.splitlines(keepends=True),
+                fromfile=f"a/{resolved.name}",
+                tofile=f"b/{resolved.name} (proposta)",
+            ))
+        else:
+            diff_lines = list(difflib.unified_diff(
+                orig_text.splitlines(keepends=True),
+                curr_text.splitlines(keepends=True),
+                fromfile=f"a/{resolved.name} (original)",
+                tofile=f"b/{resolved.name} (atual)",
+            ))
+
+        adicoes = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
+        remocoes = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+
+        linhas_estruturadas = []
+        for l in diff_lines:
+            clean_l = l.rstrip("\r\n")
+            if clean_l.startswith("@@"):
+                tipo = "hunk"
+            elif clean_l.startswith("+") and not clean_l.startswith("+++"):
+                tipo = "add"
+            elif clean_l.startswith("-") and not clean_l.startswith("---"):
+                tipo = "del"
+            else:
+                tipo = "ctx"
+            linhas_estruturadas.append({"tipo": tipo, "texto": clean_l})
+
+        return {
+            "arquivo": resolved.name,
+            "caminho": str(resolved.relative_to(PROJECT_ROOT)),
+            "adicoes": adicoes,
+            "remocoes": remocoes,
+            "linhas": linhas_estruturadas,
+            "raw_diff": "".join(diff_lines),
+            "original_code": orig_text,
+            "current_code": curr_text,
+            "proposed_code": prop_text if (curr_text == orig_text and tmp_opt.is_file()) else curr_text,
+        }
+    except Exception as err:
+        return {
+            "arquivo": caminho,
+            "adicoes": 0,
+            "remocoes": 0,
+            "linhas": [],
+            "raw_diff": "",
+            "original_code": "",
+            "current_code": "",
+            "proposed_code": "",
+            "erro": str(err),
+        }

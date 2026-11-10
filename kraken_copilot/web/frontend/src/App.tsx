@@ -12,6 +12,7 @@ import {
   Activity,
   Database,
   MessageSquare,
+  FileCode,
   FileCode2,
   Menu,
   ShieldCheck,
@@ -20,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { SidebarNav, ConversaItem } from './components/SidebarNav';
 import { PromptBar, GeminiModel, WorkspaceFile } from './components/PromptBar';
 import { ThinkingState, ThinkingStep } from './components/ThinkingState';
+import { LoadingState } from './components/LoadingState';
 import { StreamingText } from './components/StreamingText';
 import { ToolChips, ToolCallItem, DiffInfo } from './components/ToolChips';
 import { ApprovalCard } from './components/ApprovalCard';
@@ -27,6 +29,7 @@ import { InsightCards, BenchmarkMetrics } from './components/InsightCards';
 import { DataExplorerView } from './components/DataExplorerView';
 import { InvestigationView } from './components/InvestigationView';
 import { ObservabilityView } from './components/ObservabilityView';
+import { SideCodePanel } from './components/SideCodePanel';
 
 export interface Mensagem {
   id?: string;
@@ -36,6 +39,7 @@ export interface Mensagem {
   especialista?: string;
   execucao_id?: string;
   has_approval_request?: boolean;
+  proposed_code?: string;
   diff_info?: DiffInfo;
   ferramentas_executadas?: ToolCallItem[];
   sugestoes_acoes?: string[];
@@ -84,6 +88,17 @@ function cleanDisplayText(text: string, hasSuggestions: boolean): string {
   return text.replace(triggerRegex, '').trim();
 }
 
+function formatTimestamp(ts?: string): string {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+  } catch {}
+  return ts.length > 8 ? ts.slice(11, 19) : ts;
+}
+
 export function App() {
   const [activeView, setActiveView] = useState<'chat' | 'dados' | 'investigacao' | 'observabilidade'>('chat');
   const [activeExecucaoId, setActiveExecucaoId] = useState<string | null>(null);
@@ -107,6 +122,12 @@ export function App() {
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [selectedWorkspaceFile, setSelectedWorkspaceFile] = useState<string>('pipeline_prep.py');
 
+  // Side Code Panel State (Visualização lateral em tempo real)
+  const [sideCodeOpen, setSideCodeOpen] = useState(false);
+  const [sideCodeContent, setSideCodeContent] = useState('');
+  const [sideCodeDiff, setSideCodeDiff] = useState<DiffInfo | undefined>(undefined);
+  const [sideCodeHasApproval, setSideCodeHasApproval] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -125,6 +146,24 @@ export function App() {
     carregarWorkspaceFiles();
     carregarConversas(false);
   }, []);
+
+  useEffect(() => {
+    if (selectedWorkspaceFile) {
+      carregarWorkspaceCode(selectedWorkspaceFile);
+    }
+  }, [selectedWorkspaceFile]);
+
+  const carregarWorkspaceCode = async (filename: string) => {
+    try {
+      const res = await fetch(`/api/dados/arquivo?caminho=krakenlake/workspace/${filename}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.conteudo) {
+          setSideCodeContent(data.conteudo);
+        }
+      }
+    } catch {}
+  };
 
   // Atalho global Ctrl+N / Cmd+N
   useEffect(() => {
@@ -290,6 +329,18 @@ export function App() {
     setMensagens((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
+    // Se o usuário solicitou otimização ou alteração de código, abre o painel lateral em tempo real
+    if (
+      texto.toLowerCase().includes('otimi') ||
+      texto.toLowerCase().includes('pipeline') ||
+      texto.toLowerCase().includes('pyspark') ||
+      texto.toLowerCase().includes('feature') ||
+      texto.toLowerCase().includes('reescrev') ||
+      texto.toLowerCase().includes('benchmark')
+    ) {
+      setSideCodeOpen(true);
+    }
+
     // Etapas simuladas do ThinkingState durante o processamento
     setActiveAgent('Kraken Copilot');
     setThinkingSteps([
@@ -330,12 +381,24 @@ export function App() {
           especialista: data.especialista || 'Kraken Copilot',
           execucao_id: data.execucao_id,
           has_approval_request: data.has_approval_request,
+          proposed_code: data.proposed_code,
           diff_info: data.diff_info,
           ferramentas_executadas: data.ferramentas_executadas || [],
           sugestoes_acoes: data.sugestoes_acoes || [],
           benchmark_metrics: data.benchmark_metrics,
           timestamp: new Date().toLocaleTimeString(),
         };
+
+        if (data.proposed_code) {
+          setSideCodeContent(data.proposed_code);
+          setSideCodeDiff(data.diff_info);
+          setSideCodeHasApproval(Boolean(data.has_approval_request));
+          setSideCodeOpen(true);
+        } else if (data.diff_info) {
+          setSideCodeDiff(data.diff_info);
+          setSideCodeHasApproval(Boolean(data.has_approval_request));
+          setSideCodeOpen(true);
+        }
 
         setMensagens((prev) => [...prev, assistantMsg]);
         carregarConversas(true); // mantém conversa ativa
@@ -531,11 +594,33 @@ export function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="truncate max-w-[180px] sm:max-w-none">
-              krakenlake/workspace/{selectedWorkspaceFile}
-            </span>
+          <div className="flex items-center gap-2">
+            {activeView === 'chat' && (
+              <button
+                type="button"
+                onClick={() => setSideCodeOpen(!sideCodeOpen)}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer select-none',
+                  sideCodeOpen
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                )}
+                title="Abrir/Fechar painel lateral de código do workspace"
+              >
+                <FileCode className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Código</span>
+                {sideCodeHasApproval && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
+                )}
+              </button>
+            )}
+
+            <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
+              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="truncate max-w-[140px] sm:max-w-none">
+                krakenlake/workspace/{selectedWorkspaceFile}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -558,18 +643,19 @@ export function App() {
             onBackToChat={() => setActiveView('chat')}
           />
         ) : (
-          /* View Padrão: Chat */
-          <>
-            <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 min-w-0 w-full">
-              <div className="mx-auto max-w-6xl w-full space-y-6 pb-8 min-w-0">
-                {mensagens.length === 0 ? (
-                  /* Welcome Screen Estilo Beautiful UI */
-                  <div className="flex flex-col items-center justify-center py-16 text-center select-none">
-                    <img
-                      src="/web/ui/kraken-copilot.svg"
-                      alt="Kraken Copilot"
-                      className="h-16 w-16 rounded-2xl shadow-md mb-4 object-contain"
-                    />
+          /* View Padrão: Chat com Painel Lateral de Código Split */
+          <div className="flex-1 flex overflow-hidden min-w-0">
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+              <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 min-w-0 w-full">
+                <div className="mx-auto max-w-5xl w-full space-y-6 pb-8 min-w-0">
+                  {mensagens.length === 0 ? (
+                    /* Welcome Screen Estilo Beautiful UI */
+                    <div className="flex flex-col items-center justify-center py-16 text-center select-none">
+                      <img
+                        src="/kraken-copilot.svg"
+                        alt="Kraken Copilot"
+                        className="h-16 w-16 rounded-2xl shadow-md mb-4 object-contain"
+                      />
                     <h2 className="text-xl font-bold tracking-tight text-slate-900">
                       Kraken Copilot
                     </h2>
@@ -668,7 +754,7 @@ export function App() {
                               </span>
                               {msg.timestamp && (
                                 <span className="text-[10px] text-slate-400 font-mono">
-                                  {msg.timestamp}
+                                  {formatTimestamp(msg.timestamp)}
                                 </span>
                               )}
                             </div>
@@ -701,12 +787,22 @@ export function App() {
                               <InsightCards metrics={msg.benchmark_metrics} />
                             )}
 
-                            {/* Card de Aprovação Nativo Beautiful UI */}
-                            {msg.has_approval_request && (
+                            {/* Card de Aprovação Nativo Beautiful UI no Chat */}
+                            {Boolean(
+                              msg.has_approval_request ||
+                              (msg as any).metadados?.has_approval_request ||
+                              (!isUser && (
+                                msg.texto.toLowerCase().includes('deseja confirmar a aplicação') ||
+                                msg.texto.toLowerCase().includes('deseja aprovar') ||
+                                msg.texto.toLowerCase().includes('autoriza a aplicação') ||
+                                msg.texto.toLowerCase().includes('substituir definitivamente o arquivo')
+                              ))
+                            ) && (
                               <ApprovalCard
                                 execucaoId={msg.execucao_id}
                                 targetFile={selectedWorkspaceFile}
-                                diffInfo={msg.diff_info}
+                                diffInfo={msg.diff_info || (msg as any).metadados?.diff_info}
+                                proposedCode={msg.proposed_code || (msg as any).metadados?.proposed_code || sideCodeContent}
                                 onApprove={handleApprove}
                                 onReject={handleReject}
                               />
@@ -775,43 +871,60 @@ export function App() {
                   })
                 )}
 
-                {/* Thinking State Ativo */}
+                {/* Thinking State & Loading State (Beautiful UI) */}
                 {isLoading && (
-                  <div className="flex items-start gap-3.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-xs select-none overflow-hidden">
-                      <img
-                        src="/web/ui/kraken-copilot.svg"
-                        alt={activeAgent}
-                        className="h-8 w-8 object-contain"
-                      />
-                    </div>
-                    <div className="flex-1 max-w-[85%]">
-                      <ThinkingState
-                        isThinking={isLoading}
-                        agentName={activeAgent}
-                        steps={thinkingSteps}
-                      />
+                  <div className="flex flex-col gap-2.5">
+                    <LoadingState
+                      label={`O ${activeAgent} está processando sobre ${selectedWorkspaceFile}...`}
+                      variant="Drive"
+                    />
+                    <div className="flex items-start gap-3.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-xs select-none overflow-hidden">
+                        <img
+                          src="/kraken-copilot.svg"
+                          alt={activeAgent}
+                          className="h-8 w-8 object-contain"
+                        />
+                      </div>
+                      <div className="flex-1 max-w-[85%]">
+                        <ThinkingState
+                          isThinking={isLoading}
+                          agentName={activeAgent}
+                          steps={thinkingSteps}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <div ref={messagesEndRef} />
+                  <div ref={messagesEndRef} />
+                </div>
               </div>
+
+              {/* Prompt Bar Integrada na Base da Coluna de Chat */}
+              <PromptBar
+                onSendMessage={handleSendMessage}
+                isLoading={isLoading}
+                models={models}
+                currentModel={currentModel}
+                onSelectModel={handleSelectModel}
+                workspaceFiles={workspaceFiles}
+                selectedWorkspaceFile={selectedWorkspaceFile}
+                onSelectWorkspaceFile={setSelectedWorkspaceFile}
+              />
             </div>
 
-            {/* Prompt Bar Integrada */}
-            <PromptBar
-              onSendMessage={handleSendMessage}
-              isLoading={isLoading}
-              models={models}
-              currentModel={currentModel}
-              onSelectModel={handleSelectModel}
-              workspaceFiles={workspaceFiles}
-              selectedWorkspaceFile={selectedWorkspaceFile}
-              onSelectWorkspaceFile={setSelectedWorkspaceFile}
+            {/* Painel Lateral de Código (Side Bar Code) ao lado do Chat */}
+            <SideCodePanel
+              isOpen={sideCodeOpen}
+              onClose={() => setSideCodeOpen(false)}
+              filename={selectedWorkspaceFile}
+              code={sideCodeContent}
+              diffInfo={sideCodeDiff}
+              isOptimizing={isLoading && (sideCodeContent.length === 0 || sideCodeHasApproval)}
             />
-          </>
-        )}
+          </div>
+      )}
       </main>
     </div>
   );

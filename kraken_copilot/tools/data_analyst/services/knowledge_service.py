@@ -37,9 +37,12 @@ def get_knowledge_collection():
 
 def resolve_knowledge_directory() -> Path | None:
     """
-    Localiza o diretório da base de conhecimento priorizando pipeline/dados/conhecimento
-    (config.KNOWLEDGE_DIR) com fallback para docs/conhecimento em fixtures de teste.
+    Localiza o diretório da base de conhecimento priorizando krakenlake/catalog
+    (metadados e documentações) ou config.KNOWLEDGE_DIR.
     """
+    catalog_root = config.PROJECT_ROOT / "krakenlake" / "catalog"
+    if catalog_root.exists():
+        return catalog_root
     if config.KNOWLEDGE_DIR.exists():
         return config.KNOWLEDGE_DIR
     fallback_dir = config.PROJECT_ROOT / "docs" / "conhecimento"
@@ -391,7 +394,7 @@ def search_knowledge_service(
     sync_report = synchronize_knowledge_index()
     if sync_report.total_active_chunks == 0:
         return _build_search_response(
-            "Nenhum documento encontrado na base de conhecimento (pipeline/dados/conhecimento/).",
+            "Nenhum documento encontrado na base de conhecimento (krakenlake/catalog/).",
             query,
             warnings=["Base de conhecimento vazia ou diretório não encontrado."],
         )

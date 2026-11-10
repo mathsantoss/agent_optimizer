@@ -58,6 +58,24 @@ app.include_router(execucoes_router)
 app.include_router(dados_router)
 
 
+@app.get("/kraken-copilot.svg")
+async def rota_logo_kraken():
+    """Serve o logotipo oficial do Kraken Copilot."""
+    for p in (DIST_DIR / "kraken-copilot.svg", UI_DIR / "kraken-copilot.svg"):
+        if p.exists():
+            return FileResponse(p, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="Logo não encontrado.")
+
+
+@app.get("/favicon.ico")
+async def rota_favicon():
+    """Serve o favicon da aplicação."""
+    for p in (DIST_DIR / "kraken-copilot.svg", UI_DIR / "kraken-copilot.svg"):
+        if p.exists():
+            return FileResponse(p, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="Favicon não encontrado.")
+
+
 @app.get("/api/modelos")
 async def obter_modelos_api():
     """Retorna os modelos da família Gemini disponíveis."""
