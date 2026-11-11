@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -25,6 +25,8 @@ import {
   Sparkles,
   Cpu,
   FileCode,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -32,7 +34,7 @@ import { cn } from '@/lib/utils';
 export interface WorkflowNodeData extends Record<string, unknown> {
   title: string;
   subtitle?: string;
-  category: 'user' | 'guardrail' | 'orchestrator' | 'specialist' | 'tool' | 'benchmark' | 'hitl' | 'output';
+  category: 'user' | 'guardrail' | 'orchestrator' | 'specialist' | 'skill' | 'tool' | 'benchmark' | 'hitl' | 'output';
   status?: 'success' | 'running' | 'pending' | 'warning' | 'neutral';
   duration?: string;
   stepIndex?: number;
@@ -70,6 +72,13 @@ function WorkflowCustomNode({ data, selected }: NodeProps<Node<WorkflowNodeData>
           iconBg: 'bg-indigo-100 text-indigo-700',
           borderClass: 'border-indigo-300/80',
           badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        };
+      case 'skill':
+        return {
+          icon: Sparkles,
+          iconBg: 'bg-purple-100 text-purple-800',
+          borderClass: 'border-purple-400',
+          badgeClass: 'bg-purple-50 text-purple-900 border-purple-300',
         };
       case 'tool':
         return {
@@ -172,14 +181,19 @@ const nodeTypes = {
 export interface ExecutionWorkflowFlowProps {
   execucao: any;
   onSelectStep?: (idx: number) => void;
+  isFullHeight?: boolean;
   className?: string;
 }
 
 export function ExecutionWorkflowFlow({
   execucao,
   onSelectStep,
+  isFullHeight = false,
   className,
 }: ExecutionWorkflowFlowProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const effectiveFull = isFullHeight || isExpanded;
+
   // Constrói dinamicamente os nós e arestas com base nos spans reais da execução
   const { nodes, edges } = useMemo(() => {
     if (!execucao) return { nodes: [], edges: [] };
@@ -283,6 +297,34 @@ export function ExecutionWorkflowFlow({
         markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
       });
       lastNodeId = specialistId;
+    }
+
+    // 4.5. Nó: Skills ADK em Operação (Google ADK & Seb1n / K-Dense AI)
+    const skillsAtivas: string[] = execucao.skills_ativas || [];
+    if (skillsAtivas.length > 0) {
+      currentX += spacingX;
+      const skillsNodeId = 'node-skills-adk';
+      const skillsDesc = skillsAtivas.slice(0, 3).join(', ') + (skillsAtivas.length > 3 ? ` (+${skillsAtivas.length - 3})` : '');
+      generatedNodes.push({
+        id: skillsNodeId,
+        type: 'workflowNode',
+        position: { x: currentX, y: defaultY },
+        data: {
+          title: `Skills ADK (${skillsAtivas.length})`,
+          subtitle: skillsDesc,
+          category: 'skill',
+          status: 'success',
+        },
+      });
+      generatedEdges.push({
+        id: `edge-${lastNodeId}-to-skills`,
+        source: lastNodeId,
+        target: skillsNodeId,
+        animated: true,
+        style: { stroke: '#a855f7', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#a855f7' },
+      });
+      lastNodeId = skillsNodeId;
     }
 
     // 5. Nós de Ferramentas Executadas
@@ -427,36 +469,64 @@ export function ExecutionWorkflowFlow({
   );
 
   return (
-    <div className={cn('overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs', className)}>
+    <div className={cn('overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition-all', className)}>
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 bg-slate-50/80">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-purple-100 text-purple-700 shadow-2xs">
             <Activity className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-slate-900 tracking-tight">
-              Diagrama do Workflow Interativo de Execução
+            <h3 className="text-xs font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <span>Diagrama do Workflow Interativo de Execução</span>
+              {execucao.skills_ativas && execucao.skills_ativas.length > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-700 px-2 py-0.5 text-[10px] font-semibold border border-purple-200">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  {execucao.skills_ativas.length} Skills ADK
+                </span>
+              )}
             </h3>
             <p className="text-[11px] text-slate-500">
-              Orquestração
+              Orquestração, Skills Especialistas e Governança
             </p>
           </div>
         </div>
 
-        <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200 select-none">
-          React Flow Interativo
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+            title={effectiveFull ? 'Recolher altura do diagrama' : 'Expandir diagrama para preencher o espaço da tela'}
+          >
+            {effectiveFull ? (
+              <>
+                <Minimize2 className="h-3.5 w-3.5 text-slate-500" />
+                <span>Recolher</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="h-3.5 w-3.5 text-slate-500" />
+                <span>Expandir Espaço</span>
+              </>
+            )}
+          </button>
+
+          <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200 select-none">
+            React Flow Interativo
+          </span>
+        </div>
       </div>
 
-      <div className="h-[280px] w-full bg-[#f8fafc] relative">
+      <div className={cn('w-full bg-[#f8fafc] relative transition-all duration-200', effectiveFull ? 'h-[calc(100vh-270px)] min-h-[560px]' : 'h-[360px]')}>
         <ReactFlow
+          key={effectiveFull ? 'full-view' : 'compact-view'}
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
           onNodeClick={onNodeClick}
           fitView
           fitViewOptions={{ padding: 0.2 }}
-          minZoom={0.4}
+          minZoom={0.3}
           maxZoom={1.5}
           proOptions={{ hideAttribution: true }}
         >
@@ -467,7 +537,14 @@ export function ExecutionWorkflowFlow({
 
       <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-2 text-[11px] text-slate-400 flex items-center justify-between">
         <span>💡 Dica: Você pode arrastar, aproximar (zoom) e clicar nos nós para navegar no percurso.</span>
-        <span className="font-mono text-[10.5px] text-slate-500 font-semibold">{nodes.length} nós no pipeline</span>
+        <div className="flex items-center gap-3">
+          {effectiveFull && (
+            <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+              Modo Espaço Total Ativo
+            </span>
+          )}
+          <span className="font-mono text-[10.5px] text-slate-500 font-semibold">{nodes.length} nós no pipeline</span>
+        </div>
       </div>
     </div>
   );

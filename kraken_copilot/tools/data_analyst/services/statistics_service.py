@@ -71,25 +71,46 @@ def calculate_descriptive_statistics(
 
     metrics_by_column: dict[str, dict[str, Any]] = {}
     outlier_chart_data: list[dict[str, Any]] = []
+    media_chart_data: list[dict[str, Any]] = []
+    total_outliers = int(sum(outlier_counts))
+
     for col in stats_table.index:
         row = stats_table.loc[col]
         metrics_by_column[str(col)] = {k: (round(float(v), 4) if isinstance(v, (int, float)) else v) for k, v in row.items()}
+        media_val = round(float(row.get("mean", 0)), 2)
+        outliers_val = int(row.get("outliers_iqr", 0))
+
         outlier_chart_data.append({
             "coluna": str(col),
-            "outliers": int(row.get("outliers_iqr", 0)),
-            "media": round(float(row.get("mean", 0)), 2),
+            "outliers": outliers_val,
+            "media": media_val,
         })
+        if media_val > 0:
+            media_chart_data.append({
+                "coluna": str(col),
+                "media": media_val,
+            })
 
-    graficos_sugeridos = [
-        {
+    graficos_sugeridos: list[dict[str, Any]] = []
+    if total_outliers > 0:
+        graficos_sugeridos.append({
             "type": "bar",
             "title": "Outliers Identificados por Coluna (Regra IQR)",
-            "subtitle": "Contagem de valores além de 1.5x intervalo interquartil",
+            "subtitle": f"Total de {total_outliers} valores além de 1.5x intervalo interquartil",
             "x": "coluna",
             "y": "outliers",
             "data": outlier_chart_data,
-        }
-    ]
+        })
+    elif media_chart_data:
+        # Se não há outliers, exibe comparativo das médias numéricas para evitar gráficos zerados
+        graficos_sugeridos.append({
+            "type": "bar",
+            "title": "Comparativo das Médias das Colunas Numéricas",
+            "subtitle": "Valores médios observados na amostra analítica",
+            "x": "coluna",
+            "y": "media",
+            "data": media_chart_data,
+        })
 
     return {
         "vazio": False,
@@ -97,7 +118,7 @@ def calculate_descriptive_statistics(
         "amostragem_ativa": sampling_active,
         "limite_amostral": sample_size,
         "colunas_numericas": list(stats_table.index),
-        "total_outliers_identificados": int(sum(outlier_counts)),
+        "total_outliers_identificados": total_outliers,
         "tabela_markdown": markdown_representation,
         "metricas_por_coluna": metrics_by_column,
         "graficos_sugeridos": graficos_sugeridos,

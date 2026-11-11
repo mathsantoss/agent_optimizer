@@ -246,11 +246,11 @@ def get_agent_skills_instruction(agent_name: str, base_dir: Path | None = None) 
 
     if agent_name == "kraken_analyst":
         for name, info in skills.items():
-            if any(k in name.lower() for k in ("graphy", "chart", "viz", "plot", "analytics")):
+            if any(k in name.lower() for k in ("graphy", "chart", "viz", "plot", "analytics", "analysis", "eda", "sql", "clean", "stat")):
                 relevant_skills.append(info)
     elif agent_name in ("kraken_code", "kraken_optimizer"):
         for name, info in skills.items():
-            if any(k in name.lower() for k in ("diff", "patch", "code", "syntax")):
+            if any(k in name.lower() for k in ("diff", "patch", "code", "syntax", "refactor", "test", "pipeline")):
                 relevant_skills.append(info)
     else:
         relevant_skills = list(skills.values())

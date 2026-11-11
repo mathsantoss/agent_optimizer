@@ -7,6 +7,7 @@ import {
   Table as TableIcon,
   TrendingUp,
   Percent,
+  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -751,14 +752,36 @@ export function GraphyChart({
       {/* Conteúdo: Gráfico Vetorial Interativo ou Tabela */}
       <div className="p-4" style={{ minHeight: chartHeight }}>
         {activeTab === 'chart' ? (
-          <div className="h-full w-full flex items-center justify-center" style={{ height: chartHeight }}>
-            {currentType === 'line' && renderLines(false)}
-            {currentType === 'area' && renderLines(true)}
-            {currentType === 'donut' && renderPie(true)}
-            {currentType === 'pie' && renderPie(false)}
-            {currentType === 'scatter' && renderScatter()}
-            {currentType === 'bar' && renderBars()}
-          </div>
+          sanitizedData.length > 0 && sanitizedData.every((d) => d[y] === 0) ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center" style={{ height: chartHeight }}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 mb-2.5 shadow-2xs">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <span className="text-xs font-bold text-slate-800">
+                Nenhum registro diferente de zero identificado
+              </span>
+              <p className="mt-1 max-w-md text-[11px] text-slate-500">
+                Todos os {sanitizedData.length} registros avaliados na dimensão <span className="font-semibold text-slate-700 font-mono">"{x}"</span> apresentam métrica <span className="font-semibold text-slate-700 font-mono">"{y} = 0"</span> (ex.: ausência de outliers ou anomalias).
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('data')}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 cursor-pointer"
+              >
+                <TableIcon className="h-3 w-3" />
+                <span>Inspecionar Valores na Tabela</span>
+              </button>
+            </div>
+          ) : (
+            <div className="h-full w-full flex items-center justify-center" style={{ height: chartHeight }}>
+              {currentType === 'line' && renderLines(false)}
+              {currentType === 'area' && renderLines(true)}
+              {currentType === 'donut' && renderPie(true)}
+              {currentType === 'pie' && renderPie(false)}
+              {currentType === 'scatter' && renderScatter()}
+              {currentType === 'bar' && renderBars()}
+            </div>
+          )
         ) : (
           <div className="max-h-72 overflow-auto rounded-xl border border-slate-100 font-mono text-[11px]">
             <table className="w-full text-left">

@@ -659,6 +659,16 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         },
     ]
 
+    # Identifica skills ADK ativas para este especialista
+    from kraken_copilot.skills import discover_skills
+    todas_skills = list(discover_skills().keys())
+    if especialista_ativo == "kraken_analyst":
+        skills_ativas = [s for s in todas_skills if any(k in s for k in ("graphy", "chart", "viz", "plot", "analytics", "analysis", "eda", "sql", "clean", "stat"))]
+    elif especialista_ativo in ("kraken_code", "kraken_optimizer"):
+        skills_ativas = [s for s in todas_skills if any(k in s for k in ("diff", "patch", "code", "syntax", "refactor", "test", "pipeline"))]
+    else:
+        skills_ativas = todas_skills
+
     exec_payload = {
         "id": execucao_id,
         "session_id": session_id,
@@ -669,6 +679,7 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         "provedor": "Vertex AI (Google Cloud)",
         "modelo": modelo_utilizado,
         "especialista": especialista_ativo,
+        "skills_ativas": skills_ativas,
         "mensagem_usuario": msg.texto,
         "arquivo_alvo": msg.arquivo_alvo,
         "total_ferramentas": len(ferramentas_executadas),
@@ -692,6 +703,7 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         "especialista": especialista_ativo,
         "modelo": modelo_utilizado,
         "execucao_id": execucao_id,
+        "skills_ativas": skills_ativas,
         "latencia_segundos": latencia,
         "has_approval_request": has_approval_request,
         "proposed_code": proposed_code,

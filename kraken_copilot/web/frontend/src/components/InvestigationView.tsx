@@ -241,7 +241,7 @@ export function InvestigationView({
                 : 'hover:bg-slate-200/60 text-slate-600'
             )}
           >
-            Workflow Interativo (@xyflow/react)
+            Workflow
           </button>
           <button
             type="button"
@@ -253,7 +253,7 @@ export function InvestigationView({
                 : 'hover:bg-slate-200/60 text-slate-600'
             )}
           >
-            Guardrails & Governança (6 Camadas)
+            Guardrails
           </button>
           <button
             type="button"
@@ -265,7 +265,7 @@ export function InvestigationView({
                 : 'hover:bg-slate-200/60 text-slate-600'
             )}
           >
-            Trilha de Spans & Ferramentas
+            Auditoria
           </button>
         </div>
       )}
@@ -293,7 +293,7 @@ export function InvestigationView({
           ) : data ? (
             <>
               {/* Meta Cards com Detalhes da Execução */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
                   <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                     <Clock className="h-3.5 w-3.5 text-blue-500" />
@@ -333,6 +333,21 @@ export function InvestigationView({
                     {(data.etapas || data.steps || []).length} etapas · {data.total_ferramentas || (data.ferramentas_executadas || []).length} ferramentas
                   </div>
                 </div>
+
+                <div className="rounded-xl border border-purple-200/90 bg-purple-50/40 p-3.5 shadow-2xs">
+                  <div className="flex items-center gap-1.5 text-xs text-purple-700 font-medium">
+                    <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                    Skills ADK Operacionais
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-1">
+                    <span className="font-mono text-xs font-bold text-purple-950">
+                      {(data.skills_ativas || []).length > 0 ? `${(data.skills_ativas || []).length} ativas` : '6 disponíveis'}
+                    </span>
+                    <span className="text-[10px] text-purple-600 truncate font-mono">
+                      {(data.skills_ativas || []).length > 0 ? (data.skills_ativas || []).slice(0, 2).join(', ') : 'ADK Core'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* 1. SEÇÃO DO WORKFLOW INTERATIVO COM @XYFLOW/REACT */}
@@ -340,6 +355,7 @@ export function InvestigationView({
                 <ExecutionWorkflowFlow
                   execucao={data}
                   onSelectStep={scrollToStep}
+                  isFullHeight={activeTab === 'workflow'}
                 />
               )}
 
@@ -358,7 +374,7 @@ export function InvestigationView({
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                        Percurso Sequencial de Execução (Spans & Ferramentas)
+                        Plano de Execução para Auditoria
                       </h3>
                       <p className="text-[11px] text-slate-500">
                         Auditoria atômica de cada entrada, chamada de especialista, retorno de ferramenta e guardrail

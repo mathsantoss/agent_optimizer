@@ -109,6 +109,63 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
         const line = lines[i];
         const trimmed = line.trim();
 
+        // Detecta início de tabela separada por tabs (\t)
+        const isTabLine = trimmed.includes('\t') && trimmed.split('\t').filter(Boolean).length >= 3;
+        if (isTabLine) {
+          const tabLines: string[][] = [];
+          while (i < lines.length && lines[i].trim().includes('\t')) {
+            const cols = lines[i].trim().split('\t').map((c) => c.trim()).filter(Boolean);
+            if (cols.length >= 2) {
+              tabLines.push(cols);
+            }
+            i++;
+          }
+          if (tabLines.length > 0) {
+            const maxCols = Math.max(...tabLines.map((r) => r.length));
+            let headerCells: string[] = [];
+            let dataRows = tabLines;
+
+            // Se o primeiro item da linha 0 é um nome de coluna e o segundo é número, cria cabeçalho estatístico padrão
+            const isStatRow = tabLines[0].length >= 5 && !isNaN(parseFloat(tabLines[0][1]));
+            if (isStatRow) {
+              headerCells = ['Variável / Coluna', 'Média', 'Desvio', 'Mínimo', '25%', 'Mediana', '75%', 'Máximo', 'Nulos', 'Outliers'].slice(0, maxCols);
+            } else {
+              headerCells = tabLines[0];
+              dataRows = tabLines.slice(1);
+            }
+
+            renderedElements.push(
+              <div key={`tabtbl-${index}-${i}`} className="my-3.5 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-200/80">
+                        {headerCells.map((h, hIdx) => (
+                          <th key={hIdx} className="px-4 py-2.5 text-[11px] font-bold text-slate-700 tracking-tight">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {dataRows.map((row, rIdx) => (
+                        <tr key={rIdx} className="hover:bg-slate-50/50 transition-colors">
+                          {headerCells.map((_, cIdx) => (
+                            <td key={cIdx} className={cn('px-4 py-2 text-xs leading-normal', cIdx === 0 ? 'font-medium text-slate-900' : 'font-mono text-[11.5px]')}>
+                              {row[cIdx] ?? '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+            continue;
+          }
+        }
+
         // Detecta início de tabela markdown (| col1 | col2 | ...)
         const isPipeLine = trimmed.startsWith('|') && trimmed.endsWith('|');
         const nextTrimmed = i + 1 < lines.length ? lines[i + 1].trim() : '';
