@@ -306,23 +306,42 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
         // Renderiza linha padrão
         if (!trimmed) {
           renderedElements.push(<div key={`empty-${index}-${i}`} className="h-2" />);
+        } else if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+          renderedElements.push(
+            <hr key={`hr-${index}-${i}`} className="my-3.5 border-t border-slate-200/90" />
+          );
+        } else if (trimmed.startsWith('#### ')) {
+          renderedElements.push(
+            <h5 key={`h5-${index}-${i}`} className="mt-3 text-xs font-bold text-slate-900 tracking-tight">
+              {formatInline(trimmed.slice(5))}
+            </h5>
+          );
         } else if (trimmed.startsWith('### ')) {
           renderedElements.push(
-            <h4 key={`h4-${index}-${i}`} className="mt-3 text-sm font-bold text-slate-900">
+            <h4 key={`h4-${index}-${i}`} className="mt-3.5 text-sm font-bold text-slate-900 tracking-tight">
               {formatInline(trimmed.slice(4))}
             </h4>
           );
         } else if (trimmed.startsWith('## ')) {
           renderedElements.push(
-            <h3 key={`h3-${index}-${i}`} className="mt-3.5 text-base font-bold text-slate-900">
+            <h3 key={`h3-${index}-${i}`} className="mt-4 text-base font-bold text-slate-900 tracking-tight">
               {formatInline(trimmed.slice(3))}
             </h3>
           );
         } else if (trimmed.startsWith('# ')) {
           renderedElements.push(
-            <h2 key={`h2-${index}-${i}`} className="mt-4 text-lg font-bold text-slate-900">
+            <h2 key={`h2-${index}-${i}`} className="mt-4.5 text-lg font-bold text-slate-900 tracking-tight">
               {formatInline(trimmed.slice(2))}
             </h2>
+          );
+        } else if (trimmed.startsWith('> ')) {
+          renderedElements.push(
+            <blockquote
+              key={`quote-${index}-${i}`}
+              className="my-2.5 border-l-2 border-blue-500 pl-3.5 py-1 italic text-xs text-slate-600 bg-slate-50/80 rounded-r-xl"
+            >
+              {formatInline(trimmed.slice(2))}
+            </blockquote>
           );
         } else if (/^!\[(.*?)\]\((.*?)\)$/.test(trimmed)) {
           const match = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);

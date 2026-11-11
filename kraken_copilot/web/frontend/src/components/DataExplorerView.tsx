@@ -433,7 +433,7 @@ export function DataExplorerView({
             </div>
           )}
 
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 overflow-auto p-6 flex flex-col min-h-0">
             {loadingConteudo ? (
               <div className="flex h-full items-center justify-center text-xs text-slate-400 gap-2">
                 <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
@@ -486,11 +486,24 @@ export function DataExplorerView({
                 <StreamingText content={conteudo.conteudo} />
               </div>
             ) : conteudo?.tipo === 'python' ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
-                  <span>Script Python do Workspace ({arquivoAtivo.nome})</span>
+              <div className="flex flex-col h-full min-h-0 space-y-2 flex-1">
+                <div className="flex items-center justify-between text-xs text-slate-600 font-mono shrink-0">
+                  <span className="font-semibold text-slate-800">
+                    Script Python do Workspace: {arquivoAtivo.nome}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    krakenlake/workspace/{arquivoAtivo.nome}
+                  </span>
                 </div>
-                <CodeBlock code={conteudo.conteudo || ''} language="python" />
+                <div className="flex-1 min-h-[500px] h-full rounded-2xl overflow-hidden border border-slate-800 shadow-sm flex flex-col">
+                  <CodeBlock
+                    code={conteudo.conteudo || ''}
+                    language="python"
+                    filename={arquivoAtivo.nome}
+                    fullHeight={true}
+                    className="h-full flex flex-col my-0 rounded-none border-none shadow-none flex-1"
+                  />
+                </div>
               </div>
             ) : conteudo?.tipo === 'csv' || conteudo?.tipo === 'parquet' || conteudo?.linhas ? (
               <div className="space-y-4">

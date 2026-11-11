@@ -403,7 +403,9 @@ export function InvestigationView({
                       return (
                         <div
                           key={idx}
-                          ref={(el) => (stepRefs.current[idx] = el)}
+                          ref={(el) => {
+                            stepRefs.current[idx] = el;
+                          }}
                           className={cn(
                             'rounded-xl border overflow-hidden text-xs transition-all',
                             isExpanded ? 'border-blue-200 bg-white shadow-2xs' : 'border-slate-200/90 bg-slate-50/50 hover:bg-slate-50'

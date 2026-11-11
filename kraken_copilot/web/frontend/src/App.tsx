@@ -254,9 +254,7 @@ export function App() {
         const data = await res.json();
         const files: WorkspaceFile[] = data.arquivos || [];
         setWorkspaceFiles(files);
-        if (!keepSelection && files.length > 0 && !selectedWorkspaceFile) {
-          setSelectedWorkspaceFile(files[0].nome);
-        }
+        // O padrão é nenhum script selecionado até o usuário escolher conscientemente
       }
     } catch (err) {
       console.warn('Erro ao carregar arquivos do workspace:', err);
@@ -711,9 +709,9 @@ export function App() {
             )}
 
             <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
-              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className={cn("inline-block h-2 w-2 rounded-full", selectedWorkspaceFile ? "bg-emerald-500 animate-pulse" : "bg-slate-300")}></span>
               <span className="truncate max-w-[140px] sm:max-w-none">
-                krakenlake/workspace/{selectedWorkspaceFile}
+                {selectedWorkspaceFile ? `krakenlake/workspace/${selectedWorkspaceFile}` : 'krakenlake/workspace'}
               </span>
             </div>
           </div>
@@ -792,7 +790,7 @@ export function App() {
 
                       <button
                         type="button"
-                        onClick={() => handleSendMessage(`Crie uma nova feature de ticket médio e recarga mensal para o script ${selectedWorkspaceFile}`)}
+                        onClick={() => handleSendMessage(selectedWorkspaceFile ? `Crie uma nova feature de ticket médio e recarga mensal para o script ${selectedWorkspaceFile}` : 'Crie uma nova feature de ticket médio e recarga mensal para o pipeline de dados')}
                         className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all cursor-pointer text-left focus-visible:ring-2 focus-visible:ring-emerald-500"
                       >
                         <div className="flex items-center gap-2 font-semibold text-xs text-slate-800 group-hover:text-emerald-600">
@@ -806,7 +804,7 @@ export function App() {
 
                       <button
                         type="button"
-                        onClick={() => handleSendMessage(`Inspecione os gargalos de performance de ${selectedWorkspaceFile} e gere benchmark antes vs depois`)}
+                        onClick={() => handleSendMessage(selectedWorkspaceFile ? `Inspecione os gargalos de performance de ${selectedWorkspaceFile} e gere benchmark antes vs depois` : 'Inspecione os gargalos de performance dos scripts do workspace e gere benchmark antes vs depois')}
                         className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:border-amber-300 hover:shadow-xs transition-all cursor-pointer text-left focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
                         <div className="flex items-center gap-2 font-semibold text-xs text-slate-800 group-hover:text-amber-600">
@@ -828,42 +826,50 @@ export function App() {
                         ? msg.sugestoes_acoes
                         : extractSuggestionsFromText(msg.texto);
                     return (
-                      <div
-                        key={msg.id || idx}
-                        className={cn(
-                          'flex items-start gap-3.5 transition-all w-full min-w-0',
-                          isUser ? 'flex-row-reverse' : 'flex-row'
-                        )}
-                      >
-                        {/* Avatar do Emissor */}
-                        <div
-                          className={cn(
-                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-xs text-xs font-bold select-none overflow-hidden',
-                            isUser ? 'bg-slate-800 text-white' : ''
-                          )}
-                        >
-                          {isUser ? (
-                            <User className="h-4 w-4" />
-                          ) : (
-                            <img
-                              src="/web/ui/kraken-copilot.svg"
-                              alt={msg.especialista || 'Kraken Copilot'}
-                              className="h-8 w-8 object-contain"
-                            />
-                          )}
-                        </div>
+                      isUser ? (
+                        /* Mensagem do Usuário (Alinhada à Direita da Coluna) */
+                        <div key={msg.id || idx} className="flex flex-col items-end w-full min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5 text-xs text-slate-400 select-none">
+                            {msg.timestamp && (
+                              <span className="text-[10px] font-mono">{formatTimestamp(msg.timestamp)}</span>
+                            )}
+                            <span className="font-semibold text-slate-600 text-xs">Você</span>
+                            <div className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-800 text-white text-[10px]">
+                              <User className="h-3 w-3" />
+                            </div>
+                          </div>
 
-                        {/* Corpo da Mensagem */}
-                        <div
-                          className={cn(
-                            'flex flex-col min-w-0',
-                            isUser ? 'items-end max-w-2xl ml-auto' : 'items-start flex-1 w-full'
-                          )}
-                        >
-                          {/* Badge do Agente */}
-                          {!isUser && (
-                            <div className="mb-1.5 flex items-center gap-2 text-[11px] text-slate-500 select-none">
-                              <span className="font-semibold text-slate-700">
+                          <div className="max-w-2xl rounded-2xl bg-blue-600 px-4 py-3 text-xs leading-relaxed text-white shadow-xs font-medium rounded-tr-xs select-text">
+                            {extractBubbleAttachments(msg).length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1.5 mb-2 justify-end">
+                                {extractBubbleAttachments(msg).map((anexoNome, aIdx) => (
+                                  <span
+                                    key={aIdx}
+                                    className="inline-flex items-center gap-1 rounded-md bg-white/20 backdrop-blur-xs px-2 py-0.5 text-[10px] font-mono font-semibold text-white shadow-2xs"
+                                  >
+                                    <Database className="h-2.5 w-2.5" />
+                                    <span>@{anexoNome.split('/').pop()}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-xs text-white font-medium leading-relaxed whitespace-pre-wrap">
+                              {cleanUserBubbleText(msg.texto)}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Mensagem do Agente / Assistente (100% alinhada com o PromptBar) */
+                        <div key={msg.id || idx} className="flex flex-col w-full min-w-0 space-y-2">
+                          {/* Header do Agente */}
+                          <div className="flex items-center justify-between text-xs text-slate-500 select-none px-1">
+                            <div className="flex items-center gap-2">
+                              <img
+                                src="/web/ui/kraken-copilot.svg"
+                                alt={msg.especialista || 'Kraken Copilot'}
+                                className="h-5 w-5 rounded-md object-contain shadow-2xs"
+                              />
+                              <span className="font-semibold text-xs text-slate-800">
                                 {msg.especialista || 'Kraken Copilot'}
                               </span>
                               {msg.timestamp && (
@@ -872,39 +878,47 @@ export function App() {
                                 </span>
                               )}
                             </div>
-                          )}
 
-                          {/* Caixa de Texto com Suporte a Markdown & Tabelas */}
-                          <div
-                            className={cn(
-                              'rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs w-full min-w-0',
-                              isUser
-                                ? 'bg-blue-600 text-white font-medium rounded-tr-xs'
-                                : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs'
-                            )}
-                          >
-                            {isUser ? (
-                              <div className="select-text">
-                                {extractBubbleAttachments(msg).length > 0 && (
-                                  <div className="flex flex-wrap items-center gap-1.5 mb-1.5 justify-end">
-                                    {extractBubbleAttachments(msg).map((anexoNome, aIdx) => (
-                                      <span
-                                        key={aIdx}
-                                        className="inline-flex items-center gap-1 rounded-md bg-white/20 backdrop-blur-xs px-2 py-0.5 text-[10px] font-mono font-semibold text-white shadow-2xs"
-                                      >
-                                        <Database className="h-2.5 w-2.5" />
-                                        <span>@{anexoNome.split('/').pop()}</span>
-                                      </span>
-                                    ))}
-                                  </div>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(msg.id || String(idx), msg.texto)}
+                                className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                                title="Copiar resposta"
+                              >
+                                {copiedId === (msg.id || String(idx)) ? (
+                                  <>
+                                    <Check className="h-3 w-3 text-emerald-500" />
+                                    <span className="text-emerald-600 font-medium">Copiado</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-3 w-3" />
+                                    <span>Copiar</span>
+                                  </>
                                 )}
-                                <p className="text-xs text-white font-medium leading-relaxed whitespace-pre-wrap">
-                                  {cleanUserBubbleText(msg.texto)}
-                                </p>
-                              </div>
-                            ) : (
-                              <StreamingText content={cleanDisplayText(msg.texto, sugestoes.length > 0)} />
-                            )}
+                              </button>
+
+                              {msg.execucao_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveExecucaoId(msg.execucao_id || null);
+                                    setActiveView('investigacao');
+                                  }}
+                                  className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-medium transition-colors cursor-pointer"
+                                  title="Ver trilha completa de observabilidade"
+                                >
+                                  <Search className="h-3 w-3" />
+                                  <span>Investigação →</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Caixa de Texto do Agente com Suporte a Markdown & Tabelas */}
+                          <div className="rounded-2xl border border-slate-200/90 bg-white px-5 py-4 text-xs leading-relaxed text-slate-800 shadow-2xs w-full min-w-0">
+                            <StreamingText content={cleanDisplayText(msg.texto, sugestoes.length > 0)} />
 
                             {/* Tool Chips com Diff inline */}
                             {msg.ferramentas_executadas && msg.ferramentas_executadas.length > 0 && (
@@ -916,7 +930,7 @@ export function App() {
                               <InsightCards metrics={msg.benchmark_metrics} />
                             )}
 
-                            {/* Card de Aprovação Nativo Beautiful UI no Chat (Exibe SOMENTE para kraken_code/kraken_optimizer quando há código proposto) */}
+                            {/* Card de Aprovação Nativo no Chat */}
                             {Boolean(
                               (
                                 msg.proposed_code ||
@@ -953,9 +967,9 @@ export function App() {
                           </div>
 
                           {/* Ações sugeridas (Backend + Extração Inteligente) */}
-                          {!isUser && sugestoes.length > 0 && (
-                            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 select-none">
+                          {sugestoes.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1 px-1">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 select-none">
                                 <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                                 <span>Ações Sugeridas:</span>
                               </span>
@@ -972,71 +986,25 @@ export function App() {
                               ))}
                             </div>
                           )}
-
-                          {/* Footer da Mensagem com Cópia e Investigação inline */}
-                          {!isUser && (
-                            <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-400 select-none">
-                              <button
-                                type="button"
-                                onClick={() => handleCopyText(msg.id || String(idx), msg.texto)}
-                                className="flex items-center gap-1 hover:text-slate-600 transition-colors cursor-pointer"
-                              >
-                                {copiedId === (msg.id || String(idx)) ? (
-                                  <>
-                                    <Check className="h-3 w-3 text-emerald-500" />
-                                    <span className="text-emerald-600">Copiado</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="h-3 w-3" />
-                                    <span>Copiar resposta</span>
-                                  </>
-                                )}
-                              </button>
-
-                              {msg.execucao_id && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveExecucaoId(msg.execucao_id || null);
-                                    setActiveView('investigacao');
-                                  }}
-                                  className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium transition-colors cursor-pointer"
-                                >
-                                  <Search className="h-3 w-3" />
-                                  <span>Investigação da execução →</span>
-                                </button>
-                              )}
-                            </div>
-                          )}
                         </div>
-                      </div>
+                      )
                     );
                   })
                 )}
 
                 {/* Thinking State & Loading State (Beautiful UI) */}
                 {isLoading && (
-                  <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-col gap-2.5 w-full">
                     <LoadingState
-                      label={`O ${activeAgent} está processando sobre ${selectedWorkspaceFile}...`}
+                      label={selectedWorkspaceFile ? `O ${activeAgent} está processando sobre ${selectedWorkspaceFile}...` : `O ${activeAgent} está processando...`}
                       variant="Drive"
                     />
-                    <div className="flex items-start gap-3.5">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-xs select-none overflow-hidden">
-                        <img
-                          src="/kraken-copilot.svg"
-                          alt={activeAgent}
-                          className="h-8 w-8 object-contain"
-                        />
-                      </div>
-                      <div className="flex-1 max-w-[85%]">
-                        <ThinkingState
-                          isThinking={isLoading}
-                          agentName={activeAgent}
-                          steps={thinkingSteps}
-                        />
-                      </div>
+                    <div className="w-full">
+                      <ThinkingState
+                        isThinking={isLoading}
+                        agentName={activeAgent}
+                        steps={thinkingSteps}
+                      />
                     </div>
                   </div>
                 )}

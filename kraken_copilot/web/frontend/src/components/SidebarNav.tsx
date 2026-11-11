@@ -581,7 +581,7 @@ export function SidebarNav({
                           onDragStart={(e) => handleDragStart(e, file)}
                           onClick={() => {
                             if (onSelectWorkspaceFile) {
-                              onSelectWorkspaceFile(file.nome);
+                              onSelectWorkspaceFile(isSelected ? '' : file.nome);
                             }
                           }}
                           className={cn(

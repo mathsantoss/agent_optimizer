@@ -19,7 +19,6 @@ import {
   Slash,
   Plus,
   X,
-  Mic,
   Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -143,7 +142,6 @@ export function PromptBar({
 }: PromptBarProps) {
   const [text, setText] = useState('');
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [dictating, setDictating] = useState(false);
 
   // Estados dos Menus Flutuantes
   const [activeMenu, setActiveMenu] = useState<'sources' | 'commands' | null>(null);
@@ -518,31 +516,6 @@ export function PromptBar({
     e.target.value = '';
   };
 
-  const toggleDictation = () => {
-    if (dictTimer.current) {
-      window.clearInterval(dictTimer.current);
-      dictTimer.current = null;
-    }
-    if (dictating) {
-      setDictating(false);
-      return;
-    }
-    setDictating(true);
-    const samplePrompt = `Crie features avançadas com base em @dados_vendas.csv para o script ${selectedWorkspaceFile}`;
-    const words = samplePrompt.split(' ');
-    let i = 0;
-    setText('');
-    dictTimer.current = window.setInterval(() => {
-      i += 1;
-      setText(words.slice(0, i).join(' '));
-      if (i >= words.length) {
-        if (dictTimer.current) window.clearInterval(dictTimer.current);
-        dictTimer.current = null;
-        setDictating(false);
-      }
-    }, 85);
-  };
-
   const activeModelObj = models.find((m) => m.id === currentModel) || {
     id: currentModel || 'gemini-2.5-flash',
     nome: currentModel || 'Gemini 2.5 Flash',
@@ -883,14 +856,34 @@ export function PromptBar({
                   setModelDropdownOpen(false);
                   setActiveMenu(null);
                 }}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/70 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer',
+                  selectedWorkspaceFile
+                    ? 'border-emerald-200 bg-emerald-50/80 text-emerald-900 hover:bg-emerald-100/70'
+                    : 'border-slate-200/80 bg-slate-50/70 text-slate-600 hover:bg-slate-100'
+                )}
                 title="Selecionar script Python alvo no workspace"
               >
-                <FileCode2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span className="font-mono text-emerald-800 truncate max-w-[140px] sm:max-w-none">
-                  {selectedWorkspaceFile || (workspaceFiles[0]?.nome ?? 'Selecionar script')}
+                <FileCode2 className={cn('h-3.5 w-3.5', selectedWorkspaceFile ? 'text-emerald-600' : 'text-slate-400')} />
+                <span className={cn('truncate max-w-[140px] sm:max-w-none', selectedWorkspaceFile ? 'font-mono text-emerald-800' : 'text-slate-500 font-normal')}>
+                  {selectedWorkspaceFile || 'Nenhum script alvo'}
                 </span>
-                <ChevronDown className="h-3 w-3 text-slate-400" />
+                {selectedWorkspaceFile ? (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectWorkspaceFile('');
+                    }}
+                    title="Desvincular script ativo"
+                    className="ml-0.5 rounded-full p-0.5 text-slate-400 hover:bg-emerald-200/70 hover:text-emerald-900 transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                ) : (
+                  <ChevronDown className="h-3 w-3 text-slate-400" />
+                )}
               </button>
 
               {fileDropdownOpen && (
@@ -898,6 +891,28 @@ export function PromptBar({
                   <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                     Scripts do Workspace (krakenlake/workspace/)
                   </div>
+
+                  {/* Opção Padrão: Nenhum script selecionado */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectWorkspaceFile('');
+                      setFileDropdownOpen(false);
+                    }}
+                    className={cn(
+                      'flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs transition-colors cursor-pointer border-b border-slate-100 mb-1',
+                      !selectedWorkspaceFile
+                        ? 'bg-slate-100 text-slate-900 font-semibold'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileCode2 className="h-3.5 w-3.5 text-slate-400" />
+                      <span>Nenhum script (Contexto geral)</span>
+                    </div>
+                    {!selectedWorkspaceFile && <Check className="h-3.5 w-3.5 text-slate-700 shrink-0" />}
+                  </button>
+
                   {workspaceFiles.map((wf) => {
                     const isSelected = wf.nome === selectedWorkspaceFile;
                     return (
@@ -1044,22 +1059,8 @@ export function PromptBar({
               </span>
             </div>
 
-            {/* Ditado + Enviar */}
+            {/* Enviar */}
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={toggleDictation}
-                title="Ditado de prompt de exemplo"
-                className={cn(
-                  'inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-all cursor-pointer',
-                  dictating
-                    ? 'border-red-300 bg-red-50 text-red-600 animate-pulse'
-                    : 'border-slate-200/80 bg-slate-50/80 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-                )}
-              >
-                <Mic className="h-3.5 w-3.5" />
-              </button>
-
               <button
                 type="button"
                 onClick={handleSend}
