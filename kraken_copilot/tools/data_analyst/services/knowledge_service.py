@@ -246,6 +246,12 @@ def synchronize_knowledge_index(force: bool = False) -> KnowledgeIndexSyncReport
         if f.is_file() and f.suffix.lower() in SUPPORTED_KNOWLEDGE_EXTENSIONS
     ]
 
+    skills_dir = config.PROJECT_ROOT / ".agents" / "skills"
+    if skills_dir.exists():
+        for sf in sorted(skills_dir.rglob("*.md")):
+            if sf.is_file() and sf not in knowledge_files:
+                knowledge_files.append(sf)
+
     current_chunks_by_id: dict[str, tuple[str, dict[str, Any], str]] = {}
     synced_file_names: set[str] = set()
 

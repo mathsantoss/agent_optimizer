@@ -70,9 +70,26 @@ def calculate_descriptive_statistics(
         markdown_representation += f"\n\n*(Nota: estatísticas calculadas sobre amostra de {sample_size} linhas)*"
 
     metrics_by_column: dict[str, dict[str, Any]] = {}
+    outlier_chart_data: list[dict[str, Any]] = []
     for col in stats_table.index:
         row = stats_table.loc[col]
         metrics_by_column[str(col)] = {k: (round(float(v), 4) if isinstance(v, (int, float)) else v) for k, v in row.items()}
+        outlier_chart_data.append({
+            "coluna": str(col),
+            "outliers": int(row.get("outliers_iqr", 0)),
+            "media": round(float(row.get("mean", 0)), 2),
+        })
+
+    graficos_sugeridos = [
+        {
+            "type": "bar",
+            "title": "Outliers Identificados por Coluna (Regra IQR)",
+            "subtitle": "Contagem de valores além de 1.5x intervalo interquartil",
+            "x": "coluna",
+            "y": "outliers",
+            "data": outlier_chart_data,
+        }
+    ]
 
     return {
         "vazio": False,
@@ -83,5 +100,6 @@ def calculate_descriptive_statistics(
         "total_outliers_identificados": int(sum(outlier_counts)),
         "tabela_markdown": markdown_representation,
         "metricas_por_coluna": metrics_by_column,
+        "graficos_sugeridos": graficos_sugeridos,
     }
 

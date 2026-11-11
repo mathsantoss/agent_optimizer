@@ -1,0 +1,380 @@
+# React API
+
+The two components every graph needs, their props, and the hooks around them.
+
+Contents
+
+- GraphProvider
+- GraphRenderer
+- Sizing
+- Animation
+- Live data
+- Color scheme and theme
+- Formatting locale
+- Errors and warnings
+- The graph handle
+- Hooks inside the tree
+- Commands and onSpecChange
+- Text measurement and server rendering
+- The Graphy badge
+- Pitfalls
+
+Exact types: types.md § Provider & renderer, § Animation, § Diagnostics.
+
+## GraphProvider
+
+`GraphProvider` compiles `data` against `spec` and holds the result. `GraphRenderer` paints it. The provider must wrap the renderer.
+
+```tsx
+import { createSpec, geom, GraphProvider, GraphRenderer, pipe, scale } from '@graphysdk/react';
+import type { Data } from '@graphysdk/react';
+
+const data: Data = {
+  columns: [{ key: 'month' }, { key: 'revenue' }],
+  rows: [
+    { month: 'Jan', revenue: 120 },
+    { month: 'Feb', revenue: 150 },
+    { month: 'Mar', revenue: 90 },
+  ],
+};
+
+const spec = pipe(createSpec({ x: 'month', y: 'revenue' }), geom.bar(), scale.x(), scale.y());
+
+export const RevenueGraph = () => (
+  <GraphProvider data={data} spec={spec}>
+    <GraphRenderer />
+  </GraphProvider>
+);
+```
+
+Props:
+
+- `data`: the table to draw. See data.md.
+- `spec`: what to draw. See spec.md.
+- `colorScheme`: `'light'` (default) or `'dark'`.
+- `formattingLocale`: how displayed values are formatted. See "Formatting locale".
+- `theme`: a `Theme`. Read once at mount. See "Color scheme and theme".
+- `plugins`: custom geoms, stats and transforms. Read once at mount. See plugins.md.
+- `handleRef`: filled with a `GraphHandle` for code outside the tree.
+- `onSpecChange`: fires with the new spec after a committed command, an undo or a redo. See "Commands and onSpecChange".
+- `onError`: fires with the diagnostics of a failed compile, a render crash, or a command, undo or redo the compiler refused.
+- `onWarnings`: fires with the warnings of a successful compile.
+- `children`: usually one `GraphRenderer`.
+
+`data`, `spec` and `colorScheme` recompile when they change by reference. `theme` and `plugins` are read once at mount; remount the provider with a new `key` to change either.
+
+Exported types: `GraphProviderProps`, `ColorScheme`, `Scene` and `ResolvedSpec`.
+
+`@graphysdk/react` and `@graphysdk/react-renderer` export a `GraphProvider` with the same props. The one from `@graphysdk/react` turns the Graphy badge on by default. See "The Graphy badge".
+
+## GraphRenderer
+
+`GraphRenderer` paints the scene the surrounding provider holds. It has no data or spec props.
+
+```tsx
+import { GraphRenderer } from '@graphysdk/react';
+
+export const Renderer = () => <GraphRenderer sizing={{ mode: 'fixed', width: 640, height: 400 }} animation={false} />;
+```
+
+Props:
+
+- `sizing`: how the graph claims space. Default `{ mode: 'responsive' }`. See "Sizing".
+- `onResize`: called with `{ width, height, unmeasured }` whenever the container changes size.
+- `animation`: `true`, `false`, or an object. See "Animation".
+- `mode`: `'readonly'` (default), `'annotate'`, `'edit'` or `'static'`. A string that names no mode resolves to `'readonly'`. Both editing modes hide the tooltip and need `EditableGraphRenderer` from `@graphysdk/react/editable`; the graphy-editor skill covers editing. `'static'` draws the chart once with no hover, tooltip, legend popover or animation, for exports and thumbnails.
+- `slots`: replace how a region paints. See slots.md.
+
+Exported types: `GraphRendererProps`, `GraphMode`, and the `GRAPH_MODES` constant with `readonly`, `annotate`, `edit` and `static` keys.
+
+## Sizing
+
+Three modes. The container is the element around the renderer.
+
+```tsx
+import { GraphRenderer } from '@graphysdk/react';
+
+// Fill the parent. The parent must have a height.
+const responsive = <GraphRenderer sizing={{ mode: 'responsive' }} />;
+
+// Exact pixels.
+const fixed = <GraphRenderer sizing={{ mode: 'fixed', width: 800, height: 500 }} />;
+
+// Fill the width and keep a ratio. Give two of intrinsicWidth, intrinsicHeight and aspectRatio.
+const ratio = <GraphRenderer sizing={{ mode: 'keepAspectRatio', intrinsicWidth: 800, intrinsicHeight: 500 }} />;
+const ratioFromWidth = <GraphRenderer sizing={{ mode: 'keepAspectRatio', intrinsicWidth: 800, aspectRatio: 16 / 9 }} />;
+```
+
+A responsive graph paints once the first measurement lands with both dimensions above zero. In a container with no height it paints nothing and logs `[graphy] ZERO_SIZE_CONTAINER` once. A fixed graph paints at once. `keepAspectRatio` lays the graph out at its intrinsic size inside a wrapper scaled with a CSS transform, reserves the box with CSS `aspect-ratio` before the first measurement, and throws when a dimension is not a positive finite number.
+
+`onResize` fires in every mode and reports the container, not the plot panel. Sizes are rounded to integers and a repeat of the same size is skipped.
+
+Exported types: `GraphSizing`, `ResizeObserverOnResize` and `ResizeObserverState`.
+
+## Animation
+
+`animation` is a boolean or an object with three optional keys.
+
+```tsx
+import { GraphRenderer } from '@graphysdk/react';
+
+// Turn everything off.
+const still = <GraphRenderer animation={false} />;
+
+// Keep the entrance, stop geoms from moving when data changes.
+const introOnly = <GraphRenderer animation={{ transitions: false }} />;
+
+// Tune the entrance.
+const slowIntro = (
+  <GraphRenderer animation={{ intro: { durationScale: 2, stagger: true, staggerOrder: 'valueAscending' } }} />
+);
+
+// Play the entrance when the graph scrolls into view.
+const lazyIntro = <GraphRenderer animation={{ intro: { trigger: 'inView' } }} />;
+
+// Animate only small graphs.
+const capped = <GraphRenderer animation={{ maxAnimatedGeoms: 300 }} />;
+```
+
+- `intro`: the entrance. `false` or `{ enabled, trigger, durationScale, stagger, staggerOrder }`. `trigger` is `'mount'` (default) or `'inView'`, which waits until 40% of the panel is on screen and plays on mount where there is no `IntersectionObserver`. `staggerOrder` is `'mainAxis'`, `'valueAscending'` or `'valueDescending'`. The entrance plays once. A later change of coordinate system swaps the geom layers in without one.
+- `transitions`: whether geoms move to their new place when the data changes. Default on.
+- `maxAnimatedGeoms`: above this many geoms nothing animates. Default 1500. A line or an area counts as one geom.
+
+A viewer who prefers reduced motion gets no animation whatever the prop says.
+
+Exported types: `GraphAnimation` for the prop and `GraphAnimationProps` for the object form.
+
+## Live data
+
+The provider recompiles when `data`, `spec` or `colorScheme` change by reference. Pass a new `data` object and the graph updates, with transitions if they are on.
+
+```tsx
+import { useEffect, useMemo, useState } from 'react';
+
+import { createSpec, geom, GraphProvider, GraphRenderer, pipe, scale } from '@graphysdk/react';
+import type { Data } from '@graphysdk/react';
+
+export const LiveGraph = ({ initial }: { initial: Data }) => {
+  const [data, setData] = useState(initial);
+
+  useEffect(() => {
+    const timer = setInterval(() => setData((current) => ({ ...current, rows: [...current.rows, nextRow()] })), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Build the spec once. A new spec object on every render recompiles on every render.
+  const spec = useMemo(() => pipe(createSpec({ x: 'time', y: 'value' }), geom.line(), scale.x(), scale.y()), []);
+
+  return (
+    <GraphProvider data={data} spec={spec}>
+      <GraphRenderer animation={{ transitions: false }} />
+    </GraphProvider>
+  );
+};
+
+const nextRow = () => ({ time: new Date(), value: Math.random() * 100 });
+```
+
+A new `spec` prop replaces the graph: uncommitted edits are dropped, and the undo history is cleared once the new spec compiles. A spec that fails to compile leaves the history in place. A new `data` or `colorScheme` recompiles the spec as edited and keeps the history. Passing the spec received from `onSpecChange` back into the `spec` prop is recognized as an echo: no recompile, no history clear.
+
+`plugins` and `theme` are not live. Both are read once at mount. To change either, remount the provider with a new `key`.
+
+## Color scheme and theme
+
+`colorScheme` picks the light or dark side of every style token and the tones of the default palette. Stylesheet colors written as `{ light, dark }` follow it too. See styling.md.
+
+```tsx
+import { GraphProvider, GraphRenderer } from '@graphysdk/react';
+import type { Data, Spec } from '@graphysdk/react';
+
+export const DarkGraph = ({ data, spec }: { data: Data; spec: Spec }) => (
+  <GraphProvider data={data} spec={spec} colorScheme="dark">
+    <GraphRenderer />
+  </GraphProvider>
+);
+```
+
+Pass a `Theme` through the provider's `theme` prop or `createGraphyKit({ theme })`. It supplies styles, colors, config defaults, and optional geom repaints and shapes. Spec settings override it. It is read once at mount; remount the provider to change it. A theme's fixed `colorScheme` overrides the provider's `colorScheme`. See [themes](themes.md).
+
+The renderer mounts its own `ThemeProvider`. `ThemeProvider`, `vars`, `lightTheme` and `darkTheme` are exported for UI beside the graph that wants the same tokens. `ThemeProvider` takes `colorScheme` and optional `textScale`, `graphBackground`, `graphFontFamily` and `headingFontFamily`. A graph never needs them. The token types are `ThemeValues`, `ThemeKey` for one token name, and `ThemeOverrides` for a partial set.
+
+## Formatting locale
+
+`formattingLocale` sets how numbers and dates are displayed in ticks, tooltips, legends and headlines. It takes any BCP-47 tag, such as `'it-IT'` or `'ja-JP'`; a tag `Intl` cannot read formats as `'en-GB'` and warns through `onWarnings`. Abbreviations stay `k`, `m` and `b` in every locale. Dates stay in the Gregorian calendar, whatever the locale's own. When unset, display uses `config({ parsingLocale })` from the spec, which defaults to `'en-US'`. Graphy's own texts are translated only for `'en-GB'`, `'en-US'`, `'pt-PT'` and `'ar'`: a tag reads the one for its language and region, else its language, else `'en-GB'`.
+
+```tsx
+import { GraphProvider, GraphRenderer } from '@graphysdk/react';
+import type { Data, Spec } from '@graphysdk/react';
+
+export const ItalianGraph = ({ data, spec }: { data: Data; spec: Spec }) => (
+  <GraphProvider data={data} spec={spec} formattingLocale="it-IT">
+    <GraphRenderer />
+  </GraphProvider>
+);
+```
+
+Parsing and formatting are separate. Data rows are parsed day-first; `config({ parsingLocale })` reads values written in the spec; `formattingLocale` prints. See data.md § Parsing locale and formatting locale. Inside the tree, `useFormattingLocale()` returns the tag values format in, and `useGraphLocale()` the translation locale the chart's texts use unless an `IntlProvider` above the chart sets `locale`.
+
+For a language with no translation, wrap the chart in `IntlProvider` from `@graphysdk/react` with your wording as `i18nOverrides`, keyed by phrase (`'graph.headlineMetrics.total'`), as a string or, for a phrase with values, a function of them. A phrase left out keeps the chart's translation. An editable chart uses `EditorIntlProvider` from `@graphysdk/react/editable` instead, which also takes editor phrases: see the graphy-editor skill.
+
+## Errors and warnings
+
+A spec that does not compile does not blank the page. The provider paints a panel in place that says "This chart could not be rendered." and lists each diagnostic's code, message and suggestion. It also logs to the console and calls `onError`. A later spec or data that compiles replaces the panel with the graph.
+
+```tsx
+import { useState } from 'react';
+
+import { GraphProvider, GraphRenderer } from '@graphysdk/react';
+import type { Data, Spec, VizDiagnostic } from '@graphysdk/react';
+
+export const ReportingGraph = ({ data, spec }: { data: Data; spec: Spec }) => {
+  const [errors, setErrors] = useState<VizDiagnostic[]>([]);
+  const [warnings, setWarnings] = useState<VizDiagnostic[]>([]);
+
+  return (
+    <>
+      <GraphProvider data={data} spec={spec} onError={setErrors} onWarnings={setWarnings}>
+        <GraphRenderer />
+      </GraphProvider>
+      {errors.map((diagnostic) => (
+        <p key={diagnostic.code}>
+          {diagnostic.code}: {diagnostic.message} {diagnostic.suggestion}
+        </p>
+      ))}
+      {warnings.length > 0 && <p>{warnings.length} warning(s)</p>}
+    </>
+  );
+};
+```
+
+A `VizDiagnostic` has `severity` (`'error'` or `'warning'`), `kind`, `code`, `message`, and optional `suggestion` and `context`. `onWarnings` carries the compiler's warnings plus render-side ones, such as a plugin geom with no renderer, and once at mount the plugin registration warnings. `onError` fires at mount with any plugin registration errors. A render crash inside the tree lands in the same panel and the same `onError`; the panel clears when `spec` or `data` changes by reference. A plugin registration error stays on the panel across later compiles. A command, undo or redo the compiler refuses also reaches `onError`, and the graph keeps its last good state.
+
+`GraphErrorBoundary` and `GraphErrorPanel` are exported. The boundary takes `forcedErrors`, `resetKeys` and `onError` and can wrap UI of your own. The panel takes `errors` and paints the same in-place message.
+
+## The graph handle
+
+Code mounted above or beside the provider cannot use the hooks. Give the provider a `handleRef` and read the `GraphHandle` it fills.
+
+```tsx
+import { useRef } from 'react';
+
+import { GraphProvider, GraphRenderer, useGraphHistoryShortcuts, useHandleScene } from '@graphysdk/react';
+import type { Data, GraphHandle, Spec } from '@graphysdk/react';
+
+export const GraphWithToolbar = ({ data, spec }: { data: Data; spec: Spec }) => {
+  const handleRef = useRef<GraphHandle>(null);
+  useGraphHistoryShortcuts(handleRef);
+
+  return (
+    <>
+      <button onClick={() => handleRef.current?.undo()}>Undo</button>
+      <button onClick={() => handleRef.current?.redo()}>Redo</button>
+      <GraphProvider data={data} spec={spec} handleRef={handleRef}>
+        <GraphRenderer />
+      </GraphProvider>
+    </>
+  );
+};
+
+const LayerCount = ({ handle }: { handle: GraphHandle }) => {
+  const scene = useHandleScene(handle);
+  return <span>{scene ? scene.layers.length : 0} layers</span>;
+};
+```
+
+The handle has `commands` (`dispatch` and `commit`), `undo`, `redo`, `subscribe`, `getScene`, `formattingLocale`, `getSelection`, `setSelection`, `subscribeSelection`, `canPlaceDataLabels` and `canFormatDataLabelsAsPercentages`. `getScene` returns `null` until the first successful compile. `formattingLocale` is the canonical tag, unset when the provider got none. `undo` and `redo` return whether the graph took the step. A refused step reports through `onError`.
+
+`useGraphHistoryShortcuts(handleRef, options)` binds Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Ctrl+Y to the handle while the caller is mounted. `options.target` is the element to listen on, a ref holding one, or `null` to bind nothing. Default `window`. `options.enabled` turns it off without unmounting. The options type is `GraphHistoryShortcutsOptions`. A chord typed into a text input, a textarea or a contenteditable element is left alone, and so is one with Alt held or one another handler already prevented. A range, checkbox, radio or button input passes the chord through to the graph.
+
+Commands and editing are covered by the graphy-editor skill.
+
+## Hooks inside the tree
+
+Any component under the provider can read the scene.
+
+```tsx
+import { useGraphHistory, useSceneSelector } from '@graphysdk/react';
+
+export const AxisTitle = () => {
+  const axes = useSceneSelector((scene) => scene.guides.axes);
+  return <span>{axes.map((axis) => axis.label ?? '').join(' / ')}</span>;
+};
+
+export const UndoButton = () => {
+  const { undo, canUndo, undoDescription } = useGraphHistory();
+  return (
+    <button disabled={!canUndo} title={undoDescription ?? undefined} onClick={undo}>
+      Undo
+    </button>
+  );
+};
+```
+
+- `useSceneSelector(selector)`: a slice of the scene. Re-renders only when the slice changes by reference, so return existing objects rather than building new ones.
+- `useGraphHandle(handle?)`: a handle built from the surrounding provider, or the explicit `handle` when one is given. Returns `null` outside a provider.
+- `useGraphCommands()`: `{ dispatch, commit }` for applying commands. See below.
+- `useGraphHistory()`: `undo`, `redo`, `canUndo`, `canRedo`, `undoDescription`, `redoDescription`, `undoStack`, `redoStack`. Its return type is `GraphHistory`.
+- `useGraphSelection()`: what the graph holds selected, in editing modes.
+- `useFormattingLocale()`: the tag numbers and dates format in, `formattingLocale ?? parsingLocale`. Pass it to `createValueFormatter`.
+- `useGraphLocale()`: the translation locale the chart's texts use, one of `en-GB`, `en-US`, `pt-PT` or `ar`. An `IntlProvider` above the chart that sets `locale` overrides it for the texts, not for this hook.
+
+The scene has `spec`, `coordSystem`, `layers`, `scales`, `guides`, `config`, `annotations` and `styles`. `scene.spec` is the resolved spec with every default filled in.
+
+`DevToolsPanel`, rendered inside the provider, shows which compile stages ran or hit the cache after each change. Its props type is `DevToolsPanelProps` with `width`, `style` and `className`. `HoverProvider` hosts the hover state; the renderer mounts it on its own. A custom renderer built from the parts needs it, a graph does not.
+
+## Commands and onSpecChange
+
+`dispatch(command)` applies a command and fires `onSpecChange` with the resulting spec. `dispatch(command, { transient: true })` paints the frame and fires nothing. A run of transient dispatches reports one `onSpecChange` when `commit()` is called, or when the next committed dispatch or a change to `data` or `colorScheme` closes it. An undo or redo during an open run reverts the whole run in one step and fires `onSpecChange` with the stepped spec. A new `spec` prop discards the run instead. `onSpecChange` never fires for a new `spec` prop itself.
+
+```tsx
+import { useGraphCommands } from '@graphysdk/react';
+import type { GraphCommands } from '@graphysdk/react';
+
+export const SliderCommit = ({ apply }: { apply: (commands: GraphCommands, value: number) => void }) => {
+  const commands = useGraphCommands();
+  return (
+    <input
+      type="range"
+      onChange={(event) => apply(commands, event.target.valueAsNumber)}
+      onPointerUp={() => commands.commit()}
+    />
+  );
+};
+```
+
+The commands themselves are covered by the graphy-editor skill.
+
+## Text measurement and server rendering
+
+The renderer measures text with a canvas so ticks, legends and labels get exactly the space they take. It waits for `document.fonts.ready` before the first paint, up to three seconds, then logs `[graphy] FONT_READY_TIMEOUT` and paints with the fonts it has. The measurer is rebuilt when more fonts finish loading. Load web fonts through `@font-face` or a stylesheet link before or alongside the graph. Where `OffscreenCanvas` is missing it falls back to estimated metrics.
+
+`TextMeasurerProvider`, `useTextMeasurer` and `CanvasTextMeasurer` are exported. The renderer mounts the provider itself. Pass `measurer` to the provider to supply your own, for example a synchronous one in tests.
+
+A server-rendered page carries no graph markup. The text measurer provider renders nothing until its effect has run, and responsive sizing waits for the first container measurement. The graph appears on the client after mount.
+
+## The Graphy badge
+
+The "Made with Graphy" badge is a spec setting, `config.content.graphyBadge`. `@graphysdk/react` sets it on when the spec says nothing. `@graphysdk/react-renderer` leaves it off. An explicit `graphyBadge.visible` is kept by both packages.
+
+```tsx
+import { config, createSpec, geom, pipe, scale } from '@graphysdk/react';
+
+const spec = pipe(
+  createSpec({ x: 'month', y: 'revenue' }),
+  geom.bar(),
+  scale.x(),
+  scale.y(),
+  config({ content: { graphyBadge: { visible: false } } })
+);
+```
+
+The badge hides itself below 120 by 80 pixels and shrinks to a circle below 200 pixels wide. `graphyBadge.position` is `'footer'` (default) or `'header'`. `graphyBadge.variant` is `'full'` (default) or `'mini'`, and `'mini'` forces the circle at any size.
+
+## Pitfalls
+
+- A `spec` built inline in the component body is a new object every render, and every render recompiles. Build it at module scope or in `useMemo`.
+- The parent of a responsive graph needs a height. With no height the graph is zero pixels tall.
+- `plugins` and `theme` are frozen at mount. Passing a different value later does nothing until the provider remounts.
+- `mode="annotate"` on the plain `GraphRenderer` gives no editing UI. Use `EditableGraphRenderer` from `@graphysdk/react/editable`.
+- `onSpecChange` fires for committed commands, undo and redo, not when you pass a new `spec` prop. A transient dispatch fires nothing until `commit()`, the next committed dispatch, or a data, palette or scheme change closes the run.
+- The provider from `@graphysdk/react-renderer` shows no Graphy badge. Import `GraphProvider` from one package consistently.

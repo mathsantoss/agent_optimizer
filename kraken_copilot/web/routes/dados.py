@@ -131,6 +131,27 @@ async def listar_arquivos_dados():
     return {"arquivos": arquivos, "arvore": arvore}
 
 
+@router.get("/skills")
+async def listar_skills_instaladas():
+    """Lista as skills instaladas em .agents/skills/ com metadados e receitas."""
+    from kraken_copilot.skills import discover_skills
+    skills = discover_skills()
+    return {
+        "success": True,
+        "total": len(skills),
+        "skills": [
+            {
+                "name": s.name,
+                "description": s.description,
+                "caminho": str(s.directory),
+                "referencias": s.references,
+                "receitas": s.recipes,
+            }
+            for s in skills.values()
+        ],
+    }
+
+
 @router.get("/workspace/arquivos")
 async def listar_arquivos_workspace():
     """Lista todos os arquivos python disponíveis no workspace do krakenlake."""

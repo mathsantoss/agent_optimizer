@@ -1,0 +1,112 @@
+# Polar bar graph
+
+Use a polar bar graph (rose, coxcomb or radial bar) for cyclic bands such as weekdays or months, or for a compact ranked track.
+
+## Basic
+
+Long form: one row per band and group.
+
+A rose: each band is a wedge, and the value grows the radius. Dodge splits a wedge into one petal per group.
+
+```tsx
+import {
+  config,
+  coord,
+  createSpec,
+  geom,
+  GraphProvider,
+  GraphRenderer,
+  pipe,
+  scale,
+  style,
+  styles,
+} from '@graphysdk/react';
+import type { Data } from '@graphysdk/react';
+
+const signupsData: Data = {
+  columns: [{ key: 'day' }, { key: 'signups' }, { key: 'channel' }],
+  rows: [
+    { day: 'Mon', signups: 5, channel: 'Organic' },
+    { day: 'Mon', signups: 3, channel: 'Referral' },
+    { day: 'Tue', signups: 7, channel: 'Organic' },
+    { day: 'Tue', signups: 4, channel: 'Referral' },
+    { day: 'Wed', signups: 6, channel: 'Organic' },
+    { day: 'Wed', signups: 5, channel: 'Referral' },
+    { day: 'Thu', signups: 9, channel: 'Organic' },
+    { day: 'Thu', signups: 3, channel: 'Referral' },
+    { day: 'Fri', signups: 8, channel: 'Organic' },
+    { day: 'Fri', signups: 6, channel: 'Referral' },
+  ],
+};
+
+const spec = pipe(
+  createSpec({ x: 'day', y: 'signups', color: 'channel' }),
+  geom.bar({ position: 'dodge' }),
+  coord.polar({ theta: 'x' }),
+  scale.x.discrete(),
+  scale.y(),
+  scale.color.discrete(),
+  config({ legend: { position: 'top' } })
+);
+
+export function SignupsRose() {
+  return (
+    <GraphProvider data={signupsData} spec={spec}>
+      <GraphRenderer />
+    </GraphProvider>
+  );
+}
+```
+
+## Variants
+
+### Stacked rose
+
+Groups stack outward along the radius.
+
+```ts
+const layer = geom.bar({ position: 'stack' });
+```
+
+### Radial bar (race track)
+
+Swap theta to y. Each band becomes a concentric track and the value sweeps the angle. An inner radius clears the center.
+
+```ts
+const spec = pipe(
+  createSpec({ x: 'day', y: 'signups', color: 'channel' }),
+  geom.bar({ position: 'stack' }),
+  coord.polar({ theta: 'y', innerRadius: 0.15 }),
+  scale.x.discrete(),
+  scale.y(),
+  scale.color.discrete()
+);
+```
+
+### Wedge width and corner rounding
+
+```ts
+const spec = pipe(
+  createSpec({ x: 'day', y: 'signups', color: 'channel' }),
+  geom.bar({ position: 'stack', params: { width: 0.6 } }),
+  styles({ defaults: [style.geom.bar({ cornerRadius: 'md', stroke: '#ffffff', strokeWidth: 1 })] }),
+  coord.polar({ theta: 'x' }),
+  scale.x.discrete(),
+  scale.y(),
+  scale.color.discrete()
+);
+```
+
+Width is a fraction of the band: angular for a rose, radial for a track. Under polar it defaults to 1, so neighbors touch. `cornerRadius: 'full'` gives a track capsule ends.
+
+### Hide the axes
+
+```ts
+const noAxes = config({ axes: { x: { visible: false }, y: { visible: false } } });
+```
+
+## Pitfalls
+
+- `theta: 'x'` gives a rose, `theta: 'y'` gives radial tracks. Both keep x as the band.
+- The x axis under a bar is always a band, so `scale.x()` infers one. `scale.x.discrete()` says so explicitly.
+- A pie is the special case with `x: ''`, `position: 'fill'` and `theta: 'y'`. See pie.md.

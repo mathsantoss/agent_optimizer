@@ -41,6 +41,124 @@ FORBIDDEN_KEYWORDS = {
 }
 
 
+def infer_chart_recommendations(df: pd.DataFrame, max_charts: int = 4) -> list[dict[str, Any]]:
+    """
+    Inspeciona a estrutura, tipos e cardinalidade dos dados retornados para gerar
+    recomendações automáticas e especificações completas de gráficos para o analista.
+    """
+    if df.empty or len(df.columns) < 2:
+        return []
+
+    charts: list[dict[str, Any]] = []
+
+    # Identifica colunas temporais, numéricas e categóricas
+    temp_cols: list[str] = []
+    numeric_cols: list[str] = []
+    cat_cols: list[str] = []
+
+    for col in df.columns:
+        col_lower = str(col).lower()
+        if pd.api.types.is_numeric_dtype(df[col]):
+            if not (col_lower == "id" or col_lower.startswith("id_") or col_lower.endswith("_id")):
+                numeric_cols.append(col)
+        elif any(kw in col_lower for kw in ("date", "data", "mes", "ano", "periodo", "dia", "hora", "created", "timestamp")):
+            temp_cols.append(col)
+        else:
+            unique_cnt = df[col].nunique(dropna=True)
+            if 2 <= unique_cnt <= 30:
+                cat_cols.append(col)
+
+    if not numeric_cols:
+        for col in df.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                numeric_cols.append(col)
+
+    # 1. Se tem temporal + numérico: gera linha (line) e área (area)
+    if temp_cols and numeric_cols:
+        t_col = temp_cols[0]
+        n_col = numeric_cols[0]
+        chart_data = df[[t_col, n_col]].head(25).to_dict(orient="records")
+        charts.append({
+            "type": "line",
+            "title": f"Evolução Temporal: {n_col.replace('_', ' ').title()}",
+            "subtitle": f"Tendência histórica ao longo de {t_col}",
+            "x": t_col,
+            "y": n_col,
+            "data": chart_data,
+        })
+        if len(df) >= 4:
+            charts.append({
+                "type": "area",
+                "title": f"Volume Acumulado: {n_col.replace('_', ' ').title()}",
+                "subtitle": f"Área temporal contínua por {t_col}",
+                "x": t_col,
+                "y": n_col,
+                "data": chart_data,
+            })
+
+    # 2. Se tem categoria + numérico: gera barras (bar) e donut (donut) se poucas categorias
+    if cat_cols and numeric_cols:
+        c_col = cat_cols[0]
+        n_col = numeric_cols[0]
+        top_df = df[[c_col, n_col]].head(12)
+        chart_data = top_df.to_dict(orient="records")
+
+        charts.append({
+            "type": "bar",
+            "title": f"Comparativo por {c_col.replace('_', ' ').title()}",
+            "subtitle": f"Métrica agregada: {n_col.replace('_', ' ').title()}",
+            "x": c_col,
+            "y": n_col,
+            "data": chart_data,
+        })
+
+        if 2 <= len(chart_data) <= 8:
+            charts.append({
+                "type": "donut",
+                "title": f"Share / Proporção de {c_col.replace('_', ' ').title()}",
+                "subtitle": f"Composição percentual de {n_col.replace('_', ' ').title()}",
+                "x": c_col,
+                "y": n_col,
+                "data": chart_data,
+            })
+
+    # 3. Se tem 2+ colunas numéricas: gera dispersão (scatter)
+    if len(numeric_cols) >= 2 and len(df) >= 3:
+        nx = numeric_cols[0]
+        ny = numeric_cols[1]
+        label_col = cat_cols[0] if cat_cols else (temp_cols[0] if temp_cols else nx)
+        scatter_data = []
+        for _, row in df.head(30).iterrows():
+            scatter_data.append({
+                label_col: str(row[label_col]),
+                nx: float(row[nx]) if pd.notnull(row[nx]) else 0,
+                ny: float(row[ny]) if pd.notnull(row[ny]) else 0,
+            })
+        charts.append({
+            "type": "scatter",
+            "title": f"Dispersão: {nx.replace('_', ' ').title()} vs {ny.replace('_', ' ').title()}",
+            "subtitle": "Análise bivariada de correlação",
+            "x": nx,
+            "y": ny,
+            "data": scatter_data,
+        })
+
+    # Fallback se não encontrou combinações acima
+    if not charts and len(df.columns) >= 2 and numeric_cols:
+        c1 = [c for c in df.columns if c not in numeric_cols][0] if len(df.columns) > len(numeric_cols) else df.columns[0]
+        c2 = numeric_cols[0]
+        charts.append({
+            "type": "bar",
+            "title": f"Visualização Geral: {c1} vs {c2}",
+            "subtitle": "Gráfico gerado automaticamente a partir dos dados",
+            "x": c1,
+            "y": c2,
+            "data": df[[c1, c2]].head(15).to_dict(orient="records"),
+        })
+
+    return charts[:max_charts]
+
+
 def _validate_sql_query(query: str, allowed_table_names: set[str]) -> tuple[list[sql_expressions.Expression] | None, str | None]:
     """
     Valida a consulta SQL via parser AST (SQLGlot):
@@ -191,6 +309,7 @@ def execute_sql_service(
             warnings.append(f"Tabelas {sampled_tables} carregadas com limite amostral de {max_table_sample_rows} linhas.")
 
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        chart_recommendations = infer_chart_recommendations(result_df)
 
         return ToolResult.ok(
             summary=f"Consulta executada com sucesso ({len(result_df)} linhas em {elapsed_ms}ms).",
@@ -202,6 +321,7 @@ def execute_sql_service(
                 "colunas": columns,
                 "tabela_markdown": markdown_table,
                 "registros": result_df.to_dict(orient="records"),
+                "graficos_sugeridos": chart_recommendations,
             },
             warnings=warnings,
         ).model_dump()

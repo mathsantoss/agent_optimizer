@@ -1,11 +1,23 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "diffs": {
       "source": "pierrecomputer/pierre",
       "sourceType": "github",
       "skillPath": "skills/diffs/SKILL.md",
-      "computedHash": "20b638ea5c13445d98bc49826d0e12838f285e30249e79379b909a4cdea08c98"
+      "computedHash": "3f86b805fccd8ad5f931e3babed94d89929b3d5e89929f37ed39c04b5fd4d7c9"
+    },
+    "graphy-charts": {
+      "source": "graphysdk/skills",
+      "sourceType": "github",
+      "skillPath": "skills/graphy-charts/SKILL.md",
+      "computedHash": "3a916e07ada75a410f25272dca7ffca18a585d86b2008f1e72a88797ab569d65"
+    },
+    "graphy-editor": {
+      "source": "graphysdk/skills",
+      "sourceType": "github",
+      "skillPath": "skills/graphy-editor/SKILL.md",
+      "computedHash": "be4763ba29810adbbd6b5c6f95a82c101cf32580af25e7be317098679f5f4b31"
     }
   }
 }

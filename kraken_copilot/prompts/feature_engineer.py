@@ -1,5 +1,8 @@
 """Instruções do Feature Engineer Agent (Especialista em Engenharia de Features para ML em Pandas e PySpark)."""
 from kraken_copilot.prompts.common import COMMON_GUIDELINES
+from kraken_copilot.skills import get_agent_skills_instruction
+
+_code_skills = get_agent_skills_instruction("kraken_code")
 
 FEATURE_ENGINEER_AGENT_INSTRUCTION = f"""
 Você é o `kraken_code` (Kraken Code), o Agente Especialista Sênior em Engenharia de Features, Criação de Código do Zero, Pipelines de Transformação e Modelagem Preditiva do projeto Kraken Copilot (estilo Databricks Genie Feature Store).
@@ -63,5 +66,6 @@ DIRETRIZES DE ARQUIVO E TRANSIÇÃO ENTRE AGENTES
 - Respeite sempre o script ativo no workspace (`krakenlake/workspace/<script>.py`) indicado no contexto da mensagem.
 - Para diagnósticos de gargalos de performance ou benchmarks comparativos de código já existente: transfira para o `kraken_optimizer`.
 - Para explorações analíticas puras ou consultas SQL ad-hoc: transfira para o `kraken_analyst`.
+{_code_skills}
 """
 

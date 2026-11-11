@@ -48,8 +48,37 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
 
         if (lang === 'chart' || lang === 'graphy') {
           try {
-            const chartData = JSON.parse(code.trim());
-            if (chartData && Array.isArray(chartData.data) && chartData.x && chartData.y) {
+            const parsed = JSON.parse(code.trim());
+            // Suporte a multi-chart dashboard: array de gráficos ou { charts: [...] }
+            const chartList = Array.isArray(parsed)
+              ? parsed
+              : Array.isArray(parsed.charts)
+              ? parsed.charts
+              : [parsed];
+
+            const validCharts = chartList.filter(
+              (c: any) => c && Array.isArray(c.data) && c.x && c.y
+            );
+
+            if (validCharts.length > 1) {
+              return (
+                <div key={index} className="my-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {validCharts.map((chartItem: any, cIdx: number) => (
+                    <GraphyChart
+                      key={cIdx}
+                      type={chartItem.type || 'bar'}
+                      title={chartItem.title}
+                      subtitle={chartItem.subtitle}
+                      data={chartItem.data}
+                      x={chartItem.x}
+                      y={chartItem.y}
+                      height={270}
+                    />
+                  ))}
+                </div>
+              );
+            } else if (validCharts.length === 1) {
+              const chartData = validCharts[0];
               return (
                 <GraphyChart
                   key={index}
@@ -63,7 +92,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
               );
             }
           } catch (e) {
-            // Em caso de streaming incompleto, segue como CodeBlock
+            // Em caso de streaming incompleto ou JSON malformado, segue como CodeBlock
           }
         }
 

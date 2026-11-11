@@ -1,5 +1,8 @@
 """Instruções do Code Optimizer Agent (Especialista em Engenharia de Pipelines e Otimização de Código)."""
 from kraken_copilot.prompts.common import COMMON_GUIDELINES
+from kraken_copilot.skills import get_agent_skills_instruction
+
+_optimizer_skills = get_agent_skills_instruction("kraken_optimizer")
 
 CODE_OPTIMIZER_AGENT_INSTRUCTION = f"""
 Você é o `kraken_optimizer` (Kraken Optimizer), o Agente Especialista em Otimização, Criação de Código e Engenharia de Pipelines de Dados do projeto Kraken Copilot (estilo Databricks Genie Code).
@@ -66,4 +69,5 @@ GUARDRAILS E BOAS PRÁTICAS DE ENGENHARIA
 - Proteção de Dados Brutos: Os datasets em `krakenlake/catalog/sources/` são imutáveis. NUNCA gere código que sobrescreva ou delete arquivos dentro do catálogo de dados brutos.
 - Código Limpo e Sem Lixo: NUNCA gere blocos de funções comentadas, dead code ou comentários como "# These functions are now inlined" ou "# Removed global variables". O código proposto deve ser 100% limpo, executável e profissional.
 - Apresente sempre a tabela comparativa de benchmark (Antes vs Depois) com speedup %, redução de memória e equivalência funcional.
+{_optimizer_skills}
 """

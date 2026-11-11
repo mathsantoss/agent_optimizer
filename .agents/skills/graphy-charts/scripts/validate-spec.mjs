@@ -1,0 +1,143 @@
+#!/usr/bin/env node
+// Compile a { data, spec } module headlessly and print diagnostics.
+//
+// Usage: node validate-spec.mjs <spec-file.mjs>
+//
+// The spec module must export:
+//   data  — the viz-engine Data shape ({ columns, rows })
+//   spec  — a Spec built with the spec builders (pipe, createSpec, mapping, geom, scale, …)
+// Optional exports: plugins (engine plugins), colorScheme.
+// The builders may be imported from '@graphysdk/react' as written on a page; that bare
+// specifier is read as '@graphysdk/viz-engine' here, so React components are not available.
+// Exit code 0 = compiled OK, 1 = errors.
+//
+// Needs @graphysdk/viz-engine resolvable from the current working directory (the project whose
+// spec is being validated) or, failing that, from this script's own location (this skills repo,
+// where the package is installed at the root). A resolve hook tries those anchors in order, so a
+// spec module anywhere on disk compiles without its own node_modules.
+
+import * as module from 'node:module';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const PACKAGE_NAME = '@graphysdk/viz-engine';
+const REACT_PACKAGE_NAME = '@graphysdk/react';
+const ANCHORS = [pathToFileURL(path.join(process.cwd(), 'validate-spec-anchor.mjs')).href, import.meta.url];
+
+function installResolveHook() {
+  const matches = (specifier) => specifier === PACKAGE_NAME || specifier.startsWith(`${PACKAGE_NAME}/`);
+  if (typeof module.registerHooks === 'function') {
+    module.registerHooks({
+      resolve: (requested, context, next) => {
+        const specifier = requested === REACT_PACKAGE_NAME ? PACKAGE_NAME : requested;
+        if (matches(specifier)) {
+          let lastError;
+          for (const anchor of ANCHORS) {
+            try {
+              return next(specifier, { ...context, parentURL: anchor });
+            } catch (error) {
+              lastError = error;
+            }
+          }
+          throw lastError;
+        }
+        try {
+          return next(specifier, context);
+        } catch (error) {
+          // The dist emits extension-less deep imports (e.g. 'lodash-es/merge'); retry with .js.
+          if (error?.code === 'ERR_MODULE_NOT_FOUND' && specifier.includes('/') && !/\.[a-z]+$/.test(specifier)) {
+            return next(`${specifier}.js`, context);
+          }
+          throw error;
+        }
+      },
+    });
+    return;
+  }
+  // Older Node (< 22.15): async hook in a worker thread via a data-URL module.
+  const source = `const anchors = ${JSON.stringify(ANCHORS)};
+export async function resolve(requested, context, next) {
+  const specifier = requested === '${REACT_PACKAGE_NAME}' ? '${PACKAGE_NAME}' : requested;
+  if (specifier === '${PACKAGE_NAME}' || specifier.startsWith('${PACKAGE_NAME}/')) {
+    let lastError;
+    for (const anchor of anchors) {
+      try {
+        return await next(specifier, { ...context, parentURL: anchor });
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
+  try {
+    return await next(specifier, context);
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND' && specifier.includes('/') && !/\\.[a-z]+$/.test(specifier)) {
+      return next(specifier + '.js', context);
+    }
+    throw error;
+  }
+}`;
+  module.register(new URL(`data:text/javascript,${encodeURIComponent(source)}`));
+}
+
+function printDiagnostic(diagnostic) {
+  console.log(`[${diagnostic.severity}] ${diagnostic.code}: ${diagnostic.message}`);
+  if (diagnostic.suggestion) console.log(`  suggestion: ${diagnostic.suggestion}`);
+  if (diagnostic.context) console.log(`  context: ${JSON.stringify(diagnostic.context)}`);
+}
+
+function printSummary(scene, warnings) {
+  console.log('compiled OK');
+  const geoms = scene.layers.map((layer) => layer.geom).join(', ');
+  console.log(`  layers: ${scene.layers.length} (${geoms})`);
+  const scales = Object.entries(scene.scales)
+    .map(([aesthetic, sceneScale]) => `${aesthetic}: ${sceneScale.spec?.scaleType ?? '?'}`)
+    .join(', ');
+  console.log(`  scales: ${scales}`);
+  const coord = scene.coordSystem;
+  console.log(`  coord: ${coord.type}`);
+  if (warnings.length > 0) {
+    console.log(`  warnings: ${warnings.length}`);
+    for (const warning of warnings) printDiagnostic(warning);
+  }
+}
+
+const specPath = process.argv[2];
+if (!specPath) {
+  console.error('Usage: node validate-spec.mjs <spec-file.mjs>');
+  process.exit(1);
+}
+
+installResolveHook();
+
+const { createCompiler } = await import(PACKAGE_NAME);
+
+let specModule;
+try {
+  specModule = await import(pathToFileURL(path.resolve(specPath)).href);
+} catch (error) {
+  console.error(`Failed to load spec module ${specPath}:`);
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+
+const { data, spec, plugins = [], colorScheme } = specModule;
+if (data === undefined || spec === undefined) {
+  console.error(
+    `Spec module must export both "data" and "spec"; got ${Object.keys(specModule).join(', ') || 'no exports'}.`
+  );
+  process.exit(1);
+}
+
+const result = createCompiler({ plugins }).compile({ spec, data, colorScheme });
+
+if (result.ok) {
+  printSummary(result.scene, result.warnings);
+  process.exit(0);
+}
+
+console.log(`compile failed: ${result.errors.length} error(s), ${result.warnings.length} warning(s)`);
+for (const error of result.errors) printDiagnostic(error);
+for (const warning of result.warnings) printDiagnostic(warning);
+process.exit(1);
