@@ -535,8 +535,11 @@ export function ExecutionWorkflowFlow({
         </ReactFlow>
       </div>
 
-      <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-2 text-[11px] text-slate-400 flex items-center justify-between">
-        <span>💡 Dica: Você pode arrastar, aproximar (zoom) e clicar nos nós para navegar no percurso.</span>
+      <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-2 text-[11px] text-slate-500 flex items-center justify-between">
+        <span className="flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+          <span>Dica: Você pode arrastar, aproximar (zoom) e clicar nos nós para navegar no percurso.</span>
+        </span>
         <div className="flex items-center gap-3">
           {effectiveFull && (
             <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">

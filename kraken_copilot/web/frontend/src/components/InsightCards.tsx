@@ -1,5 +1,5 @@
 import React from 'react';
-import { Timer, HardDrive, CheckCircle2, AlertTriangle, Layers } from 'lucide-react';
+import { Timer, HardDrive, CheckCircle2, AlertTriangle, Layers, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface BenchmarkMetrics {
@@ -26,8 +26,9 @@ export function InsightCards({ metrics, className }: InsightCardsProps) {
   return (
     <div className={cn('my-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs', className)}>
       <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-          📊 Benchmark Comparativo (Antes vs Depois)
+        <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
+          <BarChart3 className="h-4 w-4 text-blue-600 shrink-0" />
+          <span>Benchmark Comparativo (Antes vs Depois)</span>
         </h4>
         {metrics.equivalencia_status && (
           <span

@@ -56,7 +56,7 @@ export function ApprovalCard({
       <div className="my-3 flex items-center gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-xs font-medium text-emerald-900 shadow-2xs">
         <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
         <span>
-          ✓ Proposta Aprovada e Autorizada. As alterações foram aplicadas em{' '}
+          Proposta Aprovada e Autorizada. As alterações foram aplicadas em{' '}
           <code className="font-semibold text-emerald-950">{effectiveTargetFile}</code>.
         </span>
       </div>
@@ -66,8 +66,8 @@ export function ApprovalCard({
   if (decided === 'rejected') {
     return (
       <div className="my-3 flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium text-slate-700 shadow-2xs">
-        <X className="h-4 w-4 text-slate-500 shrink-0" />
-        <span>✕ Proposta rejeitada. O código do pipeline foi mantido na versão original.</span>
+        <X className="h-4 w-4 text-rose-500 shrink-0" />
+        <span>Proposta rejeitada. O código do pipeline foi mantido na versão original.</span>
       </div>
     );
   }

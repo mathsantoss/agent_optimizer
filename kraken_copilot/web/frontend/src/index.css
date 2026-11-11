@@ -2,41 +2,63 @@
 
 @layer base {
   :root {
-    --page: #fafbfd;
-    --canvas: #f1f4f9;
+    --page: #f8fafc;
+    --canvas: #f1f5f9;
     --surface: #ffffff;
     --inset: #f8fafc;
     --hover: #f1f5f9;
     --hover-2: #e2e8f0;
 
     --ink: #0f172a;
-    --ink-2: #475569;
-    --ink-3: #94a3b8;
+    --ink-2: #334155;
+    --ink-3: #64748b;
 
     --line: #e2e8f0;
     --line-strong: #cbd5e1;
     --line-soft: #f1f5f9;
 
-    --accent: #2563eb;
-    --accent-ink: #1d4ed8;
-    --accent-tint: #eff6ff;
+    /* Design System Tokens (Data-Dense Dashboard via UI/UX Pro Max) */
+    --primary: #1e40af;
+    --primary-hover: #1d4ed8;
+    --secondary: #3b82f6;
+    --accent: #d97706;
+    --accent-tint: #fffbeb;
 
-    --green: #10b981;
+    --green: #059669;
     --green-tint: #ecfdf5;
-    --orange: #f59e0b;
+    --orange: #d97706;
     --orange-tint: #fffbeb;
-    --red: #ef4444;
+    --red: #dc2626;
     --red-tint: #fef2f2;
   }
 
   body {
     background-color: var(--page);
     color: var(--ink);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', 'Fira Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   code, pre, .font-mono {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    font-family: 'Fira Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Accessible focus rings */
+  :focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
+  }
+
+  /* Accessibility: Prefers reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 

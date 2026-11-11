@@ -16,6 +16,15 @@ import {
   FileJson,
   LayoutGrid,
   Code2,
+  Database,
+  Tag,
+  Zap,
+  BookOpen,
+  Terminal,
+  Folder,
+  FolderOpen,
+  Package,
+  FileCode2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RecordsTable } from './RecordsTable';
@@ -28,23 +37,23 @@ export interface DataExplorerViewProps {
   className?: string;
 }
 
-const SECTIONS_CONFIG: Record<string, { label: string; icon: string }> = {
-  DATALAKE: { label: 'DATALAKE', icon: '🗄️' },
-  METADADOS: { label: 'METADADOS', icon: '🏷️' },
-  OUTPUTS: { label: 'OUTPUTS', icon: '⚡' },
-  DOCUMENTAÇÕES: { label: 'DOCUMENTAÇÕES', icon: '📚' },
-  WORKSPACE: { label: 'WORKSPACE', icon: '💻' },
+const SECTIONS_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+  DATALAKE: { label: 'DATALAKE', icon: Database },
+  METADADOS: { label: 'METADADOS', icon: Tag },
+  OUTPUTS: { label: 'OUTPUTS', icon: Zap },
+  DOCUMENTAÇÕES: { label: 'DOCUMENTAÇÕES', icon: BookOpen },
+  WORKSPACE: { label: 'WORKSPACE', icon: Terminal },
 };
 
-const SUBCAT_ICONS: Record<string, string> = {
-  CSV: '📊',
-  JSON: '🗂️',
-  PARQUET: '📦',
-  MARKDOWN: '📝',
-  MD: '📝',
-  PDF: '📕',
-  PYTHON: '🐍',
-  PY: '🐍',
+const SUBCAT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  CSV: FileSpreadsheet,
+  JSON: FileJson,
+  PARQUET: Package,
+  MARKDOWN: FileText,
+  MD: FileText,
+  PDF: FileText,
+  PYTHON: FileCode2,
+  PY: FileCode2,
 };
 
 // Helper para parsear JSON profundo (evita JSONs escapados com \n e \")
@@ -188,7 +197,7 @@ export function DataExplorerView({
           <div className="h-4 w-[1px] bg-slate-200" />
 
           <div className="flex items-center gap-2">
-            <span className="text-base">🗂️</span>
+            <Database className="h-4 w-4 text-purple-600 shrink-0" />
             <h2 className="text-sm font-bold text-slate-900">
               Explorador de Dados e Documentos
             </h2>
@@ -271,7 +280,8 @@ export function DataExplorerView({
               </div>
             ) : (
               Object.entries(arvore).map(([secaoNome, subcategorias]) => {
-                const conf = SECTIONS_CONFIG[secaoNome] || { label: secaoNome, icon: '📁' };
+                const conf = SECTIONS_CONFIG[secaoNome] || { label: secaoNome, icon: Folder };
+                const SecIcon = conf.icon;
                 const isSecOpen = openSections[secaoNome] ?? true;
 
                 // Coleta e filtra arquivos da seção
@@ -299,7 +309,7 @@ export function DataExplorerView({
                         ) : (
                           <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
                         )}
-                        <span className="text-sm">{conf.icon}</span>
+                        <SecIcon className="h-4 w-4 text-purple-600 shrink-0" />
                         <strong className="text-xs font-bold tracking-tight text-slate-800 uppercase">
                           {conf.label}
                         </strong>
@@ -321,7 +331,7 @@ export function DataExplorerView({
                           const subcatKey = `${secaoNome}/${subNome}`;
                           // Nível 2 colapsado por padrão: false se não definido
                           const isSubOpen = openSubcats[subcatKey] ?? false;
-                          const subIcon = SUBCAT_ICONS[subNome.toUpperCase()] || '📁';
+                          const SubIcon = SUBCAT_ICONS[subNome.toUpperCase()] || Folder;
 
                           return (
                             <div key={subNome} className="space-y-0.5">
@@ -336,7 +346,7 @@ export function DataExplorerView({
                                   ) : (
                                     <ChevronRight className="h-3 w-3 text-slate-400" />
                                   )}
-                                  <span>{subIcon}</span>
+                                  <SubIcon className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                                   <span className="font-semibold text-slate-700 text-[11px]">
                                     {subNome}
                                   </span>
@@ -431,7 +441,7 @@ export function DataExplorerView({
               </div>
             ) : !arquivoAtivo ? (
               <div className="flex h-full flex-col items-center justify-center text-xs text-slate-400 gap-2">
-                <span className="text-3xl">📂</span>
+                <FolderOpen className="h-10 w-10 text-slate-300 stroke-1" />
                 <p className="font-semibold text-slate-700">Nenhum arquivo selecionado</p>
                 <p className="text-slate-400 max-w-sm text-center">
                   Selecione um arquivo nas categorias à esquerda para inspecionar seu conteúdo.

@@ -16,6 +16,8 @@ import {
   FileCode2,
   Menu,
   ShieldCheck,
+  BarChart3,
+  Cpu,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SidebarNav, ConversaItem } from './components/SidebarNav';
@@ -497,7 +499,7 @@ export function App() {
             id: `err-${Date.now()}`,
             autor: 'assistant',
             role: 'assistant',
-            texto: `⚠️ Ocorreu uma instabilidade na execução: ${errText.slice(0, 180)}`,
+            texto: `Ocorreu uma instabilidade na execução: ${errText.slice(0, 180)}`,
             especialista: 'Kraken Copilot',
           },
         ]);
@@ -509,7 +511,7 @@ export function App() {
           id: `err-${Date.now()}`,
           autor: 'assistant',
           role: 'assistant',
-          texto: `⚠️ Erro de conexão com o servidor: ${err.message}`,
+          texto: `Erro de conexão com o servidor: ${err.message}`,
           especialista: 'Kraken Copilot',
         },
       ]);
@@ -777,12 +779,13 @@ export function App() {
                       <button
                         type="button"
                         onClick={() => handleSendMessage('Quais dados temos disponíveis no datalake e suas características?')}
-                        className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:border-purple-300 hover:shadow-xs transition-all cursor-pointer"
+                        className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:border-purple-300 hover:shadow-xs transition-all cursor-pointer text-left focus-visible:ring-2 focus-visible:ring-purple-500"
                       >
-                        <div className="font-semibold text-xs text-slate-800 group-hover:text-purple-600">
-                          📊 Análise de Dados
+                        <div className="flex items-center gap-2 font-semibold text-xs text-slate-800 group-hover:text-purple-600">
+                          <BarChart3 className="h-4 w-4 text-purple-600 shrink-0" />
+                          <span>Análise de Dados</span>
                         </div>
-                        <div className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                        <div className="mt-1.5 text-[11px] text-slate-500 leading-relaxed">
                           Explorar bases do datalake, resumos estatísticos e qualidade.
                         </div>
                       </button>
@@ -790,12 +793,13 @@ export function App() {
                       <button
                         type="button"
                         onClick={() => handleSendMessage(`Crie uma nova feature de ticket médio e recarga mensal para o script ${selectedWorkspaceFile}`)}
-                        className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all cursor-pointer"
+                        className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all cursor-pointer text-left focus-visible:ring-2 focus-visible:ring-emerald-500"
                       >
-                        <div className="font-semibold text-xs text-slate-800 group-hover:text-emerald-600">
-                          ⚙️ Engenharia de Features
+                        <div className="flex items-center gap-2 font-semibold text-xs text-slate-800 group-hover:text-emerald-600">
+                          <Cpu className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <span>Engenharia de Features</span>
                         </div>
-                        <div className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                        <div className="mt-1.5 text-[11px] text-slate-500 leading-relaxed">
                           Criação e enriquecimento de features em Pandas e PySpark.
                         </div>
                       </button>
@@ -803,12 +807,13 @@ export function App() {
                       <button
                         type="button"
                         onClick={() => handleSendMessage(`Inspecione os gargalos de performance de ${selectedWorkspaceFile} e gere benchmark antes vs depois`)}
-                        className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:border-amber-300 hover:shadow-xs transition-all cursor-pointer"
+                        className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:border-amber-300 hover:shadow-xs transition-all cursor-pointer text-left focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
-                        <div className="font-semibold text-xs text-slate-800 group-hover:text-amber-600">
-                          🚀 Otimização de Código
+                        <div className="flex items-center gap-2 font-semibold text-xs text-slate-800 group-hover:text-amber-600">
+                          <Zap className="h-4 w-4 text-amber-600 shrink-0" />
+                          <span>Otimização de Código</span>
                         </div>
-                        <div className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                        <div className="mt-1.5 text-[11px] text-slate-500 leading-relaxed">
                           Benchmark comparativo de tempo e memória com validação.
                         </div>
                       </button>
@@ -950,8 +955,9 @@ export function App() {
                           {/* Ações sugeridas (Backend + Extração Inteligente) */}
                           {!isUser && sugestoes.length > 0 && (
                             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                              <span className="text-[11px] font-semibold text-slate-500 select-none">
-                                💡 Ações Sugeridas:
+                              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 select-none">
+                                <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                <span>Ações Sugeridas:</span>
                               </span>
                               {sugestoes.map((sugestao, sIdx) => (
                                 <button

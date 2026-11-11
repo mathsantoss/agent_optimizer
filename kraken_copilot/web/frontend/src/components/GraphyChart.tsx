@@ -25,16 +25,16 @@ export interface GraphyChartProps {
 }
 
 const PALETTE = [
-  '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#06b6d4', // cyan
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#ec4899', // pink
-  '#6366f1', // indigo
-  '#14b8a6', // teal
-  '#f97316', // orange
-  '#a855f7', // purple
+  '#1e40af', // Deep blue (primary)
+  '#3b82f6', // Vivid blue (secondary)
+  '#0284c7', // Sky blue
+  '#0d9488', // Teal
+  '#d97706', // Amber (accent)
+  '#7c3aed', // Purple
+  '#e11d48', // Rose
+  '#059669', // Emerald
+  '#ea580c', // Orange
+  '#4f46e5', // Indigo
 ];
 
 export function GraphyChart({

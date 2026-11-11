@@ -1,4 +1,5 @@
 import React from 'react';
+import { BarChart3, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CodeBlock } from './CodeBlock';
 import { RecordsTable } from './RecordsTable';
@@ -222,7 +223,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
                 {isBenchmark && (
                   <div className="flex items-center justify-between border-b border-blue-100 bg-gradient-to-r from-blue-50/80 via-white to-blue-50/40 px-4 py-2.5 text-xs font-bold text-blue-950">
                     <span className="flex items-center gap-1.5">
-                      <span>📊</span>
+                      <BarChart3 className="h-4 w-4 text-blue-600 shrink-0" />
                       <span>Benchmark Comparativo de Performance (Antes vs Depois)</span>
                     </span>
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-800">
@@ -282,7 +283,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
                                         : 'bg-slate-100 text-slate-700'
                                     )}
                                   >
-                                    {isPositiveGain && <span>✓</span>}
+                                    {isPositiveGain && <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 inline" />}
                                     {val.replace(/\*\*/g, '')}
                                   </span>
                                 ) : (

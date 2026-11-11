@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { Eye, Code2, Copy, Check, GitFork } from 'lucide-react';
+import { Eye, Code2, Copy, Check, GitFork, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Inicialização segura do Mermaid
@@ -120,8 +120,9 @@ export function MermaidBlock({ chart, className }: MermaidBlockProps) {
         {viewMode === 'code' || error ? (
           <div className="w-full">
             {error && (
-              <div className="mb-2 text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                ⚠️ Exibindo código fonte do diagrama ({error})
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                <span>Exibindo código fonte do diagrama ({error})</span>
               </div>
             )}
             <pre className="w-full rounded-xl bg-[#0f172a] p-3 font-mono text-[11px] text-slate-200 overflow-x-auto">

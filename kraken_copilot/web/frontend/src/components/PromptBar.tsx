@@ -601,9 +601,9 @@ export function PromptBar({
             {(
               [
                 { id: 'TODOS', label: 'Todos' },
-                { id: 'DATALAKE', label: '📥 Datasets' },
-                { id: 'METADADOS', label: '🏷️ Metadados / RAG' },
-                { id: 'WORKSPACE', label: '💻 Workspace' },
+                { id: 'DATALAKE', label: 'Datasets' },
+                { id: 'METADADOS', label: 'Metadados / RAG' },
+                { id: 'WORKSPACE', label: 'Workspace' },
               ] as const
             ).map((cat) => (
               <button
