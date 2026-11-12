@@ -524,7 +524,7 @@ export function PromptBar({
   const canSend = (text.trim().length > 0 || attachedSources.length > 0) && !isLoading;
 
   return (
-    <div className={cn('relative w-full max-w-5xl mx-auto px-4 sm:px-6 pb-4 select-none', className)}>
+    <div className={cn('relative w-full max-w-4xl mx-auto px-4 sm:px-6 pb-4 select-none', className)}>
       {/* Input oculto para upload de arquivo local */}
       <input
         ref={fileInputRef}

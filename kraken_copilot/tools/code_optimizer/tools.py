@@ -4,13 +4,14 @@
 3. validate_pipeline: validação completa (estática, testes, execução controlada e benchmark de equivalência).
 """
 import ast
+import difflib
 import json
 from pathlib import Path
 from typing import Any
 
 from kraken_copilot import config
 from kraken_copilot.audit_logger import record_code_validation_event, record_guardrail_event
-from kraken_copilot.schemas import ToolResult
+from kraken_copilot.schemas import KrakenBenchmark, KrakenCodeDiff, ToolResult
 from kraken_copilot.tools.code_optimizer.services.ast_service import (
     find_ast_security_violations,
     inspect_source_code_ast,
@@ -323,6 +324,31 @@ def optimize_pipeline(
                 f"definitivamente '{rel_path}', invoque 'optimize_pipeline' com 'confirmed_by_user=True'."
             )
 
+        diff_lines = list(
+            difflib.unified_diff(
+                current_code.splitlines(keepends=True),
+                clean_code.splitlines(keepends=True),
+                fromfile=f"a/{rel_path}",
+                tofile=f"b/{rel_path}",
+            )
+        )
+        raw_diff = "".join(diff_lines)
+        adds = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
+        dels = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
+
+        kraken_code_diff = KrakenCodeDiff(
+            arquivo=Path(rel_path).name,
+            arquivo_alvo=rel_path,
+            original_code=current_code,
+            proposed_code=clean_code,
+            raw_diff=raw_diff,
+            adicoes=adds,
+            remocoes=dels,
+            has_approval_request=True,
+            tipo_transformacao="otimizacao",
+            explicacao="Otimização vetorizada de loops e transformações com preservação de contratos.",
+        )
+
         payload = {
             "success": True,
             "operation": "optimize_pipeline:proposal",
@@ -332,6 +358,7 @@ def optimize_pipeline(
                 "linhas_originais": len(current_code.splitlines()),
                 "linhas_propostas": len(clean_code.splitlines()),
                 "benchmark": benchmark_proposal_data,
+                "kraken_code_diff": kraken_code_diff.model_dump(),
                 "requer_confirmacao": True,
                 "instrucao_confirmacao": "Chame optimize_pipeline(file_path=..., proposed_code=..., confirmed_by_user=True)",
             },

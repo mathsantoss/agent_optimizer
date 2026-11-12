@@ -433,7 +433,7 @@ export function DataExplorerView({
             </div>
           )}
 
-          <div className="flex-1 overflow-auto p-6 flex flex-col min-h-0">
+          <div className={cn("flex-1 overflow-auto flex flex-col min-h-0", conteudo?.tipo === 'python' ? 'p-3 sm:p-4 h-full' : 'p-6')}>
             {loadingConteudo ? (
               <div className="flex h-full items-center justify-center text-xs text-slate-400 gap-2">
                 <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
@@ -495,7 +495,7 @@ export function DataExplorerView({
                     krakenlake/workspace/{arquivoAtivo.nome}
                   </span>
                 </div>
-                <div className="flex-1 min-h-[500px] h-full rounded-2xl overflow-hidden border border-slate-800 shadow-sm flex flex-col">
+                <div className="flex-1 min-h-0 h-full rounded-2xl overflow-hidden border border-slate-800 shadow-sm flex flex-col">
                   <CodeBlock
                     code={conteudo.conteudo || ''}
                     language="python"

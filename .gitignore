@@ -26,5 +26,7 @@ dist-ssr/
 pipeline/features/
 tests/fixtures/projeto/.rag/
 tests/fixtures/projeto/logs/
+# Local agents / user skills
+.agents/
 .scratch/
 .pytest_cache/

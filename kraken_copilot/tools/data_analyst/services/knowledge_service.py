@@ -246,7 +246,9 @@ def synchronize_knowledge_index(force: bool = False) -> KnowledgeIndexSyncReport
         if f.is_file() and f.suffix.lower() in SUPPORTED_KNOWLEDGE_EXTENSIONS
     ]
 
-    skills_dir = config.PROJECT_ROOT / ".agents" / "skills"
+    skills_dir = config.PROJECT_ROOT / "kraken_copilot" / "skills"
+    if not skills_dir.exists():
+        skills_dir = config.PROJECT_ROOT / ".agents" / "skills"
     if skills_dir.exists():
         for sf in sorted(skills_dir.rglob("*.md")):
             if sf.is_file() and sf not in knowledge_files:

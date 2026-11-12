@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 import pandas as pd
 
+from kraken_copilot.schemas import KrakenStatisticalMetric, KrakenStatisticalReport
 from kraken_copilot.tools.data_analyst.services.dataset_service import read_dataset_dataframe
 
 
@@ -112,6 +113,42 @@ def calculate_descriptive_statistics(
             "data": media_chart_data,
         })
 
+    stat_metrics: list[KrakenStatisticalMetric] = []
+    for col in stats_table.index:
+        row = stats_table.loc[col]
+        q1 = float(row.get("25%", 0.0))
+        q3 = float(row.get("75%", 0.0))
+        iqr = q3 - q1
+        stat_metrics.append(
+            KrakenStatisticalMetric(
+                coluna=str(col),
+                media=round(float(row.get("mean", 0.0)), 4),
+                desvio_padrao=round(float(row.get("std", 0.0)), 4),
+                minimo=round(float(row.get("min", 0.0)), 4),
+                q25=round(q1, 4),
+                mediana=round(float(row.get("50%", 0.0)), 4),
+                q75=round(q3, 4),
+                maximo=round(float(row.get("max", 0.0)), 4),
+                nulos=int(row.get("nulos", 0)),
+                outliers_iqr=int(row.get("outliers_iqr", 0)),
+                limite_inferior_iqr=round(q1 - 1.5 * iqr, 4),
+                limite_superior_iqr=round(q3 + 1.5 * iqr, 4),
+            )
+        )
+
+    kraken_statistical_report = KrakenStatisticalReport(
+        dataset_nome=file_path.stem.replace("-", "_"),
+        total_linhas_analisadas=total_rows,
+        amostragem_ativa=sampling_active,
+        total_outliers_geral=total_outliers,
+        metricas_colunas=stat_metrics,
+        tabela_markdown=markdown_representation,
+        insights_estatisticos=[
+            f"Detectados {total_outliers} outliers no total com base na regra IQR 1.5x." if total_outliers > 0 else "Nenhum outlier detectado.",
+            f"Análise estatística realizada sobre {total_rows} registros.",
+        ],
+    )
+
     return {
         "vazio": False,
         "total_linhas_avaliadas": total_rows,
@@ -122,5 +159,6 @@ def calculate_descriptive_statistics(
         "tabela_markdown": markdown_representation,
         "metricas_por_coluna": metrics_by_column,
         "graficos_sugeridos": graficos_sugeridos,
+        "kraken_statistical_report": kraken_statistical_report.model_dump(),
     }
 

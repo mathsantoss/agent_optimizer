@@ -1,9 +1,4 @@
-"""Mecanismo de Descoberta e Aplicação de Skills do Google ADK para os Agentes do Kraken Copilot.
-Permite carregar e orquestrar skills nativas do Google ADK (google.adk.skills e google.adk.tools.skill_toolset)
-instaladas em `.agents/skills/` (ex.: via `npx skills add <repo>`) de forma extensível para qualquer domínio
-(gráficos, engenharia de features, refatoração de código, machine learning, integrações externas, etc.).
-"""
-from dataclasses import dataclass, field
+"""Serviço e carregador de Skills do Google ADK para os agentes do Kraken Copilot."""
 from pathlib import Path
 import re
 from typing import Any
@@ -18,33 +13,36 @@ from google.adk.tools import skill_toolset
 from google.adk.tools.skill_toolset import SkillDiscoveryMode, SkillToolset
 
 from kraken_copilot import config
-
-
-@dataclass
-class SkillInfo:
-    """Metadados de uma skill instalada."""
-    name: str
-    description: str
-    directory: Path
-    skill_file: Path
-    references: list[str] = field(default_factory=list)
-    recipes: list[str] = field(default_factory=list)
+from kraken_copilot.schemas.skills import SkillInfo
 
 
 def _get_skills_dir(base_dir: Path | None = None) -> Path:
-    """Retorna o diretório base de skills (.agents/skills)."""
+    """Retorna o diretório base de skills (kraken_copilot/skills ou .agents/skills)."""
+    if base_dir:
+        cand1 = base_dir / "kraken_copilot" / "skills"
+        if cand1.exists() and cand1.is_dir():
+            return cand1
+        cand2 = base_dir / ".agents" / "skills"
+        if cand2.exists() and cand2.is_dir():
+            return cand2
+
+    # Padrão: as skills integradas no próprio pacote kraken_copilot/skills
+    pkg_dir = Path(__file__).resolve().parent
+    if (pkg_dir / "graphy-charts").exists() or (pkg_dir / "data-analysis").exists():
+        return pkg_dir
+
     root = base_dir or config.PROJECT_ROOT
-    return root / ".agents" / "skills"
+    if (root / "kraken_copilot" / "skills").exists():
+        return root / "kraken_copilot" / "skills"
+    if (root / ".agents" / "skills").exists():
+        return root / ".agents" / "skills"
+    return pkg_dir
 
-
-# ==============================================================================
-# 1. INTEGRAÇÃO NATIVA COM GOOGLE ADK SKILLS (load_skill_from_dir & SkillToolset)
-# ==============================================================================
 
 def load_adk_skills(skills_dir: Path | None = None) -> list[Skill]:
     """
-    Carrega todas as skills nativas do Google ADK encontradas em `.agents/skills/`.
-    Retorna uma lista de instâncias `google.adk.skills.models.Skill`.
+    Carrega todas as skills nativas do Google ADK encontradas em kraken_copilot/skills/.
+    Retorna uma lista de instâncias google.adk.skills.models.Skill.
     """
     target_dir = skills_dir or _get_skills_dir()
     if not target_dir.exists() or not target_dir.is_dir():
@@ -52,7 +50,6 @@ def load_adk_skills(skills_dir: Path | None = None) -> list[Skill]:
     try:
         return load_skills_from_dir(target_dir)
     except Exception:
-        # Fallback individual caso alguma skill possua erro de parsing
         skills: list[Skill] = []
         for child in sorted(target_dir.iterdir()):
             if child.is_dir() and (child / "SKILL.md").exists():
@@ -66,10 +63,7 @@ def load_adk_skills(skills_dir: Path | None = None) -> list[Skill]:
 
 
 def load_adk_skill(skill_name_or_path: str | Path, base_dir: Path | None = None) -> Skill | None:
-    """
-    Carrega uma skill específica do Google ADK pelo nome ou caminho de diretório.
-    Exemplo: load_adk_skill("graphy-charts") ou load_adk_skill(Path(".../weather-skill"))
-    """
+    """Carrega uma skill específica do Google ADK pelo nome ou caminho."""
     if isinstance(skill_name_or_path, Path):
         path = skill_name_or_path
     else:
@@ -90,17 +84,7 @@ def create_adk_skill_toolset(
     discovery_mode: SkillDiscoveryMode = SkillDiscoveryMode.LAZY,
     script_timeout: int = 300,
 ) -> SkillToolset:
-    """
-    Constrói um `SkillToolset` do Google ADK a partir de uma lista de skills (objetos Skill ou nomes de pastas)
-    e ferramentas adicionais opcionais.
-    
-    Permite aos agentes executar dinamicamente:
-    - list_skills
-    - load_skill
-    - load_skill_resource
-    - run_skill_script
-    - ferramentas adicionais vinculadas ao toolset
-    """
+    """Constrói um SkillToolset do Google ADK a partir de uma lista de skills."""
     resolved_skills: list[Skill] = []
     if skills is None:
         resolved_skills = load_adk_skills()
@@ -130,17 +114,7 @@ def create_skill_enabled_agent(
     instruction: str = "",
     discovery_mode: SkillDiscoveryMode = SkillDiscoveryMode.LAZY,
 ) -> Agent:
-    """
-    Cria um Agente Google ADK habilitado com Skills através de um SkillToolset nativo.
-    
-    Exemplo de uso:
-        graphy_skill = load_adk_skill("graphy-charts")
-        agent = create_skill_enabled_agent(
-            name="chart_visualizer",
-            skills=[graphy_skill],
-            instruction="Especialista em criar gráficos usando o Graphy SDK."
-        )
-    """
+    """Cria um Agente Google ADK habilitado com Skills."""
     from kraken_copilot.agent import language_model
     selected_model = model or language_model
 
@@ -158,10 +132,6 @@ def create_skill_enabled_agent(
         tools=[toolset],
     )
 
-
-# ==============================================================================
-# 2. DESCOBERTA E METADADOS DE SKILLS PARA O SISTEMA KRAKEN
-# ==============================================================================
 
 def _parse_frontmatter(content: str) -> tuple[dict[str, str], str]:
     """Extrai o frontmatter YAML (---\n...\n---) e o corpo markdown."""
@@ -182,16 +152,14 @@ def _parse_frontmatter(content: str) -> tuple[dict[str, str], str]:
 
 
 def discover_skills(base_dir: Path | None = None) -> dict[str, SkillInfo]:
-    """
-    Descobre todas as skills instaladas em `.agents/skills/` no workspace.
-    """
+    """Descobre todas as skills instaladas em kraken_copilot/skills/ no workspace."""
     skills_dir = _get_skills_dir(base_dir)
     skills: dict[str, SkillInfo] = {}
     if not skills_dir.exists() or not skills_dir.is_dir():
         return skills
 
     for skill_path in sorted(skills_dir.iterdir()):
-        if not skill_path.is_dir():
+        if not skill_path.is_dir() or skill_path.name.startswith("__"):
             continue
 
         skill_md = skill_path / "SKILL.md"
@@ -234,10 +202,7 @@ def get_skill_content(skill_name: str, base_dir: Path | None = None) -> str | No
 
 
 def get_agent_skills_instruction(agent_name: str, base_dir: Path | None = None) -> str:
-    """
-    Gera dinamicamente a seção de instruções de skills aplicáveis a um agente específico
-    com base nas skills do Google ADK instaladas em `.agents/skills/`.
-    """
+    """Gera dinamicamente a seção de instruções de skills aplicáveis a um agente específico."""
     skills = discover_skills(base_dir)
     if not skills:
         return ""
@@ -278,3 +243,4 @@ def get_agent_skills_instruction(agent_name: str, base_dir: Path | None = None) 
             lines.append("  { 'charts': [ { 'type': 'line', ... }, { 'type': 'donut', ... } ] }")
 
     return "\n".join(lines)
+

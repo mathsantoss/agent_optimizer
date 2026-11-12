@@ -5,7 +5,11 @@ from typing import Any
 
 from kraken_copilot import config
 from kraken_copilot.audit_logger import record_benchmark_comparison
-from kraken_copilot.schemas import PipelineBenchmarkComparison, PipelineProfileResult
+from kraken_copilot.schemas import (
+    KrakenBenchmark,
+    PipelineBenchmarkComparison,
+    PipelineProfileResult,
+)
 from kraken_copilot.tools.code_optimizer.services.file_service import resolve_pipeline_path
 from kraken_copilot.tools.code_optimizer.services.profiling_service import execute_and_profile_pipeline
 
@@ -270,12 +274,30 @@ def run_pipeline_benchmark(
         f"| Equivalência dos resultados | — | **{'Aprovada' if results_equivalent else 'Reprovada'}** | {eq_details} |\n"
     )
 
+    kraken_benchmark = KrakenBenchmark(
+        arquivo=str(Path(candidate_profile.file_path).name),
+        baseline_arquivo=str(Path(baseline_profile.file_path).name),
+        status="SUCESSO" if both_succeeded else "FALHA",
+        tempo_execucao_original=base_duration,
+        tempo_execucao_otimizado=cand_duration,
+        speedup=speedup,
+        memoria_pico_original_mb=base_mem,
+        memoria_pico_otimizada_mb=cand_mem,
+        reducao_memoria_pct=mem_reduction,
+        linhas_baseline=baseline_profile.rows_processed,
+        linhas_candidato=candidate_profile.rows_processed,
+        equivalencia_preservada=results_equivalent,
+        detalhes_equivalencia=eq_details,
+        tabela_markdown=markdown_table,
+    )
+
     return {
         "success": True,
         "summary": f"Benchmark concluído: Speedup de {speedup:+.2f}%, Equivalência: {'Aprovada' if results_equivalent else 'Reprovada'}.",
         "data": {
             "comparison": comparison.model_dump(),
             "summary_comparison": comparison.model_dump(),
+            "kraken_benchmark": kraken_benchmark.model_dump(),
             "tabela_markdown": markdown_table,
             "baseline_status": baseline_profile.execution_status,
             "candidate_status": candidate_profile.execution_status,

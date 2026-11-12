@@ -5,7 +5,12 @@ import pandas as pd
 
 from kraken_copilot import config
 from kraken_copilot.guardrails import sanitize_untrusted_data_text
-from kraken_copilot.schemas import ColumnProfile, DateRangeSummary
+from kraken_copilot.schemas import (
+    ColumnProfile,
+    DateRangeSummary,
+    KrakenColumnInfo,
+    KrakenDataProfile,
+)
 from kraken_copilot.tools.data_analyst.services.dataset_service import read_dataset_dataframe
 
 
@@ -92,6 +97,39 @@ def profile_dataset_structure(
     except ValueError:
         rel_path = str(file_path)
 
+    file_size_kb = round(file_path.stat().st_size / 1024, 2) if file_path.is_file() else 0.0
+    column_infos = [
+        KrakenColumnInfo(
+            nome=col_name,
+            tipo=meta["tipo"],
+            valores_unicos=meta["valores_unicos"],
+            nulos=meta["nulos"],
+            percentual_nulos=meta["percentual_nulos"],
+        )
+        for col_name, meta in columns_metadata.items()
+    ]
+    alerts: list[str] = []
+    if duplicate_count > 0:
+        alerts.append(f"{duplicate_count} linhas duplicadas detectadas")
+    if sampling_active:
+        alerts.append(f"Amostragem ativa sobre {total_rows} linhas")
+
+    kraken_data_profile = KrakenDataProfile(
+        dataset_nome=file_path.stem.replace("-", "_"),
+        arquivo=file_path.name,
+        caminho=rel_path,
+        total_linhas=total_rows,
+        total_colunas=len(columns_metadata),
+        tamanho_kb=file_size_kb,
+        amostragem_ativa=sampling_active,
+        linhas_duplicadas=duplicate_count,
+        chaves_candidatas=candidate_keys,
+        periodo_temporal=date_ranges if date_ranges else "Nenhuma coluna de data detectada",
+        colunas=column_infos,
+        amostra_linhas=sanitized_sample,
+        alertas_qualidade=alerts,
+    )
+
     return {
         "arquivo": rel_path,
         "tabela_sql": file_path.stem.replace("-", "_"),
@@ -103,5 +141,6 @@ def profile_dataset_structure(
         "periodo_temporal": date_ranges if date_ranges else "Nenhuma coluna de data detectada",
         "colunas": columns_metadata,
         "amostra_3_linhas": sanitized_sample,
+        "kraken_data_profile": kraken_data_profile.model_dump(),
     }
 

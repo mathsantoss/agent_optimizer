@@ -5,6 +5,7 @@ import { CodeBlock } from './CodeBlock';
 import { RecordsTable } from './RecordsTable';
 import { MermaidBlock } from './MermaidBlock';
 import { GraphyChart } from './GraphyChart';
+import { StructuredResultCard } from './structured/StructuredResultCard';
 
 export interface StreamingTextProps {
   content: string;
@@ -94,6 +95,25 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
             }
           } catch (e) {
             // Em caso de streaming incompleto ou JSON malformado, segue como CodeBlock
+          }
+        }
+
+        if (lang === 'json') {
+          try {
+            const parsed = JSON.parse(code.trim());
+            if (
+              parsed.kraken_benchmark ||
+              parsed.kraken_data_profile ||
+              parsed.kraken_code_diff ||
+              parsed.kraken_statistical_report ||
+              (parsed.tempo_execucao_otimizado !== undefined && parsed.speedup !== undefined) ||
+              (parsed.dataset_nome && parsed.colunas && parsed.tamanho_kb !== undefined) ||
+              (parsed.total_linhas_analisadas && parsed.metricas_colunas)
+            ) {
+              return <StructuredResultCard key={index} data={parsed} />;
+            }
+          } catch (e) {
+            // fallback
           }
         }
 
@@ -308,7 +328,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
           renderedElements.push(<div key={`empty-${index}-${i}`} className="h-2" />);
         } else if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
           renderedElements.push(
-            <hr key={`hr-${index}-${i}`} className="my-3.5 border-t border-slate-200/90" />
+            <hr key={`hr-${index}-${i}`} className="my-4 border-t border-slate-200/80" />
           );
         } else if (trimmed.startsWith('#### ')) {
           renderedElements.push(
@@ -324,7 +344,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
           );
         } else if (trimmed.startsWith('## ')) {
           renderedElements.push(
-            <h3 key={`h3-${index}-${i}`} className="mt-4 text-base font-bold text-slate-900 tracking-tight">
+            <h3 key={`h3-${index}-${i}`} className="mt-4 text-base font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
               {formatInline(trimmed.slice(3))}
             </h3>
           );
@@ -338,7 +358,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
           renderedElements.push(
             <blockquote
               key={`quote-${index}-${i}`}
-              className="my-2.5 border-l-2 border-blue-500 pl-3.5 py-1 italic text-xs text-slate-600 bg-slate-50/80 rounded-r-xl"
+              className="my-3 border-l-3 border-blue-500 bg-blue-50/40 pl-3.5 py-2 text-xs text-slate-700 leading-relaxed rounded-r-xl"
             >
               {formatInline(trimmed.slice(2))}
             </blockquote>
@@ -368,20 +388,24 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
         } else if (trimmed.startsWith('• ') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
           const bulletText = trimmed.replace(/^[•\-*]\s+/, '');
           renderedElements.push(
-            <li key={`li-${index}-${i}`} className="ml-4 list-disc text-xs text-slate-700 leading-relaxed">
-              {formatInline(bulletText)}
-            </li>
+            <div key={`li-${index}-${i}`} className="flex items-start gap-2 text-xs text-slate-800 leading-relaxed pl-1 py-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+              <div className="flex-1 min-w-0">{formatInline(bulletText)}</div>
+            </div>
           );
         } else if (/^\d+\.\s+/.test(trimmed)) {
-          const numText = trimmed.replace(/^\d+\.\s+/, '');
+          const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+          const num = numMatch ? numMatch[1] : '1';
+          const numText = numMatch ? numMatch[2] : trimmed;
           renderedElements.push(
-            <li key={`ol-${index}-${i}`} className="ml-4 list-decimal text-xs text-slate-700 leading-relaxed">
-              {formatInline(numText)}
-            </li>
+            <div key={`ol-${index}-${i}`} className="flex items-start gap-2 text-xs text-slate-800 leading-relaxed pl-1 py-0.5">
+              <span className="font-mono text-[11px] font-semibold text-slate-500 shrink-0 w-4 text-right">{num}.</span>
+              <div className="flex-1 min-w-0">{formatInline(numText)}</div>
+            </div>
           );
         } else {
           renderedElements.push(
-            <p key={`p-${index}-${i}`} className="text-xs text-slate-700 leading-relaxed">
+            <p key={`p-${index}-${i}`} className="text-xs text-slate-800 leading-relaxed">
               {formatInline(trimmed)}
             </p>
           );
@@ -402,7 +426,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
         return (
           <code
             key={i}
-            className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] font-semibold text-slate-800"
+            className="rounded-md bg-slate-100 border border-slate-200/80 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-800"
           >
             {token.slice(1, -1)}
           </code>

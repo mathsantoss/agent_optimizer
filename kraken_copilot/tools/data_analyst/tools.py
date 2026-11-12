@@ -93,11 +93,15 @@ def analyze_dataset(
             consolidated_data["amostra_linhas"] = structure_info.get("amostra_3_linhas", [])
         else:
             consolidated_data["estrutura"] = structure_info
+        if structure_info.get("kraken_data_profile"):
+            consolidated_data["kraken_data_profile"] = structure_info.get("kraken_data_profile")
 
     if statistics_info:
         if statistics_info.get("amostragem_ativa"):
             warnings.append(f"Estatísticas descritivas calculadas sobre amostra de {statistics_info.get('limite_amostral')} linhas.")
         consolidated_data["estatisticas"] = statistics_info
+        if statistics_info.get("kraken_statistical_report"):
+            consolidated_data["kraken_statistical_report"] = statistics_info.get("kraken_statistical_report")
 
     record_data_analysis_event(
         action=f"analyze_dataset:{norm_op}",

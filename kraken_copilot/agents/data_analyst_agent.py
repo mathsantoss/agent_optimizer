@@ -9,6 +9,7 @@ from kraken_copilot.guardrails import (
     before_tool_guardrail,
 )
 from kraken_copilot.prompts.data_analyst import ANALYST_AGENT_INSTRUCTION
+from kraken_copilot.skills import get_agent_skills_instruction
 from kraken_copilot.tools.data_analyst import (
     analyze_dataset,
     query_dataset,
@@ -18,6 +19,9 @@ from kraken_copilot.tools.data_analyst import (
 
 def create_kraken_analyst_agent(language_model: Any) -> Agent:
     """Instancia o Kraken Analyst com exatamente 3 ferramentas públicas orientadas a objetivos."""
+    skills_text = get_agent_skills_instruction("kraken_analyst")
+    full_instruction = f"{ANALYST_AGENT_INSTRUCTION}\n{skills_text}" if skills_text else ANALYST_AGENT_INSTRUCTION
+
     return Agent(
         name="kraken_analyst",
         model=language_model,
@@ -25,7 +29,7 @@ def create_kraken_analyst_agent(language_model: Any) -> Agent:
             "Kraken Analyst — Agente Analista de Dados especialista em análise exploratória, verificação de qualidade, "
             "resumos estatísticos descritivos, consultas SQL analíticas e consulta ao Dicionário de Dados."
         ),
-        static_instruction=ANALYST_AGENT_INSTRUCTION,
+        static_instruction=full_instruction,
         before_model_callback=before_model_guardrail,
         after_model_callback=after_model_guardrail,
         before_tool_callback=before_tool_guardrail,

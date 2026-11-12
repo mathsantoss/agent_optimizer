@@ -196,7 +196,9 @@ export function CodeBlock({
     return (
       <div
         className={cn(
-          'my-3 w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0c1222] shadow-md font-mono text-xs select-text flex flex-col',
+          fullHeight
+            ? 'h-full flex-1 min-h-0 my-0 rounded-none border-none shadow-none font-mono text-xs select-text flex flex-col bg-[#0c1222]'
+            : 'my-3 w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0c1222] shadow-md font-mono text-xs select-text flex flex-col',
           className
         )}
       >
@@ -223,7 +225,9 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        'my-3 w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0c1222] shadow-md font-mono text-xs select-text flex flex-col',
+        fullHeight
+          ? 'h-full flex-1 min-h-0 my-0 rounded-none border-none shadow-none font-mono text-xs select-text flex flex-col bg-[#0c1222]'
+          : 'my-3 w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0c1222] shadow-md font-mono text-xs select-text flex flex-col',
         className
       )}
     >
@@ -340,8 +344,8 @@ export function CodeBlock({
       {/* Body — Pierre Diffs Container com Shiki Highlighting e Virtualização */}
       <div
         className={cn(
-          'overflow-auto py-1 font-mono text-[12px] leading-[1.65] text-slate-300 w-full min-w-0 bg-[#0c1222]',
-          fullHeight ? 'flex-1 h-full max-h-none' : 'max-h-[520px]'
+          'overflow-auto font-mono text-[12px] leading-[1.65] text-slate-300 w-full min-w-0 bg-[#0c1222]',
+          fullHeight ? 'flex-1 h-full min-h-0 max-h-none py-0' : 'max-h-[520px] py-1'
         )}
       >
         <PierreErrorBoundary
@@ -356,6 +360,8 @@ export function CodeBlock({
               <MultiFileDiff
                 oldFile={{ name: filename, contents: effectiveOldCode }}
                 newFile={{ name: filename, contents: effectiveNewCode }}
+                className={fullHeight ? 'h-full flex-1' : undefined}
+                style={fullHeight ? { height: '100%' } : undefined}
                 options={{
                   theme: 'pierre-dark',
                   diffStyle: diffLayout,
@@ -366,6 +372,8 @@ export function CodeBlock({
             ) : (
               <PatchDiff
                 patch={unifiedPatch}
+                className={fullHeight ? 'h-full flex-1' : undefined}
+                style={fullHeight ? { height: '100%' } : undefined}
                 options={{
                   theme: 'pierre-dark',
                   diffStyle: diffLayout,
@@ -377,6 +385,8 @@ export function CodeBlock({
           ) : (
             <File
               file={{ name: filename, contents: displayCode }}
+              className={fullHeight ? 'h-full flex-1' : undefined}
+              style={fullHeight ? { height: '100%' } : undefined}
               options={{
                 theme: 'pierre-dark',
                 overflow: 'scroll',

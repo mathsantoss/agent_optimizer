@@ -11,6 +11,7 @@ class ToolResult(BaseModel):
     success: bool = Field(default=True, description="Indica se a operação foi executada com sucesso")
     operation: str = Field(default="", description="Identificador da ferramenta ou sub-operação executada")
     summary: str = Field(description="Resumo claro do resultado em linguagem natural para o agente e usuário")
+    schema_name: str | None = Field(default=None, description="Nome do modelo estruturado Pydantic (ex: KrakenBenchmark, KrakenDataProfile)")
     data: dict[str, Any] = Field(default_factory=dict, description="Payload de dados estruturados da operação")
     warnings: list[str] = Field(default_factory=list, description="Alertas operacionais ou informativos não impeditivos")
     errors: list[str] = Field(default_factory=list, description="Lista de erros impeditivos caso ocorram")
@@ -20,15 +21,27 @@ class ToolResult(BaseModel):
         cls,
         summary: str,
         operation: str = "",
-        data: dict[str, Any] | None = None,
+        data: dict[str, Any] | BaseModel | None = None,
         warnings: list[str] | None = None,
+        schema_name: str | None = None,
     ) -> ToolResult:
-        """Cria uma resposta de sucesso padronizada."""
+        """Cria uma resposta de sucesso padronizada com suporte a Pydantic models."""
+        resolved_schema = schema_name
+        resolved_data: dict[str, Any] = {}
+        if isinstance(data, BaseModel):
+            resolved_schema = resolved_schema or data.__class__.__name__
+            resolved_data = data.model_dump()
+        elif isinstance(data, dict):
+            resolved_data = data
+            if not resolved_schema and "__schema__" in resolved_data:
+                resolved_schema = str(resolved_data["__schema__"])
+
         return cls(
             success=True,
             operation=operation,
             summary=summary,
-            data=data or {},
+            schema_name=resolved_schema,
+            data=resolved_data,
             warnings=warnings or [],
             errors=[],
         )
@@ -39,8 +52,9 @@ class ToolResult(BaseModel):
         summary: str,
         operation: str = "",
         errors: list[str] | str | None = None,
-        data: dict[str, Any] | None = None,
+        data: dict[str, Any] | BaseModel | None = None,
         warnings: list[str] | None = None,
+        schema_name: str | None = None,
     ) -> ToolResult:
         """Cria uma resposta de erro padronizada."""
         err_list: list[str] = []
@@ -50,11 +64,21 @@ class ToolResult(BaseModel):
             err_list = errors
         elif errors is None and summary:
             err_list = [summary]
+
+        resolved_schema = schema_name
+        resolved_data: dict[str, Any] = {}
+        if isinstance(data, BaseModel):
+            resolved_schema = resolved_schema or data.__class__.__name__
+            resolved_data = data.model_dump()
+        elif isinstance(data, dict):
+            resolved_data = data
+
         return cls(
             success=False,
             operation=operation,
             summary=summary,
-            data=data or {},
+            schema_name=resolved_schema,
+            data=resolved_data,
             warnings=warnings or [],
             errors=err_list,
         )
