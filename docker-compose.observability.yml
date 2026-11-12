@@ -13,6 +13,7 @@ services:
       - GF_PATHS_DATA=/data/grafana
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ALLOW_EMBEDDING=true
     volumes:
       - ./observability/grafana/provisioning/dashboards/kraken-copilot-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/kraken-copilot-dashboards.yaml:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards/kraken-copilot:ro

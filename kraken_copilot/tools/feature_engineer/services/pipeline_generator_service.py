@@ -1,11 +1,58 @@
 """Serviço de geração dinâmica e agnóstica de pipelines de Feature Engineering em Pandas e PySpark."""
 from pathlib import Path
+import re
 from typing import Any
 import pandas as pd
 
 from kraken_copilot import config
 from kraken_copilot.schemas import FeaturePipelinePlan, FeatureSpec
-from kraken_copilot.tools.data_analyst.services.dataset_service import resolve_dataset_file
+from kraken_copilot.tools.data_analyst.services.dataset_service import (
+    get_available_datasets_catalog,
+    list_dataset_files,
+    resolve_dataset_file,
+)
+
+
+def resolve_dataset_smart(dataset_name: str, fallback_if_empty: bool = False) -> tuple[Path | None, str | None]:
+    """
+    Resolve o arquivo de dataset com suporte a linguagem natural (ex: 'dados de venda' -> 'dados_vendas.csv').
+    Preserva o comportamento exato para nomes explícitos de outras bases (ex: 'clientes_telecom').
+    """
+    clean = (dataset_name or "").strip()
+    if clean:
+        exact_path, err = resolve_dataset_file(clean)
+        if exact_path is not None:
+            return exact_path, None
+
+    files = list_dataset_files()
+    if not files:
+        return None, "Nenhum dataset encontrado no catálogo."
+
+    if not clean or clean.lower() in ("auto", "default", "padrao", "padrão", "catalogo", "catálogo"):
+        if fallback_if_empty:
+            return files[0], None
+        return None, "Dataset não especificado."
+
+    stopwords = {"de", "da", "do", "das", "dos", "no", "na", "em", "base", "dataset", "tabela", "arquivo", "csv", "parquet"}
+    raw_tokens = [t.rstrip("s") for t in re.split(r"[\s_\-./]+", clean.lower()) if t and t not in stopwords]
+    if raw_tokens:
+        best_file = None
+        best_score = 0
+        for f in files:
+            f_tokens = [ft.rstrip("s") for ft in re.split(r"[\s_\-./]+", f.stem.lower()) if ft]
+            # Exige correspondência de token significativo (não apenas 'dado')
+            matched = [t for t in raw_tokens if any(t == ft or (len(t) >= 4 and (t in ft or ft in t)) for ft in f_tokens)]
+            meaningful = [t for t in matched if t not in ("dado", "data")]
+            if meaningful and len(matched) > best_score:
+                best_score = len(matched)
+                best_file = f
+        if best_file is not None:
+            return best_file, None
+
+    if fallback_if_empty and len(files) == 1:
+        return files[0], None
+
+    return None, f"Dataset '{dataset_name}' não encontrado."
 
 
 def infer_candidate_features_from_schema(
@@ -141,8 +188,15 @@ def infer_candidate_features_from_schema(
                     name=f"ratio_{col_a}_{col_b}",
                     category="ratio",
                     framework="pandas",
-                    expression=f"np.where(df['{col_b}'] == 0, 0, df['{col_a}'] / df['{col_b}'].replace(0, np.nan)).fillna(0)",
+                    expression=f"(df['{col_a}'] / df['{col_b}'].replace(0, np.nan)).fillna(0.0)",
                     description=f"Razão normalizada com proteção contra divisão por zero ({col_a} / {col_b})",
+                ),
+                FeatureSpec(
+                    name=f"interacao_{col_a}_x_{col_b}",
+                    category="interaction",
+                    framework="pandas",
+                    expression=f"df['{col_a}'].fillna(0) * df['{col_b}'].fillna(0)",
+                    description=f"Produto de interação multiplicativa ({col_a} * {col_b}, ex: volume financeiro/transacional)",
                 ),
             ])
 
@@ -216,7 +270,14 @@ def generate_pandas_pipeline_code(
     features: list[FeatureSpec],
     dataset_file_rel: str = "",
 ) -> str:
-    """Gera o código-fonte de um pipeline completo e performático de Feature Engineering em Pandas."""
+    """
+    Gera o código-fonte de um pipeline estruturado, modular e de alta performance de Feature Engineering em Pandas.
+    Todo o fluxo é estritamente encapsulado em funções 'def' padronizadas:
+    - load_data(): Ingestão segura agnóstica a formatos (parquet, csv, json)
+    - clean_data(): Limpeza robusta (remoção de duplicatas, tratamento de nulos, tipagem temporal)
+    - engineer_features(): Criação vetorizada de features analíticas e preditivas
+    - run(): Orquestrador do pipeline
+    """
     data_filename = dataset_file_rel or f"{dataset_name}.csv"
 
     # Detecta colunas que usam acessor .dt para conversão prévia de tipos
@@ -229,26 +290,43 @@ def generate_pandas_pipeline_code(
             temporal_cols_needed.update(matches)
 
     lines = [
-        '"""Pipeline de Feature Engineering (Pandas) gerado para modelagem de Machine Learning."""',
+        '"""',
+        f'Pipeline modular de Limpeza e Feature Engineering para o dataset: {dataset_name}',
+        'Arquitetura padronizada Kraken Copilot: funções puras, vetorização NumPy/Pandas e tratamento de erros.',
+        '"""',
         "from pathlib import Path",
         "import numpy as np",
         "import pandas as pd",
         "",
         "",
-        "def run():",
-        '    """Executa a ingestão, limpeza e criação vetorizada de features em Pandas."""',
-        "    project_root = Path(__file__).resolve().parents[1]",
-        f'    data_path = project_root / "pipeline" / "dados" / "{data_filename}"',
-        "    if not data_path.exists():",
-        f'        data_path = Path("pipeline/dados/{data_filename}").resolve()',
+        "def load_data(filepath: Path | str | None = None) -> pd.DataFrame:",
+        '    """Localiza e carrega o dataset com suporte flexível a CSV, Parquet e JSON."""',
+        "    if filepath is not None:",
+        "        data_path = Path(filepath).resolve()",
+        "    else:",
+        "        project_root = Path(__file__).resolve().parents[1]",
+        "        candidate_paths = [",
+        f'            project_root / "krakenlake" / "catalog" / "sources" / "{data_filename}",',
+        f'            project_root / "krakenlake" / "datalake" / "{data_filename}",',
+        f'            Path("krakenlake/catalog/sources/{data_filename}").resolve(),',
+        f'            Path("krakenlake/datalake/{data_filename}").resolve(),',
+        f'            Path("{data_filename}").resolve(),',
+        "        ]",
+        "        data_path = None",
+        "        for p in candidate_paths:",
+        "            if p.exists():",
+        "                data_path = p",
+        "                break",
+        "        if data_path is None:",
+        f'            data_path = Path("krakenlake/catalog/sources/{data_filename}").resolve()',
         "",
         "    if not data_path.exists():",
-        f'        raise FileNotFoundError(f"Dataset de entrada não encontrado: {{data_path}}")',
+        '        raise FileNotFoundError(f"Dataset de entrada não encontrado: {data_path}")',
         "",
-        "    # 1. Ingestão segura dos dados",
-        "    if str(data_path).endswith('.parquet'):",
+        "    suffix = data_path.suffix.lower()",
+        "    if suffix == '.parquet':",
         "        df = pd.read_parquet(data_path)",
-        "    elif str(data_path).endswith('.json') or str(data_path).endswith('.jsonl'):",
+        "    elif suffix in ('.json', '.jsonl'):",
         "        try:",
         "            df = pd.read_json(data_path)",
         "        except ValueError:",
@@ -256,28 +334,74 @@ def generate_pandas_pipeline_code(
         "    else:",
         "        df = pd.read_csv(data_path, sep=None, engine='python')",
         "",
+        "    return df",
+        "",
+        "",
+        "def clean_data(df: pd.DataFrame) -> pd.DataFrame:",
+        '    """',
+        '    Executa a etapa de Data Cleaning:',
+        '    - Deduplicação de registros',
+        '    - Conversão e normalização de colunas temporais',
+        '    - Imputação preventiva de dados ausentes (numéricos e categóricos)',
+        '    """',
+        "    df = df.copy()",
+        "",
+        "    # 1. Remoção de duplicatas completas",
+        "    df = df.drop_duplicates()",
+        "",
     ]
 
     if temporal_cols_needed:
-        lines.append("    # 2. Conversão otimizada de colunas temporais")
+        lines.append("    # 2. Conversão de colunas temporais")
         for col_name in sorted(temporal_cols_needed):
             lines.append(f"    if '{col_name}' in df.columns:")
             lines.append(f"        df['{col_name}'] = pd.to_datetime(df['{col_name}'], errors='coerce')")
         lines.append("")
 
-    lines.append("    # 3. Engenharia de Features (Vetorizada)")
+    lines.extend([
+        "    # 3. Tratamento e imputação de valores ausentes por tipo",
+        "    num_cols = df.select_dtypes(include=[np.number]).columns",
+        "    for n_col in num_cols:",
+        "        if df[n_col].isna().any():",
+        "            df[n_col] = df[n_col].fillna(df[n_col].median() if not df[n_col].isna().all() else 0.0)",
+        "",
+        "    cat_cols = df.select_dtypes(include=['object', 'string', 'category']).columns",
+        "    for c_col in cat_cols:",
+        "        if df[c_col].isna().any():",
+        "            df[c_col] = df[c_col].fillna('DESCONHECIDO')",
+        "",
+        "    return df",
+        "",
+        "",
+        "def engineer_features(df: pd.DataFrame) -> pd.DataFrame:",
+        '    """Aplica transformações analíticas e criação vetorizada de novas features."""',
+        "    df = df.copy()",
+        "",
+    ])
+
     for feat in features:
         lines.append(f"    # {feat.description}")
-        lines.append(f"    df['{feat.name}'] = {feat.expression}")
+        lines.append(f"    try:")
+        lines.append(f"        df['{feat.name}'] = {feat.expression}")
+        lines.append(f"    except Exception as err:")
+        lines.append(f"        print(f'Aviso: não foi possível gerar feature {feat.name}: {{err}}')")
         lines.append("")
 
     lines.extend([
         "    return df",
         "",
         "",
+        "def run():",
+        '    """Orquestrador do pipeline de dados: carga -> limpeza -> features."""',
+        "    df_raw = load_data()",
+        "    df_cleaned = clean_data(df_raw)",
+        "    df_featured = engineer_features(df_cleaned)",
+        "    return df_featured",
+        "",
+        "",
         'if __name__ == "__main__":',
-        "    features_df = run()",
-        "    print(f'Pipeline de features concluído com sucesso: {features_df.shape[0]} linhas x {features_df.shape[1]} colunas.')",
+        "    resultado_df = run()",
+        "    print(f'Pipeline concluído com sucesso: {resultado_df.shape[0]} linhas x {resultado_df.shape[1]} colunas.')",
     ])
 
     return "\n".join(lines) + "\n"
@@ -288,14 +412,22 @@ def generate_pyspark_pipeline_code(
     features: list[FeatureSpec],
     dataset_file_rel: str = "",
 ) -> str:
-    """Gera o código-fonte de um pipeline distribuído de Feature Engineering em PySpark."""
+    """
+    Gera o código-fonte de um pipeline distribuído em PySpark encapsulado em funções modulares:
+    - get_spark_session()
+    - load_data()
+    - clean_data()
+    - engineer_features()
+    - run()
+    """
     data_filename = dataset_file_rel or f"{dataset_name}.csv"
-
-    # Verifica se Window é utilizado em alguma feature
     uses_window = any("Window" in feat.expression for feat in features)
 
     lines = [
-        '"""Pipeline de Feature Engineering (PySpark) gerado para processamento distribuído e ML."""',
+        '"""',
+        f'Pipeline modular distribuído (PySpark) de Limpeza e Feature Engineering: {dataset_name}',
+        'Arquitetura padronizada Kraken Copilot com funções modulares e Lazy Evaluation.',
+        '"""',
         "from pathlib import Path",
         "from pyspark.sql import SparkSession",
         "from pyspark.sql import functions as F",
@@ -305,7 +437,7 @@ def generate_pyspark_pipeline_code(
     lines.extend([
         "",
         "",
-        "def get_spark_session():",
+        "def get_spark_session() -> SparkSession:",
         '    """Inicializa ou obtém a sessão ativa do Apache Spark."""',
         "    return SparkSession.builder \\",
         '        .appName("KrakenIA-FeatureEngineering") \\',
@@ -313,35 +445,64 @@ def generate_pyspark_pipeline_code(
         "        .getOrCreate()",
         "",
         "",
-        "def run():",
-        '    """Executa a ingestão e transformações distribuídas de features em PySpark."""',
-        "    spark = get_spark_session()",
-        "    project_root = Path(__file__).resolve().parents[1]",
-        f'    data_path = str(project_root / "pipeline" / "dados" / "{data_filename}")',
-        "",
-        "    # 1. Ingestão distribuída",
-        "    if data_path.endswith('.parquet'):",
-        "        df = spark.read.parquet(data_path)",
-        "    elif data_path.endswith('.json') or data_path.endswith('.jsonl'):",
-        "        df = spark.read.json(data_path)",
+        "def load_data(spark: SparkSession, filepath: str | None = None):",
+        '    """Carrega dados em PySpark com inferência automática de formato."""',
+        "    if filepath is not None:",
+        "        data_path = str(filepath)",
         "    else:",
-        "        df = spark.read.option('header', 'true').option('inferSchema', 'true').csv(data_path)",
+        "        project_root = Path(__file__).resolve().parents[1]",
+        "        candidate_paths = [",
+        f'            project_root / "krakenlake" / "catalog" / "sources" / "{data_filename}",',
+        f'            project_root / "krakenlake" / "datalake" / "{data_filename}",',
+        f'            Path("krakenlake/catalog/sources/{data_filename}").resolve(),',
+        f'            Path("krakenlake/datalake/{data_filename}").resolve(),',
+        f'            Path("{data_filename}").resolve(),',
+        "        ]",
+        "        data_path = None",
+        "        for p in candidate_paths:",
+        "            if p.exists():",
+        "                data_path = str(p)",
+        "                break",
+        "        if data_path is None:",
+        f'            data_path = str(project_root / "krakenlake" / "catalog" / "sources" / "{data_filename}")',
         "",
-        "    # 2. Criação de Features em PySpark",
+        "    if data_path.endswith('.parquet'):",
+        "        return spark.read.parquet(data_path)",
+        "    elif data_path.endswith('.json') or data_path.endswith('.jsonl'):",
+        "        return spark.read.json(data_path)",
+        "    else:",
+        "        return spark.read.option('header', 'true').option('inferSchema', 'true').csv(data_path)",
+        "",
+        "",
+        "def clean_data(df):",
+        '    """Aplica deduplicação e limpeza no DataFrame PySpark."""',
+        "    return df.dropDuplicates()",
+        "",
+        "",
+        "def engineer_features(df):",
+        '    """Aplica as transformações e colunas de features derivadas no Spark."""',
     ])
 
     for feat in features:
         lines.append(f"    # {feat.description}")
         lines.append(f"    df = df.withColumn('{feat.name}', {feat.expression})")
-        lines.append("")
 
     lines.extend([
         "    return df",
         "",
         "",
+        "def run():",
+        '    """Orquestrador do pipeline Spark: carga -> limpeza -> features."""',
+        "    spark = get_spark_session()",
+        "    df_raw = load_data(spark)",
+        "    df_clean = clean_data(df_raw)",
+        "    df_final = engineer_features(df_clean)",
+        "    return df_final",
+        "",
+        "",
         'if __name__ == "__main__":',
         "    spark_df = run()",
-        "    print(f'Pipeline PySpark concluído: {spark_df.count()} registros processados.')",
+        "    print(f'Pipeline PySpark concluído com sucesso: {spark_df.count()} registros.')",
     ])
 
     return "\n".join(lines) + "\n"
@@ -350,10 +511,14 @@ def generate_pyspark_pipeline_code(
 def create_feature_pipeline_plan(
     dataset_name: str,
     framework: str = "pandas",
-    target_file_path: str = "pipeline/pipeline_prep.py",
+    target_file_path: str | None = None,
     features: list[FeatureSpec] | list[dict[str, Any]] | None = None,
 ) -> FeaturePipelinePlan:
     """Monta o plano de construção de pipeline de features com código e especificações completas para qualquer dataset."""
+    from kraken_copilot.tools.code_optimizer.services.file_service import get_default_workspace_pipeline
+
+    if not target_file_path:
+        target_file_path = get_default_workspace_pipeline()
     fw = framework.strip().lower()
 
     # Normaliza features fornecidas
@@ -373,17 +538,21 @@ def create_feature_pipeline_plan(
                     )
                 )
 
-    resolved_file, _ = resolve_dataset_file(dataset_name)
+    resolved_file, _ = resolve_dataset_smart(dataset_name, fallback_if_empty=not bool(selected_features))
     data_filename = resolved_file.name if resolved_file else f"{dataset_name}.csv"
+    resolved_stem = resolved_file.stem if resolved_file else dataset_name
 
     # Se nenhuma feature foi especificada, infere dinamicamente a partir do schema real do arquivo
     if not selected_features:
         if resolved_file and resolved_file.exists():
             try:
                 if resolved_file.suffix.lower() == ".parquet":
-                    sample_df = pd.read_parquet(resolved_file).head(10)
+                    sample_df = pd.read_parquet(resolved_file).head(200)
                 else:
-                    sample_df = pd.read_csv(resolved_file, nrows=10)
+                    try:
+                        sample_df = pd.read_csv(resolved_file, nrows=200, sep=None, engine="python", encoding="utf-8-sig")
+                    except Exception:
+                        sample_df = pd.read_csv(resolved_file, nrows=200, sep=None, engine="python", encoding="latin-1")
                 selected_features = infer_candidate_features_from_schema(sample_df, framework=fw)
             except Exception:
                 selected_features = []
@@ -402,15 +571,15 @@ def create_feature_pipeline_plan(
             ]
 
     if fw == "pyspark":
-        code = generate_pyspark_pipeline_code(dataset_name, selected_features, data_filename)
+        code = generate_pyspark_pipeline_code(resolved_stem, selected_features, data_filename)
     else:
-        code = generate_pandas_pipeline_code(dataset_name, selected_features, data_filename)
+        code = generate_pandas_pipeline_code(resolved_stem, selected_features, data_filename)
 
     return FeaturePipelinePlan(
         pipeline_name=f"pipeline_features_{fw}",
         framework=fw,
         target_file_path=target_file_path,
-        source_dataset=dataset_name,
+        source_dataset=resolved_stem,
         features=selected_features,
         code=code,
     )

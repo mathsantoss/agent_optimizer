@@ -37,9 +37,12 @@ def get_knowledge_collection():
 
 def resolve_knowledge_directory() -> Path | None:
     """
-    Localiza o diretório da base de conhecimento priorizando pipeline/dados/conhecimento
-    (config.KNOWLEDGE_DIR) com fallback para docs/conhecimento em fixtures de teste.
+    Localiza o diretório da base de conhecimento priorizando krakenlake/catalog
+    (metadados e documentações) ou config.KNOWLEDGE_DIR.
     """
+    catalog_root = config.PROJECT_ROOT / "krakenlake" / "catalog"
+    if catalog_root.exists():
+        return catalog_root
     if config.KNOWLEDGE_DIR.exists():
         return config.KNOWLEDGE_DIR
     fallback_dir = config.PROJECT_ROOT / "docs" / "conhecimento"
@@ -243,6 +246,14 @@ def synchronize_knowledge_index(force: bool = False) -> KnowledgeIndexSyncReport
         if f.is_file() and f.suffix.lower() in SUPPORTED_KNOWLEDGE_EXTENSIONS
     ]
 
+    skills_dir = config.PROJECT_ROOT / "kraken_copilot" / "skills"
+    if not skills_dir.exists():
+        skills_dir = config.PROJECT_ROOT / ".agents" / "skills"
+    if skills_dir.exists():
+        for sf in sorted(skills_dir.rglob("*.md")):
+            if sf.is_file() and sf not in knowledge_files:
+                knowledge_files.append(sf)
+
     current_chunks_by_id: dict[str, tuple[str, dict[str, Any], str]] = {}
     synced_file_names: set[str] = set()
 
@@ -391,7 +402,7 @@ def search_knowledge_service(
     sync_report = synchronize_knowledge_index()
     if sync_report.total_active_chunks == 0:
         return _build_search_response(
-            "Nenhum documento encontrado na base de conhecimento (pipeline/dados/conhecimento/).",
+            "Nenhum documento encontrado na base de conhecimento (krakenlake/catalog/).",
             query,
             warnings=["Base de conhecimento vazia ou diretório não encontrado."],
         )

@@ -12,11 +12,18 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from kraken_copilot.web.routes import conversas_router, dados_router, execucoes_router
+from kraken_copilot.web.middleware import CopilotKitInfoMiddleware
+from kraken_copilot.web.routes import (
+    conversas_router,
+    copilotkit_router,
+    dados_router,
+    execucoes_router,
+    mount_copilotkit_adk,
+)
 from kraken_copilot.web.runner import adk_runner
 from kraken_copilot.web.storage import Storage, storage
 
@@ -25,6 +32,9 @@ CURRENT_DIR = Path(__file__).resolve().parent
 UI_DIR = CURRENT_DIR / "ui"
 INDEX_HTML = UI_DIR / "index.html"
 INVESTIGACAO_HTML = UI_DIR / "investigacao.html"
+DIST_DIR = UI_DIR / "dist"
+DIST_INDEX_HTML = DIST_DIR / "index.html"
+DIST_ASSETS_DIR = DIST_DIR / "assets"
 
 
 @asynccontextmanager
@@ -40,15 +50,44 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Monta arquivos estáticos do frontend em /web/ui, /ui e /web (retrocompatibilidade)
+# 1. Registra middlewares modulares
+app.add_middleware(CopilotKitInfoMiddleware)
+
+# 2. Monta assets do bundle React compilado se existirem
+if DIST_ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=DIST_ASSETS_DIR, check_dir=False), name="dist_assets")
+
+# 3. Monta arquivos estáticos do frontend em /web/ui, /ui e /web (retrocompatibilidade)
 app.mount("/web/ui", StaticFiles(directory=UI_DIR, check_dir=False), name="web_ui")
 app.mount("/ui", StaticFiles(directory=UI_DIR, check_dir=False), name="ui")
 app.mount("/web", StaticFiles(directory=UI_DIR, check_dir=False), name="web")
 
-# Registra os roteadores modulares da API REST
+# 4. Registra os roteadores modulares da API REST
 app.include_router(conversas_router)
 app.include_router(execucoes_router)
 app.include_router(dados_router)
+app.include_router(copilotkit_router)
+
+# 5. Monta o endpoint do Google ADK para CopilotKit via AG-UI
+mount_copilotkit_adk(app)
+
+
+@app.get("/kraken-copilot.svg")
+async def rota_logo_kraken():
+    """Serve o logotipo oficial do Kraken Copilot."""
+    for p in (DIST_DIR / "kraken-copilot.svg", UI_DIR / "kraken-copilot.svg"):
+        if p.exists():
+            return FileResponse(p, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="Logo não encontrado.")
+
+
+@app.get("/favicon.ico")
+async def rota_favicon():
+    """Serve o favicon da aplicação."""
+    for p in (DIST_DIR / "kraken-copilot.svg", UI_DIR / "kraken-copilot.svg"):
+        if p.exists():
+            return FileResponse(p, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="Favicon não encontrado.")
 
 
 @app.get("/api/modelos")
@@ -67,6 +106,8 @@ async def obter_modelos_api():
 @app.get("/")
 async def rota_raiz():
     """Página principal de chat do Kraken Copilot."""
+    if DIST_INDEX_HTML.exists():
+        return FileResponse(DIST_INDEX_HTML)
     return FileResponse(INDEX_HTML)
 
 

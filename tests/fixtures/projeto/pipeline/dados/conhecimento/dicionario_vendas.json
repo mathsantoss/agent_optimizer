@@ -2,7 +2,6 @@
   "metadata": {
     "category": "dicionario_dados",
     "table": "dados_vendas",
-    "source_file": "pipeline/dados/dados_vendas.csv",
     "version": "1.2",
     "updated_at": "2026-10-30"
   },
@@ -70,4 +69,3 @@
     }
   ]
 }
-

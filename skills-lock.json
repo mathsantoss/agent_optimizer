@@ -1,0 +1,59 @@
+{
+  "version": 2,
+  "skills": {
+    "data-analysis": {
+      "source": "seb1n/awesome-ai-agent-skills",
+      "sourceType": "github",
+      "skillPath": "data-and-analytics/data-analysis/SKILL.md",
+      "computedHash": "3de5a7939f8c4711c7a42b314e857184fcff4d9067011f1b562c5f296ee3024f"
+    },
+    "data-cleaning": {
+      "source": "seb1n/awesome-ai-agent-skills",
+      "sourceType": "github",
+      "skillPath": "data-and-analytics/data-cleaning/SKILL.md",
+      "computedHash": "b3f575f3b2d50a24c8098343188cd24f197c677ad014f00e02c09f88dfb85bbe"
+    },
+    "data-visualization": {
+      "source": "seb1n/awesome-ai-agent-skills",
+      "sourceType": "github",
+      "skillPath": "data-and-analytics/data-visualization/SKILL.md",
+      "computedHash": "a1f44d8df180f222611b09f0d90e5e56f3643fcadc640f8b4030c4324e792e4c"
+    },
+    "diffs": {
+      "source": "pierrecomputer/pierre",
+      "sourceType": "github",
+      "skillPath": "skills/diffs/SKILL.md",
+      "computedHash": "3f86b805fccd8ad5f931e3babed94d89929b3d5e89929f37ed39c04b5fd4d7c9"
+    },
+    "exploratory-data-analysis": {
+      "source": "seb1n/awesome-ai-agent-skills",
+      "sourceType": "github",
+      "skillPath": "data-and-analytics/exploratory-data-analysis/SKILL.md",
+      "computedHash": "f5451525b598a79298ddd0a13cf10b06b26c51ec2f24157364dfb9e9364eecf8"
+    },
+    "graphy-charts": {
+      "source": "graphysdk/skills",
+      "sourceType": "github",
+      "skillPath": "skills/graphy-charts/SKILL.md",
+      "computedHash": "3a916e07ada75a410f25272dca7ffca18a585d86b2008f1e72a88797ab569d65"
+    },
+    "graphy-editor": {
+      "source": "graphysdk/skills",
+      "sourceType": "github",
+      "skillPath": "skills/graphy-editor/SKILL.md",
+      "computedHash": "be4763ba29810adbbd6b5c6f95a82c101cf32580af25e7be317098679f5f4b31"
+    },
+    "sql-query-generation": {
+      "source": "seb1n/awesome-ai-agent-skills",
+      "sourceType": "github",
+      "skillPath": "data-and-analytics/sql-query-generation/SKILL.md",
+      "computedHash": "d6d0d7024c50f4d729d1e09f8216f532e9c4b34c38ff10a532812932c67b6593"
+    },
+    "statistical-analysis": {
+      "source": "K-Dense-AI/scientific-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/statistical-analysis/SKILL.md",
+      "computedHash": "7428d347cfe2f52324cba1aaf30031fc480d47a65dfb932879ec25ca5c7eac7f"
+    }
+  }
+}

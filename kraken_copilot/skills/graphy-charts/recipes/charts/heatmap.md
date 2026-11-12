@@ -1,0 +1,165 @@
+# Heatmap
+
+Use a heatmap to show one value across two bands. Each cell is a tile, and the value sets its color.
+
+## Basic
+
+One row per cell, in long form: an x band, a y band, and the value.
+
+```tsx
+import {
+  config,
+  createSpec,
+  geom,
+  GraphProvider,
+  GraphRenderer,
+  mapping,
+  pipe,
+  scale,
+  style,
+  styles,
+  transform,
+} from '@graphysdk/react';
+import type { Data } from '@graphysdk/react';
+
+const shippedData: Data = {
+  columns: [{ key: 'team' }, { key: 'quarter' }, { key: 'shipped' }],
+  rows: [
+    { team: 'Alpha', quarter: 'Q1', shipped: 5 },
+    { team: 'Alpha', quarter: 'Q2', shipped: 8 },
+    { team: 'Alpha', quarter: 'Q3', shipped: 6 },
+    { team: 'Alpha', quarter: 'Q4', shipped: 11 },
+    { team: 'Beta', quarter: 'Q1', shipped: 2 },
+    { team: 'Beta', quarter: 'Q2', shipped: 3 },
+    { team: 'Beta', quarter: 'Q3', shipped: 6 },
+    { team: 'Beta', quarter: 'Q4', shipped: 7 },
+  ],
+};
+
+const spec = pipe(
+  createSpec({ x: 'quarter', y: 'team', color: 'shipped' }),
+  geom.tile(),
+  scale.x(),
+  scale.y(),
+  scale.color.continuous(),
+  config({
+    axes: { x: { label: 'Quarter', position: 'top' }, y: { label: 'Team', position: 'left' } },
+    legend: { position: 'none' },
+  })
+);
+
+export function ShippedHeatmap() {
+  return (
+    <GraphProvider data={shippedData} spec={spec}>
+      <GraphRenderer />
+    </GraphProvider>
+  );
+}
+```
+
+Tiles colored by a number show their value as a data label by default. Turn it off with `geom.tile({ dataLabels: { showDataLabels: false } })`. Tiles colored by a category show none unless you set `showDataLabels: true`.
+
+## Variants
+
+### Custom color range
+
+Only when the brief gives the colors. The bare call above takes the theme's sequential list, else the engine's brick colormap. Values that cross zero take the diverging variant below. A `range` is two or more stops and decides over the theme.
+
+```ts
+const colorScale = scale.color.continuous({ range: ['#f7fbff', '#08306b'] });
+```
+
+### Diverging values around zero
+
+Pin the neutral color to zero. The theme's diverging list, else the engine's blue, gray, brick colormap, supplies the colors. `domainMid` also turns on `symmetric`, so equal magnitudes get equal intensity. Pass `symmetric: false` to keep the raw extent.
+
+```ts
+const colorScale = scale.color.continuous({ domainMid: 0 });
+```
+
+### Wide matrix from a spreadsheet
+
+One column per x band needs a reshape before the mapping.
+
+```ts
+const revenueData: Data = {
+  columns: [{ key: 'product' }, { key: 'North' }, { key: 'South' }, { key: 'East' }, { key: 'West' }],
+  rows: [
+    { product: 'Coffee', North: 18, South: 12, East: 15, West: 9 },
+    { product: 'Tea', North: 7, South: 11, East: 6, West: 14 },
+    { product: 'Pastry', North: 22, South: 19, East: 12, West: 10 },
+    { product: 'Sandwich', North: 14, South: 8, East: 17, West: 13 },
+  ],
+};
+
+const spec = pipe(
+  createSpec(),
+  transform.reshape({
+    keep: ['product'],
+    reshape: ['North', 'South', 'East', 'West'],
+    keyName: 'region',
+    valueName: 'revenue',
+  }),
+  mapping({ x: 'region', y: 'product', color: 'revenue' }),
+  geom.tile(),
+  scale.x(),
+  scale.y(),
+  scale.color.continuous()
+);
+```
+
+### Percent strings
+
+Values like `'86%'` are read as percentages. The colormap and labels follow.
+
+### Sparse grid
+
+Only rows that exist paint a tile. A missing cell stays empty, which keeps absent and zero apart.
+
+### Waffle
+
+The same tile geom with a band on the color scale. Each cell is one percentage point, and the grid indices are hidden.
+
+```ts
+const channels = [
+  { channel: 'Organic', share: 38, color: '#4c78a8' },
+  { channel: 'Direct', share: 24, color: '#f58518' },
+  { channel: 'Social', share: 18, color: '#54a24b' },
+  { channel: 'Referral', share: 12, color: '#b279a2' },
+  { channel: 'Paid', share: 8, color: '#e45756' },
+];
+const size = 10;
+const indices = Array.from({ length: size }, (_unused, index) => index);
+const cells = channels.flatMap((entry) => Array.from({ length: entry.share }, () => entry.channel));
+
+const waffleData: Data = {
+  columns: [{ key: 'col' }, { key: 'row' }, { key: 'channel' }],
+  rows: cells.map((channel, index) => ({ col: Math.floor(index / size), row: size - 1 - (index % size), channel })),
+};
+
+const spec = pipe(
+  createSpec({ x: 'col', y: 'row', color: 'channel' }),
+  geom.tile(),
+  scale.x.discrete({ domain: indices }),
+  scale.y.discrete({ domain: indices }),
+  scale.color.discrete({ domain: channels.map((entry) => entry.channel), range: channels.map((entry) => entry.color) }),
+  config({ axes: { x: { visible: false }, y: { visible: false } }, legend: { position: 'right' } })
+);
+```
+
+### Cell corner radius and borders
+
+```ts
+const cellStyles = styles({ defaults: [style.geom.tile({ cornerRadius: 4, stroke: '#ffffff', strokeWidth: 2 })] });
+```
+
+`cornerRadius` on a tile is a pixel number, not a token.
+
+## Pitfalls
+
+- Both x and y are always bands under a tile, whatever the values. An explicit continuous scale is replaced by a band with a warning. Use `scale.x.discrete({ domain })` only to pin the order or the set of bands.
+- The y band reads top-down: the first band is at the top. `scale.y.discrete({ reverse: false })` flips it.
+- A tile takes `position: 'identity'` only and draws in cartesian coordinates only. No stacking, no `coord.flip()`, no `coord.polar()`. Swap the two mappings to transpose the grid.
+- The color scale is inferred from the value. Declare `scale.color.continuous(...)` to set a range or a diverging midpoint.
+- Use `domainMid` only when the values cross zero; otherwise the midpoint falls outside the data and the scale stays sequential.
+- The legend for a continuous color scale is one pill per domain stop: the two ends, plus the midpoint of a diverging scale. There is no gradient bar.

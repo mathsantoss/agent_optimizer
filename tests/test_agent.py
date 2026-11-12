@@ -38,9 +38,24 @@ def test_multi_agent_structure():
     assert "kraken_optimizer" in root_sub_names
     assert len(root_agent.tools) == 0, "O orquestrador não deve possuir ferramentas diretas de baixo nível."
 
-    # Ferramentas públicas do Agente Analista de Dados (exatamente 3)
+    # Ferramentas públicas do Agente Analista de Dados (exploração, qualidade, EDA, limpeza e relatórios)
     analyst_tool_names = sorted(tool.__name__ for tool in kraken_analyst.tools)
-    expected_analyst_tools = sorted(["analyze_dataset", "query_dataset", "search_knowledge_base"])
+    expected_analyst_tools = sorted([
+        "analyze_dataset",
+        "query_dataset",
+        "search_knowledge_base",
+        "load_data_tool",
+        "missing_value_analysis_tool",
+        "univariate_analysis_tool",
+        "correlation_analysis_tool",
+        "outlier_detection_tool",
+        "target_relationship_tool",
+        "clean_dataset_tool",
+        "generate_visualizations_tool",
+        "export_report_tool",
+        "save_workspace_script_tool",
+        "evidently_quality_report_tool",
+    ])
     assert analyst_tool_names == expected_analyst_tools
 
     # Ferramentas públicas do Agente Engenheiro de Features (exatamente 3)
@@ -510,4 +525,72 @@ def test_guardrails_callbacks_and_sanitization():
     )
     assert blocked is not None
     assert "CIRCUIT BREAKER" in blocked["result"]
+
+
+def test_new_eda_and_workspace_tools():
+    """Valida as novas ferramentas analíticas de EDA, Limpeza, Visualização e Script de Workspace."""
+    from kraken_copilot.tools.data_analyst import (
+        load_data_tool,
+        missing_value_analysis_tool,
+        univariate_analysis_tool,
+        correlation_analysis_tool,
+        outlier_detection_tool,
+        clean_dataset_tool,
+        generate_visualizations_tool,
+        export_report_tool,
+        save_workspace_script_tool,
+        evidently_quality_report_tool,
+    )
+
+    # 1. load_data_tool
+    load_res = json.loads(load_data_tool("dados_vendas", nrows=50))
+    assert load_res["sucesso"] is True
+    assert load_res["total_linhas_amostradas"] > 0
+    assert load_res["total_colunas"] > 0
+
+    # 2. missing_value_analysis_tool
+    missing_res = json.loads(missing_value_analysis_tool("dados_vendas"))
+    assert missing_res["sucesso"] is True
+    assert "colunas_com_nulos" in missing_res
+
+    # 3. univariate_analysis_tool
+    univ_res = json.loads(univariate_analysis_tool("dados_vendas"))
+    assert univ_res["sucesso"] is True
+    assert len(univ_res["metricas"]) > 0
+
+    # 4. correlation_analysis_tool
+    corr_res = json.loads(correlation_analysis_tool("dados_vendas"))
+    assert corr_res["sucesso"] is True
+    assert "matriz_correlacao" in corr_res
+
+    # 5. outlier_detection_tool
+    outlier_res = json.loads(outlier_detection_tool("dados_vendas"))
+    assert outlier_res["sucesso"] is True
+    assert "outliers" in outlier_res
+
+    # 6. clean_dataset_tool
+    clean_res = json.loads(clean_dataset_tool("dados_vendas", drop_duplicates=True))
+    assert clean_res["sucesso"] is True
+
+    # 7. generate_visualizations_tool
+    viz_res = json.loads(generate_visualizations_tool("dados_vendas", chart_type="bar"))
+    assert viz_res["sucesso"] is True
+    assert len(viz_res["data"]) > 0
+
+    # 8. export_report_tool
+    rep_res = json.loads(export_report_tool("dados_vendas"))
+    assert rep_res["sucesso"] is True
+    assert Path(rep_res["caminho_arquivo"]).exists()
+
+    # 9. save_workspace_script_tool
+    script_res = json.loads(save_workspace_script_tool("teste_pipeline.py", "def run():\n    pass\n"))
+    assert script_res["sucesso"] is True
+    assert Path(script_res["caminho"]).exists()
+
+    # 10. evidently_quality_report_tool
+    evi_res = json.loads(evidently_quality_report_tool("dados_vendas", save_html=True))
+    assert evi_res["sucesso"] is True
+    assert "evidently_dataset_stats" in evi_res
+    assert evi_res["relatorio_html_salvo"] is not None
+    assert Path(evi_res["relatorio_html_salvo"]).exists()
 

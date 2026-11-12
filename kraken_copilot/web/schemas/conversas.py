@@ -9,6 +9,8 @@ class MensagemInput(BaseModel):
     """Payload de envio de mensagem pelo usuário."""
     texto: str = Field(min_length=1, max_length=10000, description="Texto da mensagem enviada")
     modelo: Optional[str] = Field(default=None, description="Versão do modelo da família Gemini selecionado pelo usuário")
+    arquivo_alvo: Optional[str] = Field(default=None, description="Script Python do workspace selecionado pelo usuário (ex: exploracao_dados.py)")
+    anexos: Optional[List[str]] = Field(default=None, description="Caminhos ou nomes de fontes e datasets anexados via @")
 
 
 class MensagemResponse(BaseModel):

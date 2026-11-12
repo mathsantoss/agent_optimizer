@@ -13,6 +13,7 @@ from kraken_copilot.tools.data_analyst.services.dataset_service import (
 )
 from kraken_copilot.tools.feature_engineer.services.pipeline_generator_service import (
     infer_candidate_features_from_schema,
+    resolve_dataset_smart,
 )
 
 
@@ -26,7 +27,7 @@ def preview_features_on_sample(
     Executa o cálculo de features propostas sobre uma amostra segura de qualquer dataset
     para inspeção prévia de valores, tipos e nulos, sem regras hardcoded de domínio.
     """
-    file_path, err = resolve_dataset_file(dataset_name)
+    file_path, err = resolve_dataset_smart(dataset_name, fallback_if_empty=True)
     if err or file_path is None or not file_path.exists():
         return FeaturePreviewSummary(
             source_dataset=dataset_name,

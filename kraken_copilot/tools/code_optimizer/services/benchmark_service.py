@@ -5,7 +5,11 @@ from typing import Any
 
 from kraken_copilot import config
 from kraken_copilot.audit_logger import record_benchmark_comparison
-from kraken_copilot.schemas import PipelineBenchmarkComparison, PipelineProfileResult
+from kraken_copilot.schemas import (
+    KrakenBenchmark,
+    PipelineBenchmarkComparison,
+    PipelineProfileResult,
+)
 from kraken_copilot.tools.code_optimizer.services.file_service import resolve_pipeline_path
 from kraken_copilot.tools.code_optimizer.services.profiling_service import execute_and_profile_pipeline
 
@@ -24,8 +28,18 @@ def clean_snapshot_key(raw_path: str) -> str:
         clean = clean[len("baseline::"):]
     while clean.startswith("latest::"):
         clean = clean[len("latest::"):]
-    if "pipeline_prep_original" in clean or "pipeline_prep_otimizado" in clean:
-        return "pipeline/pipeline_prep.py"
+    name = Path(clean).name
+    if "_original.bak" in name:
+        stem = name.split("_original.bak")[0]
+        return f"krakenlake/workspace/{stem}.py"
+    if "_otimizado.bak" in name:
+        stem = name.split("_otimizado.bak")[0]
+        return f"krakenlake/workspace/{stem}.py"
+    if "_original" in clean or "_otimizado" in clean:
+        clean = clean.replace("_original", "").replace("_otimizado", "")
+        if not clean.endswith(".py"):
+            clean += ".py"
+        return clean
     for suffix in (".candidate.py", ".candidate", ".opt.py", ".opt", ".bak"):
         if clean.endswith(suffix):
             clean = clean[:-len(suffix)]
@@ -70,13 +84,24 @@ def load_profile_snapshot(key: str) -> PipelineProfileResult | None:
 
 
 def run_pipeline_benchmark(
-    baseline_file_path: str = "pipeline/pipeline_prep.py.bak",
-    candidate_file_path: str = "pipeline/pipeline_prep.py",
+    baseline_file_path: str | None = None,
+    candidate_file_path: str | None = None,
 ) -> dict[str, Any]:
     """
     Executa o benchmark comparativo entre a versão baseline (.bak ou snapshot) e a versão candidata (otimizada).
     Avalia speedup, redução de memória e equivalência funcional estrita por coluna.
     """
+    from kraken_copilot.tools.code_optimizer.services.file_service import (
+        get_default_workspace_pipeline,
+        get_file_tmp_paths,
+    )
+
+    if not candidate_file_path:
+        candidate_file_path = get_default_workspace_pipeline()
+
+    if not baseline_file_path:
+        tmp_orig, _ = get_file_tmp_paths(candidate_file_path)
+        baseline_file_path = str(tmp_orig) if tmp_orig.is_file() else f"{candidate_file_path}.bak"
     try:
         candidate_resolved = resolve_pipeline_path(candidate_file_path, allow_write=False)
         if not candidate_resolved.is_file() or candidate_resolved.stat().st_size == 0:
@@ -249,12 +274,30 @@ def run_pipeline_benchmark(
         f"| Equivalência dos resultados | — | **{'Aprovada' if results_equivalent else 'Reprovada'}** | {eq_details} |\n"
     )
 
+    kraken_benchmark = KrakenBenchmark(
+        arquivo=str(Path(candidate_profile.file_path).name),
+        baseline_arquivo=str(Path(baseline_profile.file_path).name),
+        status="SUCESSO" if both_succeeded else "FALHA",
+        tempo_execucao_original=base_duration,
+        tempo_execucao_otimizado=cand_duration,
+        speedup=speedup,
+        memoria_pico_original_mb=base_mem,
+        memoria_pico_otimizada_mb=cand_mem,
+        reducao_memoria_pct=mem_reduction,
+        linhas_baseline=baseline_profile.rows_processed,
+        linhas_candidato=candidate_profile.rows_processed,
+        equivalencia_preservada=results_equivalent,
+        detalhes_equivalencia=eq_details,
+        tabela_markdown=markdown_table,
+    )
+
     return {
         "success": True,
         "summary": f"Benchmark concluído: Speedup de {speedup:+.2f}%, Equivalência: {'Aprovada' if results_equivalent else 'Reprovada'}.",
         "data": {
             "comparison": comparison.model_dump(),
             "summary_comparison": comparison.model_dump(),
+            "kraken_benchmark": kraken_benchmark.model_dump(),
             "tabela_markdown": markdown_table,
             "baseline_status": baseline_profile.execution_status,
             "candidate_status": candidate_profile.execution_status,

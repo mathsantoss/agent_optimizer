@@ -6,6 +6,17 @@ dist/
 wheels/
 *.egg-info
 
+# Node / Frontend
+node_modules/
+**/node_modules/**
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.vite/
+dist-ssr/
+*.local
+
 # Virtual environments
 .venv
 .env
@@ -15,5 +26,7 @@ wheels/
 pipeline/features/
 tests/fixtures/projeto/.rag/
 tests/fixtures/projeto/logs/
+# Local agents / user skills
+.agents/
 .scratch/
 .pytest_cache/

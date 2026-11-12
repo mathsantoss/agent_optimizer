@@ -1,13 +1,22 @@
-"""Adaptador de eventos de auditoria integrado ao OpenTelemetry (Loki / Grafana).
+"""Adaptador de eventos de auditoria integrado ao SQLite e OpenTelemetry (Loki / Grafana).
 
-Encaminha os eventos de benchmark, profiling, diagnósticos de código, análises de dados
-e guardrails diretamente para o coletor OpenTelemetry via `emit_telemetry_log`, sem criar
-arquivos locais na pasta `logs/`.
+Grava eventos estruturados de benchmark, profiling, diagnósticos de código, análises de dados
+e guardrails diretamente no banco SQLite (`logs/kraken_copilot.db`) e encaminha para o coletor
+OpenTelemetry via `emit_telemetry_log`, sem criar arquivos JSON soltos na pasta `logs/`.
 """
 import logging
 from typing import Any
 
 from kraken_copilot.observability import emit_telemetry_log
+
+
+def _record_to_sqlite(category: str, action: str, status: str, details: Any = "") -> None:
+    """Grava o evento no banco SQLite corporativo."""
+    try:
+        from kraken_copilot.web.storage import storage
+        storage.append_audit_log(category=category, action=action, status=status, details=details)
+    except Exception:
+        pass
 
 
 def log_text_event(
@@ -16,7 +25,8 @@ def log_text_event(
     status: str,
     message: str,
 ) -> None:
-    """Encaminha evento cronológico estruturado para o OpenTelemetry Logs (Loki)."""
+    """Registra evento cronológico estruturado no SQLite e no OpenTelemetry Logs (Loki)."""
+    _record_to_sqlite(category=category.upper(), action=action, status=status.upper(), details=message)
     emit_telemetry_log(
         "audit_event",
         level=logging.INFO,
@@ -28,8 +38,14 @@ def log_text_event(
 
 
 def record_benchmark_comparison(comparison_data: dict[str, Any]) -> None:
-    """Encaminha métricas comparativas Antes vs Depois (`compare_pipeline_runs`) para o OpenTelemetry."""
+    """Registra métricas comparativas Antes vs Depois (`compare_pipeline_runs`) no SQLite e OpenTelemetry."""
     equivalent = bool(comparison_data.get("results_equivalent", False))
+    _record_to_sqlite(
+        category="BENCHMARK",
+        action="compare_pipeline_runs",
+        status="APROVADA" if equivalent else "REPROVADA",
+        details=comparison_data,
+    )
     emit_telemetry_log(
         "benchmark_comparison",
         level=logging.INFO,
@@ -45,7 +61,13 @@ def record_benchmark_comparison(comparison_data: dict[str, Any]) -> None:
 
 
 def record_pipeline_profile(profile_data: dict[str, Any]) -> None:
-    """Encaminha métricas de profiling (`profile_pipeline`) para o OpenTelemetry."""
+    """Registra métricas de profiling (`profile_pipeline`) no SQLite e OpenTelemetry."""
+    _record_to_sqlite(
+        category="PROFILING",
+        action="profile_pipeline",
+        status=str(profile_data.get("execution_status", "info")).upper(),
+        details=profile_data,
+    )
     emit_telemetry_log(
         "pipeline_profile",
         level=logging.INFO,
@@ -66,12 +88,18 @@ def record_code_validation_event(
     details: dict[str, Any] | str = "",
     **kwargs: Any,
 ) -> None:
-    """Encaminha etapas de engenharia e validação de código para o OpenTelemetry."""
+    """Registra etapas de engenharia e validação de código no SQLite e OpenTelemetry."""
     actual_file_path = file_path or kwargs.get("pipeline_name", "")
     actual_action = action or kwargs.get("action", "validate_pipeline")
     actual_status = status or kwargs.get("status", "SUCESSO")
     actual_details = details or kwargs.get("issues_found") or kwargs.get("details", "")
 
+    _record_to_sqlite(
+        category="CODE_VALIDATION",
+        action=actual_action,
+        status=str(actual_status).upper(),
+        details={"file_path": str(actual_file_path), "details": str(actual_details)},
+    )
     emit_telemetry_log(
         "code_validation",
         level=logging.INFO,
@@ -88,7 +116,13 @@ def record_data_analysis_event(
     status: str,
     summary_metrics: dict[str, Any] | str,
 ) -> None:
-    """Encaminha eventos de exploração de dados, estatísticas, SQL e RAG para o OpenTelemetry."""
+    """Registra eventos de exploração de dados, estatísticas e SQL no SQLite e OpenTelemetry."""
+    _record_to_sqlite(
+        category="DATA_ANALYSIS",
+        action=action,
+        status=status.upper(),
+        details={"target": target, "metrics": summary_metrics},
+    )
     emit_telemetry_log(
         "data_analysis",
         level=logging.INFO,
@@ -105,7 +139,13 @@ def record_guardrail_event(
     status: str,
     description: str,
 ) -> None:
-    """Encaminha acionamentos de guardrails para o OpenTelemetry."""
+    """Registra acionamentos de guardrails no SQLite e no OpenTelemetry."""
+    _record_to_sqlite(
+        category=f"GUARDRAIL_{guardrail_type.upper()}",
+        action=source,
+        status=status.upper(),
+        details=description,
+    )
     emit_telemetry_log(
         "guardrail_audit",
         level=logging.WARNING,

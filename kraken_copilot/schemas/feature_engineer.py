@@ -20,7 +20,7 @@ class FeaturePipelinePlan(BaseModel):
 
     pipeline_name: str = Field(description="Nome descritivo do pipeline de features")
     framework: str = Field(default="pandas", description="Framework utilizado: pandas ou pyspark")
-    target_file_path: str = Field(description="Caminho do arquivo de script (ex.: pipeline/pipeline_prep.py)")
+    target_file_path: str = Field(description="Caminho do arquivo de script no workspace (ex.: krakenlake/workspace/meu_pipeline.py)")
     source_dataset: str = Field(description="Dataset base de entrada")
     features: list[FeatureSpec] = Field(default_factory=list, description="Lista de features especificadas no plano")
     code: str = Field(default="", description="Código Python/PySpark gerado para o pipeline")

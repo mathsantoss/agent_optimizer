@@ -41,42 +41,76 @@ output_signature_hash = None
 column_hashes = {}
 return_code = 0
 
+def _remap_data_path(p):
+    if isinstance(p, (str, Path)):
+        p_str = str(p)
+        if not Path(p_str).exists():
+            if "pipeline/dados" in p_str:
+                alt = Path(p_str.replace("pipeline/dados", "krakenlake/catalog/sources")).resolve()
+                if alt.exists():
+                    return alt if isinstance(p, Path) else str(alt)
+            if "pipeline/" in p_str:
+                alt = Path(p_str.replace("pipeline/", "krakenlake/")).resolve()
+                if alt.exists():
+                    return alt if isinstance(p, Path) else str(alt)
+            # fallback para buscar pelo nome do arquivo dentro de krakenlake
+            fname = Path(p_str).name
+            for cand in (Path("krakenlake/catalog/sources") / fname, Path("krakenlake/workspace") / fname):
+                if cand.exists():
+                    return cand.resolve() if isinstance(p, Path) else str(cand.resolve())
+    return p
+
+try:
+    import builtins
+    _orig_builtin_open = builtins.open
+    def _patched_open(file, *args, **kwargs):
+        return _orig_builtin_open(_remap_data_path(file), *args, **kwargs)
+    builtins.open = _patched_open
+
+    import pandas as pd
+    _orig_read_csv = pd.read_csv
+    _orig_read_parquet = pd.read_parquet
+    _orig_read_json = pd.read_json
+
+    def _safe_read_csv(filepath_or_buffer, *args, **kwargs):
+        global full_dataset_rows
+        target = _remap_data_path(filepath_or_buffer)
+        df_full = _orig_read_csv(target, *args, **kwargs)
+        if sample_limit > 0:
+            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
+                full_dataset_rows = int(len(df_full))
+            return df_full.head(sample_limit).copy()
+        return df_full
+
+    def _safe_read_parquet(path, *args, **kwargs):
+        global full_dataset_rows
+        target = _remap_data_path(path)
+        df_full = _orig_read_parquet(target, *args, **kwargs)
+        if sample_limit > 0:
+            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
+                full_dataset_rows = int(len(df_full))
+            return df_full.head(sample_limit).copy()
+        return df_full
+
+    def _safe_read_json(path_or_buf, *args, **kwargs):
+        global full_dataset_rows
+        target = _remap_data_path(path_or_buf)
+        df_full = _orig_read_json(target, *args, **kwargs)
+        if sample_limit > 0:
+            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
+                full_dataset_rows = int(len(df_full))
+            return df_full.head(sample_limit).copy()
+        return df_full
+
+    pd.read_csv = _safe_read_csv
+    pd.read_parquet = _safe_read_parquet
+    pd.read_json = _safe_read_json
+except Exception:
+    pass
+
 if sample_limit > 0:
-    # Modo de amostragem dinâmica para baselines lentos (O(N^2) / iterrows / sleep):
-    # Neutraliza sleeps e amostra leituras do pandas preservando a contagem real de linhas do dataset
+    # Modo de amostragem dinâmica para baselines lentos (O(N^2) / iterrows / sleep)
     time.sleep = lambda *a, **kw: None
-    try:
-        import pandas as pd
-        _orig_read_csv = pd.read_csv
-        _orig_read_parquet = pd.read_parquet
-        _orig_read_json = pd.read_json
-
-        def _sampled_read_csv(*args, **kwargs):
-            global full_dataset_rows
-            df_full = _orig_read_csv(*args, **kwargs)
-            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
-                full_dataset_rows = int(len(df_full))
-            return df_full.head(sample_limit).copy()
-
-        def _sampled_read_parquet(*args, **kwargs):
-            global full_dataset_rows
-            df_full = _orig_read_parquet(*args, **kwargs)
-            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
-                full_dataset_rows = int(len(df_full))
-            return df_full.head(sample_limit).copy()
-
-        def _sampled_read_json(*args, **kwargs):
-            global full_dataset_rows
-            df_full = _orig_read_json(*args, **kwargs)
-            if full_dataset_rows is None or len(df_full) > full_dataset_rows:
-                full_dataset_rows = int(len(df_full))
-            return df_full.head(sample_limit).copy()
-
-        pd.read_csv = _sampled_read_csv
-        pd.read_parquet = _sampled_read_parquet
-        pd.read_json = _sampled_read_json
-    except Exception:
-        pass
 
 tracemalloc.start()
 start_time = time.perf_counter()
@@ -261,7 +295,7 @@ def execute_and_profile_pipeline(
 
 
 def profile_pipeline_service(
-    file_path: str = "pipeline/pipeline_prep.py",
+    file_path: str | None = None,
     timeout_seconds: int = PROFILING_DEFAULT_TIMEOUT_SECONDS,
 ) -> PipelineProfileResult:
     """Perfilamento seguro de pipeline resolvendo o caminho relativo."""

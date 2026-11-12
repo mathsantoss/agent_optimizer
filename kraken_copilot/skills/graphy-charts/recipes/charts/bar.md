@@ -1,0 +1,209 @@
+# Bar graph
+
+Use a bar graph to compare values across bands: products, regions, months treated as labels.
+
+## Basic
+
+One row per observation: a band column for x and a numeric column for y.
+
+```tsx
+import {
+  config,
+  coord,
+  createSpec,
+  geom,
+  GraphProvider,
+  GraphRenderer,
+  mapping,
+  pipe,
+  scale,
+  style,
+  styles,
+  transform,
+} from '@graphysdk/react';
+import type { Data } from '@graphysdk/react';
+
+const revenueData: Data = {
+  columns: [{ key: 'product' }, { key: 'revenue' }],
+  rows: [
+    { product: 'Product A', revenue: 1200 },
+    { product: 'Product B', revenue: 1800 },
+    { product: 'Product C', revenue: 2400 },
+    { product: 'Product D', revenue: 1600 },
+  ],
+};
+
+const spec = pipe(createSpec({ x: 'product', y: 'revenue' }), geom.bar(), scale.x(), scale.y());
+
+export function RevenueBars() {
+  return (
+    <GraphProvider data={revenueData} spec={spec}>
+      <GraphRenderer />
+    </GraphProvider>
+  );
+}
+```
+
+## Variants
+
+### Horizontal bars
+
+Flip the coordinate system. The x band runs down the left side.
+
+```ts
+const spec = pipe(createSpec({ x: 'product', y: 'revenue' }), geom.bar(), scale.x(), scale.y(), coord.flip());
+```
+
+### Grouped bars
+
+Wide data (one column per group) needs a reshape first. Map the new key column to color and set the position to dodge.
+
+```ts
+const regionData: Data = {
+  columns: [{ key: 'quarter' }, { key: 'North' }, { key: 'South' }, { key: 'West' }],
+  rows: [
+    { quarter: 'Q1', North: 350, South: 200, West: 500 },
+    { quarter: 'Q2', North: 300, South: 250, West: 350 },
+    { quarter: 'Q3', North: 400, South: 300, West: 300 },
+    { quarter: 'Q4', North: 200, South: 150, West: 400 },
+  ],
+};
+
+const toLong = transform.reshape({
+  keep: ['quarter'],
+  reshape: ['North', 'South', 'West'],
+  keyName: 'region',
+  valueName: 'sales',
+});
+
+const spec = pipe(
+  createSpec(),
+  toLong,
+  mapping({ x: 'quarter', y: 'sales', color: 'region' }),
+  geom.bar({ position: 'dodge' }),
+  scale.x(),
+  scale.y(),
+  scale.color.discrete()
+);
+```
+
+If the data is already long (one row per quarter and region), skip the reshape and map the group column to color.
+
+### Stacked bars
+
+Same data and mapping as grouped. Change the position.
+
+```ts
+const layer = geom.bar({ position: 'stack' });
+```
+
+### Percent stacked bars
+
+Every bar fills the full height and segments show shares.
+
+```ts
+const layer = geom.bar({ position: 'fill' });
+```
+
+### Bar width and corner radius
+
+Width is a fraction of the band, default 0.7. Corner rounding and borders are style declarations, not geom params.
+
+```ts
+const spec = pipe(
+  createSpec({ x: 'product', y: 'revenue' }),
+  geom.bar({ params: { width: 0.5 } }),
+  styles({ defaults: [style.geom.bar({ cornerRadius: 'md', stroke: '#1f2937', strokeWidth: 1 })] }),
+  scale.x(),
+  scale.y()
+);
+```
+
+Corner radius tokens run from `'none'` through `'xl'`, plus `'full'` for pills. A pixel number also works. The default is `'sm'`.
+
+### Data labels
+
+```ts
+const layer = geom.bar({ position: 'stack', dataLabels: { showDataLabels: true, showStackTotals: true } });
+```
+
+Use `format: 'percentage'` on a filled stack to label shares instead of values.
+
+### Sorted bars
+
+Sort the observations before the geom reads them.
+
+```ts
+const spec = pipe(
+  createSpec({ x: 'product', y: 'revenue' }),
+  transform.sort({ variableName: 'revenue', direction: 'desc' }),
+  geom.bar(),
+  scale.x(),
+  scale.y()
+);
+```
+
+### Count of observations
+
+When each row is one event, the count stat tallies rows per band. No y mapping is needed.
+
+```ts
+const ordersData: Data = {
+  columns: [{ key: 'orderType' }],
+  rows: [
+    { orderType: 'Online' },
+    { orderType: 'Online' },
+    { orderType: 'Online' },
+    { orderType: 'Store' },
+    { orderType: 'Store' },
+    { orderType: 'Phone' },
+  ],
+};
+
+const spec = pipe(
+  createSpec({ x: 'orderType' }),
+  geom.bar({ stat: 'count' }),
+  scale.x(),
+  scale.y(),
+  config({ axes: { y: { label: 'Orders' } } })
+);
+```
+
+### Negative values
+
+Nothing special. Bars grow down from zero.
+
+### Single bar
+
+One observation draws one bar. The spec is the basic one.
+
+### Month names without a year
+
+Short month names are read as dates. A bar keeps x as a band, but each color group gets its own synthetic year, counted from the group's first row. A group that starts in `Dec` puts its `Jan` in the next year and gets a separate `Jan` band from a group that starts in `Jan`. Pin the column as text to keep the labels as plain bands in row order.
+
+```ts
+const productData: Data = {
+  columns: [{ key: 'month', valueFormat: { type: 'text' } }, { key: 'revenue' }, { key: 'product' }],
+  rows: [
+    { month: 'Dec', revenue: 100, product: 'Alpha' },
+    { month: 'Jan', revenue: 120, product: 'Alpha' },
+    { month: 'Feb', revenue: 280, product: 'Alpha' },
+    { month: 'Jan', revenue: 90, product: 'Beta' },
+    { month: 'Feb', revenue: 150, product: 'Beta' },
+  ],
+};
+
+const spec = pipe(
+  createSpec({ x: 'month', y: 'revenue', color: 'product' }),
+  geom.bar({ position: 'stack' }),
+  scale.x(),
+  scale.y(),
+  scale.color.discrete()
+);
+```
+
+## Pitfalls
+
+- The x axis under a bar is always a band, even for numeric or date columns. Declaring `scale.x.continuous()` under a bar gets replaced by a band with a warning. Use a point or line geom for a continuous x.
+- Bars with several observations per band sit side by side by default. Use `position: 'stack'` to stack them.
+- Borders use `stroke` and `strokeWidth` in `style.geom.bar`. There is no `borderColor` property.

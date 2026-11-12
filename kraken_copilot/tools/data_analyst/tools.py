@@ -16,6 +16,19 @@ from kraken_copilot.tools.data_analyst.services.knowledge_service import search_
 from kraken_copilot.tools.data_analyst.services.profiling_service import profile_dataset_structure
 from kraken_copilot.tools.data_analyst.services.sql_service import execute_sql_service
 from kraken_copilot.tools.data_analyst.services.statistics_service import calculate_descriptive_statistics
+from kraken_copilot.tools.data_analyst.services.eda_service import (
+    load_dataset_info,
+    analyze_missing_values,
+    analyze_univariate_distributions,
+    analyze_correlations,
+    detect_outliers_iqr,
+    analyze_target_relationship,
+    run_data_cleaning_pipeline,
+    generate_visualization_specs,
+    export_report_document,
+    save_script_to_workspace,
+    run_evidently_quality_report,
+)
 
 
 def analyze_dataset(
@@ -53,7 +66,7 @@ def analyze_dataset(
             summary_metrics={"total_datasets": len(catalog)},
         )
         return ToolResult.ok(
-            summary=f"{len(catalog)} dataset(s) disponível(is) em pipeline/dados/.",
+            summary=f"{len(catalog)} dataset(s) disponível(is) no datalake (krakenlake/catalog/sources/).",
             operation="analyze_dataset:catalog",
             data={"datasets": catalog},
         ).to_json()
@@ -93,11 +106,15 @@ def analyze_dataset(
             consolidated_data["amostra_linhas"] = structure_info.get("amostra_3_linhas", [])
         else:
             consolidated_data["estrutura"] = structure_info
+        if structure_info.get("kraken_data_profile"):
+            consolidated_data["kraken_data_profile"] = structure_info.get("kraken_data_profile")
 
     if statistics_info:
         if statistics_info.get("amostragem_ativa"):
             warnings.append(f"Estatísticas descritivas calculadas sobre amostra de {statistics_info.get('limite_amostral')} linhas.")
         consolidated_data["estatisticas"] = statistics_info
+        if statistics_info.get("kraken_statistical_report"):
+            consolidated_data["kraken_statistical_report"] = statistics_info.get("kraken_statistical_report")
 
     record_data_analysis_event(
         action=f"analyze_dataset:{norm_op}",
@@ -180,5 +197,155 @@ def search_knowledge_base(
             "maior_relevancia": result.get("data", {}).get("maior_relevancia", 0.0) if result.get("data") else 0.0,
         },
     )
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def load_data_tool(dataset_name: str, nrows: int = 10_000) -> str:
+    """
+    Carrega o dataset e retorna metadados cadastrais, volumetria, tipos de dados e amostra.
+
+    Args:
+        dataset_name: Nome do dataset no catálogo (ex.: 'dados_vendas' ou 'dados_vendas.csv').
+        nrows: Limite de linhas amostradas para proteção de memória (padrão: 10.000).
+    """
+    result = load_dataset_info(dataset_name, max_rows=nrows)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def missing_value_analysis_tool(dataset_name: str) -> str:
+    """
+    Sumariza colunas com dados faltantes (nulos), percentual de ausência e criticidade.
+
+    Args:
+        dataset_name: Nome do dataset no catálogo (ex.: 'dados_vendas').
+    """
+    result = analyze_missing_values(dataset_name)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def univariate_analysis_tool(dataset_name: str, column: str = "") -> str:
+    """
+    Analisa a distribuição estatística de features numéricas (média, mediana, IQR, assimetria/skewness, curtose).
+
+    Args:
+        dataset_name: Nome do dataset (ex.: 'dados_vendas').
+        column: Nome específico da coluna numérica (opcional; se vazio analisa todas).
+    """
+    result = analyze_univariate_distributions(dataset_name, column=column)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def correlation_analysis_tool(dataset_name: str, method: str = "pearson") -> str:
+    """
+    Calcula a matriz de correlação e destaca pares com forte correlação linear/monotônica.
+
+    Args:
+        dataset_name: Nome do dataset (ex.: 'dados_vendas').
+        method: Método de correlação ('pearson' ou 'spearman', padrão: 'pearson').
+    """
+    result = analyze_correlations(dataset_name, method=method)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def outlier_detection_tool(dataset_name: str, column: str = "") -> str:
+    """
+    Identifica anomalias e outliers através do método da amplitude interquartil (IQR).
+
+    Args:
+        dataset_name: Nome do dataset (ex.: 'dados_vendas').
+        column: Coluna numérica específica a verificar (opcional).
+    """
+    result = detect_outliers_iqr(dataset_name, column=column)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def target_relationship_tool(dataset_name: str, target_column: str, feature_column: str = "") -> str:
+    """
+    Visualiza e quantifica a relação entre preditores e uma variável alvo (target).
+
+    Args:
+        dataset_name: Nome do dataset (ex.: 'dados_vendas').
+        target_column: Nome da coluna alvo (ex.: 'price_x' ou 'categoria').
+        feature_column: Coluna opcional para agregação comparativa.
+    """
+    result = analyze_target_relationship(dataset_name, target_column=target_column, feature_column=feature_column)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def clean_dataset_tool(
+    dataset_name: str,
+    fill_missing_strategy: str = "auto",
+    drop_duplicates: bool = True,
+    output_filename: str = "",
+) -> str:
+    """
+    Executa o pipeline de Data Cleaning: preenche nulos, remove duplicatas e normaliza colunas temporais.
+
+    Args:
+        dataset_name: Nome do dataset de entrada.
+        fill_missing_strategy: Estratégia de preenchimento ('auto', 'median', 'mean').
+        drop_duplicates: Se deve remover linhas 100% duplicadas (padrão: True).
+        output_filename: Nome opcional do arquivo limpo a gravar em krakenlake/workspace/.
+    """
+    result = run_data_cleaning_pipeline(
+        dataset_name=dataset_name,
+        fill_missing_strategy=fill_missing_strategy,
+        drop_duplicates=drop_duplicates,
+        output_filename=output_filename,
+    )
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def generate_visualizations_tool(dataset_name: str, chart_type: str = "bar", x: str = "", y: str = "") -> str:
+    """
+    Gera especificações visuais de dados para renderização de gráficos interativos (barras, histogramas, linhas).
+
+    Args:
+        dataset_name: Nome do dataset.
+        chart_type: Tipo de gráfico ('bar', 'histogram', 'line', 'scatter', 'pie').
+        x: Coluna do eixo horizontal.
+        y: Coluna do eixo vertical (métrica).
+    """
+    result = generate_visualization_specs(dataset_name, chart_type=chart_type, x=x, y=y)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def export_report_tool(dataset_name: str, report_format: str = "markdown", title: str = "") -> str:
+    """
+    Gera um relatório analítico consolidado e o salva como documento Markdown/PDF em krakenlake/reports/.
+
+    Args:
+        dataset_name: Nome do dataset analisado.
+        report_format: Formato ('markdown' ou 'pdf', padrão: 'markdown').
+        title: Título customizado do documento (opcional).
+    """
+    result = export_report_document(dataset_name, report_format=report_format, title=title)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def save_workspace_script_tool(script_name: str, code: str, overwrite: bool = True) -> str:
+    """
+    Cria ou atualiza um script Python (.py) diretamente no diretório do workspace do repositório (krakenlake/workspace/).
+
+    Args:
+        script_name: Nome do script com extensão (ex.: 'etl_vendas.py' ou 'pipeline_limpeza.py').
+        code: Código Python formatado e encapsulado em funções 'def'.
+        overwrite: Se deve sobrescrever caso já exista (padrão: True).
+    """
+    result = save_script_to_workspace(script_name=script_name, code=code, overwrite=overwrite)
+    return json.dumps(result, ensure_ascii=False, indent=2, default=str)
+
+
+def evidently_quality_report_tool(dataset_name: str, save_html: bool = True) -> str:
+    """
+    Executa a suíte de qualidade de dados profissional Evidently AI para o dataset.
+    Métricas prontas: linhas, colunas, tipos, contagem de nulos, linhas duplicadas, colunas vazias e quase constantes.
+    Salva opcionalmente o relatório interativo HTML em krakenlake/workspace/reports/.
+
+    Args:
+        dataset_name: Nome do dataset cadastrado no catálogo (ex.: 'dados_vendas').
+        save_html: Se deve exportar o dashboard interativo HTML (padrão: True).
+    """
+    result = run_evidently_quality_report(dataset_name=dataset_name, save_html=save_html)
     return json.dumps(result, ensure_ascii=False, indent=2, default=str)
 
