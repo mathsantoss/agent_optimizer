@@ -1,5 +1,5 @@
 # Relatório Analítico Executivo - dados_vendas
-**Dataset:** `dados_vendas` | **Data de Geração:** 12/11/2026 01:57
+**Dataset:** `dados_vendas` | **Data de Geração:** 12/11/2026 13:36
 
 ## 1. Resumo Executivo e Volumetria
 - **Total de Linhas Analisadas:** 10

@@ -130,7 +130,18 @@ def calculate_descriptive_statistics(
         )
 
     graficos_sugeridos: list[dict[str, Any]] = []
-    if total_outliers > 0:
+    if media_chart_data:
+        # Sugere comparativo das métricas médias observadas nas variáveis numéricas de negócio
+        graficos_sugeridos.append({
+            "type": "bar",
+            "title": "Comparativo das Médias das Colunas Numéricas",
+            "subtitle": "Valores médios calculados sobre a amostra analítica",
+            "x": "coluna",
+            "y": "media",
+            "data": media_chart_data,
+        })
+    elif total_outliers > 0:
+        # Sugestão de outliers apenas como alternativa secundária se não houver médias positivas
         graficos_sugeridos.append({
             "type": "bar",
             "title": "Outliers Identificados por Coluna (Regra IQR)",
@@ -138,16 +149,6 @@ def calculate_descriptive_statistics(
             "x": "coluna",
             "y": "outliers",
             "data": outlier_chart_data,
-        })
-    elif media_chart_data:
-        # Se não há outliers, exibe comparativo das médias numéricas para evitar gráficos zerados
-        graficos_sugeridos.append({
-            "type": "bar",
-            "title": "Comparativo das Médias das Colunas Numéricas",
-            "subtitle": "Valores médios observados na amostra analítica",
-            "x": "coluna",
-            "y": "media",
-            "data": media_chart_data,
         })
 
     kraken_statistical_report = KrakenStatisticalReport(

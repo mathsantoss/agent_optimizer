@@ -1,0 +1,516 @@
+{
+  "dataset": "Brazilian Pix Usage Dataset",
+  "created_at": "2026-10-08T15:23:45.292799",
+  "source": {
+    "institution": "Banco Central do Brasil",
+    "service": "Pix_DadosAbertos",
+    "resource": "EstatisticasTransacoesPix"
+  },
+  "processing": {
+    "method": "streaming JSON with incremental Parquet",
+    "library_json": "ijson",
+    "library_parquet": "pyarrow",
+    "batch_size": 10000
+  },
+  "files_processed": [
+    "estatisticas_transacoes_pix_202011.json",
+    "estatisticas_transacoes_pix_202012.json",
+    "estatisticas_transacoes_pix_202101.json",
+    "estatisticas_transacoes_pix_202102.json",
+    "estatisticas_transacoes_pix_202103.json",
+    "estatisticas_transacoes_pix_202104.json",
+    "estatisticas_transacoes_pix_202105.json",
+    "estatisticas_transacoes_pix_202106.json",
+    "estatisticas_transacoes_pix_202107.json",
+    "estatisticas_transacoes_pix_202108.json",
+    "estatisticas_transacoes_pix_202109.json",
+    "estatisticas_transacoes_pix_202110.json",
+    "estatisticas_transacoes_pix_202111.json",
+    "estatisticas_transacoes_pix_202112.json",
+    "estatisticas_transacoes_pix_202201.json",
+    "estatisticas_transacoes_pix_202202.json",
+    "estatisticas_transacoes_pix_202203.json",
+    "estatisticas_transacoes_pix_202204.json",
+    "estatisticas_transacoes_pix_202205.json",
+    "estatisticas_transacoes_pix_202206.json",
+    "estatisticas_transacoes_pix_202207.json",
+    "estatisticas_transacoes_pix_202208.json",
+    "estatisticas_transacoes_pix_202209.json",
+    "estatisticas_transacoes_pix_202210.json",
+    "estatisticas_transacoes_pix_202211.json",
+    "estatisticas_transacoes_pix_202212.json",
+    "estatisticas_transacoes_pix_202301.json",
+    "estatisticas_transacoes_pix_202302.json",
+    "estatisticas_transacoes_pix_202303.json",
+    "estatisticas_transacoes_pix_202304.json",
+    "estatisticas_transacoes_pix_202305.json",
+    "estatisticas_transacoes_pix_202306.json",
+    "estatisticas_transacoes_pix_202307.json",
+    "estatisticas_transacoes_pix_202308.json",
+    "estatisticas_transacoes_pix_202309.json",
+    "estatisticas_transacoes_pix_202310.json",
+    "estatisticas_transacoes_pix_202311.json",
+    "estatisticas_transacoes_pix_202312.json",
+    "estatisticas_transacoes_pix_202401.json",
+    "estatisticas_transacoes_pix_202402.json",
+    "estatisticas_transacoes_pix_202403.json",
+    "estatisticas_transacoes_pix_202404.json",
+    "estatisticas_transacoes_pix_202405.json",
+    "estatisticas_transacoes_pix_202406.json",
+    "estatisticas_transacoes_pix_202407.json",
+    "estatisticas_transacoes_pix_202408.json",
+    "estatisticas_transacoes_pix_202409.json",
+    "estatisticas_transacoes_pix_202410.json",
+    "estatisticas_transacoes_pix_202411.json",
+    "estatisticas_transacoes_pix_202412.json",
+    "estatisticas_transacoes_pix_202501.json",
+    "estatisticas_transacoes_pix_202502.json",
+    "estatisticas_transacoes_pix_202503.json",
+    "estatisticas_transacoes_pix_202504.json",
+    "estatisticas_transacoes_pix_202505.json",
+    "estatisticas_transacoes_pix_202506.json",
+    "estatisticas_transacoes_pix_202507.json",
+    "estatisticas_transacoes_pix_202508.json",
+    "estatisticas_transacoes_pix_202509.json",
+    "estatisticas_transacoes_pix_202510.json",
+    "estatisticas_transacoes_pix_202511.json",
+    "estatisticas_transacoes_pix_202512.json",
+    "estatisticas_transacoes_pix_202601.json",
+    "estatisticas_transacoes_pix_202602.json",
+    "estatisticas_transacoes_pix_202603.json",
+    "estatisticas_transacoes_pix_202604.json",
+    "estatisticas_transacoes_pix_202605.json",
+    "estatisticas_transacoes_pix_202606.json",
+    "estatisticas_transacoes_pix_202607.json",
+    "estatisticas_transacoes_pix_202608.json",
+    "estatisticas_transacoes_pix_202609.json"
+  ],
+  "statistics": [
+    {
+      "file": "estatisticas_transacoes_pix_202011.json",
+      "records": 754733,
+      "amount": 107124249940176.88,
+      "transactions": 253971577363.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202012.json",
+      "records": 752945,
+      "amount": 107098380093868.97,
+      "transactions": 253942052468.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202101.json",
+      "records": 750986,
+      "amount": 106991179367885.66,
+      "transactions": 253817161515.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202102.json",
+      "records": 748943,
+      "amount": 106853259810550.55,
+      "transactions": 253647395408.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202103.json",
+      "records": 746046,
+      "amount": 106683654609944.6,
+      "transactions": 253417977449.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202104.json",
+      "records": 743950,
+      "amount": 106445313839724.03,
+      "transactions": 253089517837.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202105.json",
+      "records": 741829,
+      "amount": 106171712963783.44,
+      "transactions": 252678845573.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202106.json",
+      "records": 739672,
+      "amount": 105844331436078.69,
+      "transactions": 252135567705.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202107.json",
+      "records": 731402,
+      "amount": 105482968362067.62,
+      "transactions": 251509550062.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202108.json",
+      "records": 721631,
+      "amount": 105069545866178.4,
+      "transactions": 250763871260.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202109.json",
+      "records": 712856,
+      "amount": 104611541317982.97,
+      "transactions": 249948680411.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202110.json",
+      "records": 704104,
+      "amount": 104131899979272.31,
+      "transactions": 249077466261.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202111.json",
+      "records": 695201,
+      "amount": 103629823042333.5,
+      "transactions": 248097604364.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202112.json",
+      "records": 686221,
+      "amount": 103091493084975.64,
+      "transactions": 247062463227.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202201.json",
+      "records": 676956,
+      "amount": 102469062324323.0,
+      "transactions": 245838062476.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202202.json",
+      "records": 667614,
+      "amount": 101915083069607.23,
+      "transactions": 244744694246.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202203.json",
+      "records": 658117,
+      "amount": 101352744020857.6,
+      "transactions": 243582254681.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202204.json",
+      "records": 648430,
+      "amount": 100662545851091.38,
+      "transactions": 242219776258.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202205.json",
+      "records": 638707,
+      "amount": 99982082612962.62,
+      "transactions": 240799809831.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202206.json",
+      "records": 628772,
+      "amount": 99211459223570.44,
+      "transactions": 239224647122.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202207.json",
+      "records": 618724,
+      "amount": 98438723610501.67,
+      "transactions": 237590896865.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202208.json",
+      "records": 608578,
+      "amount": 97626901471919.38,
+      "transactions": 235840970107.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202209.json",
+      "records": 598324,
+      "amount": 96739853520243.14,
+      "transactions": 233982063848.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202210.json",
+      "records": 587949,
+      "amount": 95859773273863.58,
+      "transactions": 232060395954.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202211.json",
+      "records": 577432,
+      "amount": 94962296419092.06,
+      "transactions": 230011419333.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202212.json",
+      "records": 566930,
+      "amount": 94040899954140.62,
+      "transactions": 227907622083.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202301.json",
+      "records": 556260,
+      "amount": 92994110097100.38,
+      "transactions": 225484457394.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202302.json",
+      "records": 545626,
+      "amount": 92038822155150.62,
+      "transactions": 223301540428.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202303.json",
+      "records": 534995,
+      "amount": 91132556539652.06,
+      "transactions": 221147750285.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202304.json",
+      "records": 524239,
+      "amount": 90034214297580.16,
+      "transactions": 218601737113.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202305.json",
+      "records": 513408,
+      "amount": 89004868393697.39,
+      "transactions": 216082660412.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202306.json",
+      "records": 502511,
+      "amount": 87858061125922.11,
+      "transactions": 213323754339.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202307.json",
+      "records": 491620,
+      "amount": 86700926398902.94,
+      "transactions": 210465325532.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202308.json",
+      "records": 480593,
+      "amount": 85493857592160.22,
+      "transactions": 207387777455.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202309.json",
+      "records": 469526,
+      "amount": 84207090674751.75,
+      "transactions": 204109547018.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202310.json",
+      "records": 458592,
+      "amount": 82929885539799.05,
+      "transactions": 200758491276.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202311.json",
+      "records": 447534,
+      "amount": 81549378999581.52,
+      "transactions": 197203882556.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202312.json",
+      "records": 436408,
+      "amount": 80127289398149.47,
+      "transactions": 193498528292.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202401.json",
+      "records": 425226,
+      "amount": 78527161786518.56,
+      "transactions": 189285103924.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202402.json",
+      "records": 414083,
+      "amount": 77043954283745.78,
+      "transactions": 185434461134.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202403.json",
+      "records": 402904,
+      "amount": 75620693546945.19,
+      "transactions": 181587379640.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202404.json",
+      "records": 391654,
+      "amount": 74028865023078.98,
+      "transactions": 177264452446.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202405.json",
+      "records": 380506,
+      "amount": 72292564377006.67,
+      "transactions": 172919182067.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202406.json",
+      "records": 369327,
+      "amount": 70521840516075.06,
+      "transactions": 168298441951.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202407.json",
+      "records": 357918,
+      "amount": 68745458381826.18,
+      "transactions": 163641218116.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202408.json",
+      "records": 346322,
+      "amount": 66790708305872.66,
+      "transactions": 158854580557.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202409.json",
+      "records": 334888,
+      "amount": 64842525959128.01,
+      "transactions": 153845196636.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202410.json",
+      "records": 323494,
+      "amount": 62905039408186.28,
+      "transactions": 148950237991.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202411.json",
+      "records": 312088,
+      "amount": 60816576429733.45,
+      "transactions": 143854081321.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202412.json",
+      "records": 300673,
+      "amount": 58735015496752.62,
+      "transactions": 138682804783.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202501.json",
+      "records": 289285,
+      "amount": 56405836284006.65,
+      "transactions": 132972691287.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202502.json",
+      "records": 277963,
+      "amount": 54328497731290.77,
+      "transactions": 127912405853.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202503.json",
+      "records": 266662,
+      "amount": 52284021836976.66,
+      "transactions": 122926600920.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202504.json",
+      "records": 255234,
+      "amount": 50111601325784.18,
+      "transactions": 117362169520.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202505.json",
+      "records": 243757,
+      "amount": 47857387512742.68,
+      "transactions": 111764008275.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202506.json",
+      "records": 232247,
+      "amount": 45478164217535.586,
+      "transactions": 105833867662.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202507.json",
+      "records": 220585,
+      "amount": 43082683467010.21,
+      "transactions": 100034857703.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202508.json",
+      "records": 205846,
+      "amount": 40520627500308.36,
+      "transactions": 94037996904.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202509.json",
+      "records": 190395,
+      "amount": 37970354434625.85,
+      "transactions": 87798388821.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202510.json",
+      "records": 175009,
+      "amount": 35318729920518.97,
+      "transactions": 81665112365.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202511.json",
+      "records": 159541,
+      "amount": 32551941639245.496,
+      "transactions": 75212107059.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202512.json",
+      "records": 142256,
+      "amount": 29944155017435.11,
+      "transactions": 68751208667.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202601.json",
+      "records": 126124,
+      "amount": 26797391655906.465,
+      "transactions": 61652575603.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202602.json",
+      "records": 110036,
+      "amount": 24097388011995.09,
+      "transactions": 55288400225.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202603.json",
+      "records": 93998,
+      "amount": 21533948696165.043,
+      "transactions": 49302126180.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202604.json",
+      "records": 80771,
+      "amount": 18521210901431.223,
+      "transactions": 42560129725.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202605.json",
+      "records": 67542,
+      "amount": 15624535589113.318,
+      "transactions": 35879232951.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202606.json",
+      "records": 53910,
+      "amount": 12667047183124.55,
+      "transactions": 28757353906.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202607.json",
+      "records": 40157,
+      "amount": 9622919961255.43,
+      "transactions": 21775080382.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202608.json",
+      "records": 26724,
+      "amount": 6399627390806.441,
+      "transactions": 14536705840.0
+    },
+    {
+      "file": "estatisticas_transacoes_pix_202609.json",
+      "records": 13350,
+      "amount": 3225144302036.906,
+      "transactions": 7169724394.0
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import {
   Search,
   BookOpen,
   ChevronLeft,
+  ChevronRight,
   Sparkles,
   ChevronDown,
   X,
@@ -18,11 +19,40 @@ import {
   AtSign,
   Eye,
   FileText,
+  FileSpreadsheet,
+  FileJson,
+  Package,
+  Globe,
+  Tag,
+  Zap,
+  Terminal,
+  Folder,
+  RefreshCw,
   Pencil,
   Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CatalogDataSource, WorkspaceFile } from './PromptBar';
+
+const SECTIONS_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+  DATALAKE: { label: 'DATALAKE', icon: Database },
+  METADADOS: { label: 'METADADOS', icon: Tag },
+  OUTPUTS: { label: 'OUTPUTS', icon: Zap },
+  DOCUMENTAÇÕES: { label: 'DOCUMENTAÇÕES', icon: BookOpen },
+  WORKSPACE: { label: 'WORKSPACE', icon: Terminal },
+};
+
+const SUBCAT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  CSV: FileSpreadsheet,
+  JSON: FileJson,
+  PARQUET: Package,
+  MARKDOWN: FileText,
+  MD: FileText,
+  PDF: FileText,
+  PYTHON: FileCode2,
+  PY: FileCode2,
+  HTML: Globe,
+};
 
 export interface ConversaItem {
   id: string;
@@ -48,6 +78,7 @@ export interface SidebarNavProps {
   selectedWorkspaceFile?: string;
   onSelectWorkspaceFile?: (filename: string) => void;
   onAttachSource?: (source: CatalogDataSource) => void;
+  onSelectDatasetPreview?: (filename: string) => void;
   className?: string;
 }
 
@@ -68,6 +99,7 @@ export function SidebarNav({
   selectedWorkspaceFile = '',
   onSelectWorkspaceFile,
   onAttachSource,
+  onSelectDatasetPreview,
   className,
 }: SidebarNavProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -75,6 +107,44 @@ export function SidebarNav({
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [fileQuery, setFileQuery] = useState('');
+  const [catalogTree, setCatalogTree] = useState<Record<string, Record<string, any[]>>>({});
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    DATALAKE: true,
+    METADADOS: true,
+    OUTPUTS: true,
+    DOCUMENTAÇÕES: true,
+    WORKSPACE: true,
+  });
+  const [openSubcats, setOpenSubcats] = useState<Record<string, boolean>>({});
+
+  const toggleSection = (sec: string) => {
+    setOpenSections((prev) => ({ ...prev, [sec]: !prev[sec] }));
+  };
+
+  const toggleSubcat = (key: string) => {
+    setOpenSubcats((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const carregarCatalogo = async () => {
+    try {
+      setLoadingCatalog(true);
+      const res = await fetch('/api/dados/arquivos');
+      if (res.ok) {
+        const json = await res.json();
+        setCatalogTree(json.arvore || {});
+      }
+    } catch (err) {
+      console.error('Erro ao listar arquivos do catálogo:', err);
+    } finally {
+      setLoadingCatalog(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarCatalogo();
+  }, []);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -549,187 +619,204 @@ export function SidebarNav({
             </div>
           )}
 
-          {/* ABA 2: ARQUIVOS DO PROJETO (DRAG & DROP PARA O CHAT) */}
+          {/* ABA 2: ARQUIVOS DO PROJETO (ESTILO HIERÁRQUICO COMPLETO) */}
           {sidebarTab === 'arquivos' && !collapsed && (
-            <div className="space-y-3">
-              {/* Busca rápida de arquivos */}
-              <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 shadow-2xs">
-                <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <div className="space-y-2.5">
+              {/* Header de Arquivos do Projeto */}
+              <div className="flex items-center justify-between px-1">
+                <h3 className="text-xs font-bold tracking-tight text-slate-800">
+                  Arquivos do Projeto
+                </h3>
+                <button
+                  type="button"
+                  onClick={carregarCatalogo}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors cursor-pointer"
+                  title="Recarregar arquivos"
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', loadingCatalog && 'animate-spin')} />
+                </button>
+              </div>
+
+              {/* Campo de Busca de Arquivos */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <input
                   type="text"
                   value={fileQuery}
                   onChange={(e) => setFileQuery(e.target.value)}
                   placeholder="Filtrar arquivos..."
-                  className="w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400 font-medium"
+                  className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-purple-500 focus:outline-hidden"
                 />
-                {fileQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setFileQuery('')}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+              </div>
+
+              {/* Árvore Hierárquica de Seções, Subcategorias e Arquivos */}
+              <div className="space-y-2">
+                {loadingCatalog ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-xs text-slate-400 gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
+                    <span>Carregando catálogo de arquivos...</span>
+                  </div>
+                ) : Object.keys(catalogTree).length === 0 ? (
+                  <div className="text-center py-8 text-xs text-slate-400">
+                    Nenhum arquivo encontrado.
+                  </div>
+                ) : (
+                  Object.entries(catalogTree).map(([secaoNome, subcategorias]) => {
+                    const conf = SECTIONS_CONFIG[secaoNome] || { label: secaoNome, icon: Folder };
+                    const SecIcon = conf.icon;
+                    const isSecOpen = openSections[secaoNome] ?? true;
+
+                    // Coleta e filtra arquivos da seção
+                    const subEntries = Object.entries(subcategorias || {});
+                    let totalSecArquivos = 0;
+                    subEntries.forEach(([_, items]) => {
+                      totalSecArquivos += (items || []).length;
+                    });
+
+                    if (totalSecArquivos === 0) return null;
+
+                    return (
+                      <div
+                        key={secaoNome}
+                        className="rounded-xl border border-slate-200/80 bg-white overflow-hidden shadow-2xs"
+                      >
+                        {/* Nível 1: Cabeçalho da Seção */}
+                        <div
+                          onClick={() => toggleSection(secaoNome)}
+                          className="flex items-center justify-between px-2.5 py-2 cursor-pointer bg-slate-50/70 hover:bg-slate-100/60 transition-colors select-none"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            {isSecOpen ? (
+                              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                            )}
+                            <SecIcon className="h-4 w-4 text-purple-600 shrink-0" />
+                            <strong className="text-[11px] font-bold tracking-tight text-slate-800 uppercase">
+                              {conf.label}
+                            </strong>
+                          </div>
+                          <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[9.5px] font-bold text-slate-600 uppercase tracking-tight">
+                            {totalSecArquivos} {totalSecArquivos === 1 ? 'ARQUIVO' : 'ARQUIVOS'}
+                          </span>
+                        </div>
+
+                        {/* Nível 2 & 3: Subcategorias e Arquivos */}
+                        {isSecOpen && (
+                          <div className="p-1 space-y-1 bg-white">
+                            {subEntries.map(([subNome, rawItems]) => {
+                              const items = (rawItems || []).filter((item: any) =>
+                                (item.nome || '').toLowerCase().includes(fileQuery.toLowerCase())
+                              );
+                              if (items.length === 0) return null;
+
+                              const subcatKey = `${secaoNome}/${subNome}`;
+                              const isSubOpen = openSubcats[subcatKey] ?? false;
+                              const SubIcon = SUBCAT_ICONS[subNome.toUpperCase()] || Folder;
+
+                              return (
+                                <div key={subNome} className="space-y-0.5">
+                                  {/* Nível 2: Cabeçalho da Subcategoria */}
+                                  <div
+                                    onClick={() => toggleSubcat(subcatKey)}
+                                    className="flex items-center justify-between rounded-lg px-2.5 py-1.5 cursor-pointer hover:bg-slate-100/70 text-xs transition-colors select-none"
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      {isSubOpen ? (
+                                        <ChevronDown className="h-3 w-3 text-slate-400" />
+                                      ) : (
+                                        <ChevronRight className="h-3 w-3 text-slate-400" />
+                                      )}
+                                      <SubIcon className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                                      <span className="font-semibold text-slate-700 text-[11px]">
+                                        {subNome}
+                                      </span>
+                                    </div>
+                                    <span className="rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-500">
+                                      {items.length}
+                                    </span>
+                                  </div>
+
+                                  {/* Nível 3: Lista de Arquivos */}
+                                  {isSubOpen && (
+                                    <div className="pl-4 space-y-0.5">
+                                      {items.map((item: any) => {
+                                        let itemIcon = <FileText className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
+                                        if (item.tipo === 'csv' || item.tipo === 'parquet') {
+                                          itemIcon = <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 shrink-0" />;
+                                        } else if (item.tipo === 'json') {
+                                          itemIcon = <FileJson className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
+                                        } else if (item.tipo === 'pdf') {
+                                          itemIcon = <FileText className="h-3.5 w-3.5 text-rose-500 shrink-0" />;
+                                        } else if (item.tipo === 'py') {
+                                          itemIcon = <FileCode2 className="h-3.5 w-3.5 text-indigo-500 shrink-0" />;
+                                        }
+
+                                        return (
+                                          <div
+                                            key={item.caminho}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, item)}
+                                            onClick={() => onSelectDatasetPreview?.(item.nome)}
+                                            className="group flex items-center justify-between rounded-lg p-1.5 text-xs hover:bg-purple-50/50 hover:text-purple-950 transition-colors cursor-pointer select-none"
+                                            title="Clique para abrir preview ou arraste para o chat"
+                                          >
+                                            <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
+                                              {itemIcon}
+                                              <div className="min-w-0 flex-1">
+                                                <div className="font-mono text-[11px] font-medium text-slate-800 truncate group-hover:text-purple-700 transition-colors">
+                                                  {item.nome}
+                                                </div>
+                                                <div className="text-[9.5px] text-slate-400 truncate">
+                                                  {item.tipo.toUpperCase()} {item.tamanho_kb ? `· ${item.tamanho_kb} KB` : ''}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                              {onSelectDatasetPreview && (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onSelectDatasetPreview(item.nome);
+                                                  }}
+                                                  title={`Preview dos dados de ${item.nome}`}
+                                                  className="p-1 rounded text-slate-400 hover:text-purple-700 hover:bg-purple-100/80 transition-colors cursor-pointer"
+                                                >
+                                                  <Eye className="h-3 w-3" />
+                                                </button>
+                                              )}
+
+                                              {onAttachSource && (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onAttachSource(item);
+                                                  }}
+                                                  title="Anexar ao contexto do Chat"
+                                                  className="p-1 rounded text-slate-400 hover:text-purple-700 hover:bg-purple-100/80 transition-colors cursor-pointer"
+                                                >
+                                                  <Plus className="h-3 w-3" />
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
-
-              <div className="text-[10px] text-slate-400 font-mono px-1 flex items-center gap-1">
-                <GripVertical className="h-3 w-3 text-blue-500 shrink-0" />
-                <span>Arraste qualquer item para o Chat ou clique em @ para anexar.</span>
-              </div>
-
-              {/* 1. DATA SOURCES / DATALAKE */}
-              {datalakeFiles.length > 0 && (
-                <div>
-                  <div className="px-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
-                    <Database className="h-3 w-3" />
-                    <span>Data Sources ({datalakeFiles.length})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {datalakeFiles.map((file) => (
-                      <div
-                        key={file.caminho}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, file)}
-                        className="group flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2 text-xs hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-2xs transition-all cursor-grab active:cursor-grabbing select-none"
-                        title="Arraste para o chat ou use o botão @"
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
-                          <GripVertical className="h-3 w-3 text-slate-300 group-hover:text-blue-500 shrink-0" />
-                          <Database className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-mono text-[11px] font-bold text-slate-800 truncate">
-                              {file.nome}
-                            </div>
-                            <div className="text-[10px] text-slate-400 truncate">
-                              {file.tamanho_kb ? `${file.tamanho_kb} KB` : 'CSV / Parquet'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {onAttachSource && (
-                          <button
-                            type="button"
-                            onClick={() => onAttachSource(file)}
-                            title="Anexar ao contexto do Chat"
-                            className="shrink-0 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-blue-700 hover:bg-blue-100/80 border border-transparent hover:border-blue-200 transition-colors cursor-pointer"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 2. METADADOS & RAG */}
-              {metadataFiles.length > 0 && (
-                <div>
-                  <div className="px-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-purple-600 flex items-center gap-1.5">
-                    <BookOpen className="h-3 w-3" />
-                    <span>Metadados &amp; RAG ({metadataFiles.length})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {metadataFiles.map((file) => (
-                      <div
-                        key={file.caminho}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, file)}
-                        className="group flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2 text-xs hover:border-purple-300 hover:bg-purple-50/40 hover:shadow-2xs transition-all cursor-grab active:cursor-grabbing select-none"
-                        title="Arraste para o chat ou use o botão @"
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
-                          <GripVertical className="h-3 w-3 text-slate-300 group-hover:text-purple-500 shrink-0" />
-                          <BookOpen className="h-3.5 w-3.5 text-purple-600 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-mono text-[11px] font-bold text-slate-800 truncate">
-                              {file.nome}
-                            </div>
-                            <div className="text-[10px] text-slate-400 truncate">
-                              {file.tipo?.toUpperCase() || 'DOC'} · RAG
-                            </div>
-                          </div>
-                        </div>
-
-                        {onAttachSource && (
-                          <button
-                            type="button"
-                            onClick={() => onAttachSource(file)}
-                            title="Anexar ao contexto do Chat"
-                            className="shrink-0 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-purple-700 hover:bg-purple-100/80 border border-transparent hover:border-purple-200 transition-colors cursor-pointer"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 3. SCRIPTS DO WORKSPACE */}
-              {workspaceScripts.length > 0 && (
-                <div>
-                  <div className="px-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
-                    <FileCode2 className="h-3 w-3" />
-                    <span>Scripts do Workspace ({workspaceScripts.length})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {workspaceScripts.map((file) => {
-                      const isSelected = file.nome === selectedWorkspaceFile;
-                      return (
-                        <div
-                          key={file.caminho}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, file)}
-                          onClick={() => {
-                            if (onSelectWorkspaceFile) {
-                              onSelectWorkspaceFile(isSelected ? '' : file.nome);
-                            }
-                          }}
-                          className={cn(
-                            'group flex items-center justify-between rounded-xl border p-2 text-xs transition-all cursor-grab active:cursor-grabbing select-none',
-                            isSelected
-                              ? 'border-emerald-300 bg-emerald-50/80 text-emerald-950 font-semibold shadow-2xs'
-                              : 'border-slate-200/80 bg-white hover:border-emerald-300 hover:bg-emerald-50/30'
-                          )}
-                          title="Clique para selecionar ou arraste para o chat"
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
-                            <GripVertical className="h-3 w-3 text-slate-300 group-hover:text-emerald-500 shrink-0" />
-                            <FileCode2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <div className="font-mono text-[11px] font-bold truncate">
-                                {file.nome}
-                              </div>
-                              <div className="text-[10px] text-slate-400 truncate">
-                                Python · {isSelected ? 'Script Ativo' : 'Workspace'}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1 shrink-0">
-                            {onAttachSource && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onAttachSource(file);
-                                }}
-                                title="Anexar ao contexto do Chat"
-                                className="shrink-0 flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-100/80 border border-transparent hover:border-emerald-200 transition-colors cursor-pointer"
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>

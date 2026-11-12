@@ -31,6 +31,7 @@ import { ToolChips, ToolCallItem, DiffInfo } from './components/ToolChips';
 import { ApprovalCard } from './components/ApprovalCard';
 import { InsightCards, BenchmarkMetrics } from './components/InsightCards';
 import { DataExplorerView } from './components/DataExplorerView';
+import { DataExplorerModal } from './components/DataExplorerModal';
 import { InvestigationView } from './components/InvestigationView';
 import { ObservabilityView } from './components/ObservabilityView';
 import { SideCodePanel } from './components/SideCodePanel';
@@ -137,7 +138,13 @@ function formatTimestamp(ts?: string): string {
 export function App() {
   const [activeView, setActiveView] = useState<'chat' | 'dados' | 'investigacao' | 'observabilidade'>('chat');
   const [activeExecucaoId, setActiveExecucaoId] = useState<string | null>(null);
+  const [selectedDataFile, setSelectedDataFile] = useState<string | null>(null);
+  const [previewModalFile, setPreviewModalFile] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleOpenDatasetPreview = (fileName: string) => {
+    setPreviewModalFile(fileName);
+  };
 
   const [conversas, setConversas] = useState<ConversaItem[]>([]);
   const [conversaAtivaId, setConversaAtivaId] = useState<string | null>(null);
@@ -753,6 +760,7 @@ export function App() {
           selectedWorkspaceFile={selectedWorkspaceFile}
           onSelectWorkspaceFile={setSelectedWorkspaceFile}
           onAttachSource={handleAttachSource}
+          onSelectDatasetPreview={handleOpenDatasetPreview}
         />
 
         {/* Main Container */}
@@ -875,6 +883,7 @@ export function App() {
           {/* Renderização Condicional de Vistas */}
           {activeView === 'dados' ? (
             <DataExplorerView
+              initialFilePath={selectedDataFile}
               onBackToChat={() => setActiveView('chat')}
               onSendToChat={(prompt) => {
                 setActiveView('chat');
@@ -911,7 +920,7 @@ export function App() {
                 }}
               >
                 <div className="flex-1 overflow-y-auto min-w-0 w-full [scrollbar-gutter:stable]">
-                  <div className="mx-auto max-w-4xl w-full px-4 sm:px-6 py-6 space-y-6 pb-8 min-w-0">
+                  <div className="mx-auto w-full max-w-6xl xl:max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6 pb-8 min-w-0">
                     {mensagens.length === 0 ? (
                       /* Welcome Screen Estilo Beautiful UI */
                       <div className="flex flex-col items-center justify-center py-16 text-center select-none">
@@ -994,7 +1003,7 @@ export function App() {
                                 </div>
                               </div>
 
-                              <div className="max-w-2xl rounded-2xl bg-blue-600 px-4 py-3 text-xs leading-relaxed text-white shadow-xs font-medium rounded-tr-xs select-text">
+                              <div className="max-w-3xl lg:max-w-4xl rounded-2xl bg-blue-600 px-4 py-3 text-xs leading-relaxed text-white shadow-xs font-medium rounded-tr-xs select-text">
                                 {extractBubbleAttachments(msg).length > 0 && (
                                   <div className="flex flex-wrap items-center gap-1.5 mb-2 justify-end">
                                     {extractBubbleAttachments(msg).map((anexoNome, aIdx) => (
@@ -1052,7 +1061,10 @@ export function App() {
 
                               {/* Caixa de Texto do Agente com Suporte a Markdown & Tabelas */}
                               <div className="rounded-2xl border border-slate-200/90 bg-white px-5 py-4 text-xs leading-relaxed text-slate-800 shadow-2xs w-full min-w-0">
-                                <StreamingText content={cleanDisplayText(msg.texto, sugestoes.length > 0)} />
+                                <StreamingText
+                                  content={cleanDisplayText(msg.texto, sugestoes.length > 0)}
+                                  onSelectDataset={handleOpenDatasetPreview}
+                                />
 
                                 {/* Resultados Estruturados Pydantic (KrakenBenchmark, KrakenDataProfile, KrakenCodeDiff, KrakenStatisticalReport) */}
                                 {((msg as any).metadados?.structured_result || (msg as any).metadados?.resultado_estruturado) && (
@@ -1260,6 +1272,23 @@ export function App() {
             </div>
           )}
         </main>
+
+        {/* Janela Flutuante (Modal) com Preview dos Dados */}
+        <DataExplorerModal
+          isOpen={!!previewModalFile}
+          onClose={() => setPreviewModalFile(null)}
+          initialFileName={previewModalFile}
+          onAttachToChat={(fileName) => {
+            handleSendMessage(`@${fileName}`);
+          }}
+          onSendSqlToChat={(sql) => {
+            handleSendMessage(sql);
+          }}
+          onOpenFullExplorer={(fileName) => {
+            setSelectedDataFile(fileName);
+            setActiveView('dados');
+          }}
+        />
       </div>
   );
 }

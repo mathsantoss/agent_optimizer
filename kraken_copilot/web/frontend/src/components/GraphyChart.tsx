@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   BarChart3,
   LineChart as LineChartIcon,
@@ -6,12 +6,32 @@ import {
   ScatterChart as ScatterChartIcon,
   Table as TableIcon,
   TrendingUp,
-  Percent,
+  Maximize2,
+  Minimize2,
+  Sun,
+  Moon,
   CheckCircle2,
 } from 'lucide-react';
+import {
+  GraphProvider,
+  GraphRenderer,
+  createSpec,
+  pipe,
+  geom,
+  scale,
+  coord,
+  config,
+} from '@graphysdk/react';
+import type { Data } from '@graphysdk/react';
+import { shiny } from '@graphysdk/theme-shiny';
+import { botanical } from '@graphysdk/theme-botanical';
+import { neoBrutalist } from '@graphysdk/theme-neo-brutalist';
+import { spreadsheet } from '@graphysdk/theme-spreadsheet';
 import { cn } from '@/lib/utils';
 
 export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'scatter';
+export type ColorSchemeType = 'light' | 'dark';
+export type ThemeChoice = 'default' | 'shiny' | 'botanical' | 'neoBrutalist' | 'spreadsheet';
 
 export interface GraphyChartProps {
   type?: ChartType;
@@ -22,20 +42,36 @@ export interface GraphyChartProps {
   y: string;
   className?: string;
   height?: number;
+  sizing?: {
+    mode?: 'responsive' | 'fixed';
+    width?: number;
+    height?: number;
+  };
 }
 
-const PALETTE = [
-  '#1e40af', // Deep blue (primary)
-  '#3b82f6', // Vivid blue (secondary)
-  '#0284c7', // Sky blue
-  '#0d9488', // Teal
-  '#d97706', // Amber (accent)
-  '#7c3aed', // Purple
-  '#e11d48', // Rose
-  '#059669', // Emerald
-  '#ea580c', // Orange
-  '#4f46e5', // Indigo
-];
+// Mapeamento dos temas oficiais do Graphy SDK
+const THEMES: Record<ThemeChoice, { label: string; theme: any }> = {
+  default: { label: 'Default', theme: undefined },
+  shiny: { label: 'Shiny Glow', theme: shiny },
+  botanical: { label: 'Botanical', theme: botanical },
+  neoBrutalist: { label: 'Neo Brutalist', theme: neoBrutalist },
+  spreadsheet: { label: 'Spreadsheet', theme: spreadsheet },
+};
+
+// Formatação compacta de números para títulos e resumos estatísticos
+export function formatCompactNumber(val: number): string {
+  const abs = Math.abs(val);
+  if (abs >= 1_000_000_000) {
+    return `R$ ${(val / 1_000_000_000).toFixed(2).replace(/\.00$/, '')}B`;
+  }
+  if (abs >= 1_000_000) {
+    return `R$ ${(val / 1_000_000).toFixed(2).replace(/\.00$/, '')}M`;
+  }
+  if (abs >= 1_000) {
+    return `R$ ${(val / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
 
 export function GraphyChart({
   type: initialType = 'bar',
@@ -45,11 +81,56 @@ export function GraphyChart({
   x,
   y,
   className,
-  height = 290,
+  height = 380,
 }: GraphyChartProps) {
   const [activeTab, setActiveTab] = useState<'chart' | 'data'>('chart');
   const [currentType, setCurrentType] = useState<ChartType>(initialType);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  // Padrão light e tema simples (sem tema extra) conforme preferência visual
+  const [colorScheme, setColorScheme] = useState<ColorSchemeType>('light');
+  const [selectedTheme, setSelectedTheme] = useState<ThemeChoice>('default');
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+
+  // Medição reativa e contínua da largura do container para renderização imediata do Graphy
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      const w = Math.floor(rect.width);
+      if (w > 0) {
+        setContainerWidth(w);
+      }
+    };
+
+    measure();
+
+    const ro = new ResizeObserver(() => {
+      measure();
+    });
+    ro.observe(el);
+
+    // Timeout de segurança para layout assíncrono do navegador
+    const timer = setTimeout(measure, 100);
+
+    return () => {
+      clearTimeout(timer);
+      ro.disconnect();
+    };
+  }, [isExpanded, activeTab]);
+
+  // Fecha tela cheia com tecla ESC
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsExpanded(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded]);
 
   // Sanitização e formatação dos dados
   const sanitizedData = useMemo(() => {
@@ -62,40 +143,119 @@ export function GraphyChart({
           ? rawY
           : parseFloat(String(rawY).replace(/[^\d.-]/g, ''));
       copy[y] = isNaN(parsedY) ? 0 : parsedY;
-
-      // Se for scatter, também tenta parsear X como número
-      if (currentType === 'scatter') {
-        const rawX = copy[x];
-        const parsedX =
-          typeof rawX === 'number'
-            ? rawX
-            : parseFloat(String(rawX).replace(/[^\d.-]/g, ''));
-        copy._numX = isNaN(parsedX) ? 0 : parsedX;
-      }
       copy[x] = String(copy[x] ?? '');
       return copy;
     });
-  }, [data, x, y, currentType]);
+  }, [data, x, y]);
 
-  // Estatísticas descritivas rápidas para o cabeçalho e cálculos
+  // Estatísticas descritivas básicas para o resumo
   const stats = useMemo(() => {
-    if (sanitizedData.length === 0) return { max: 0, min: 0, avg: 0, total: 0, maxX: 0, minX: 0 };
-    const valuesY = sanitizedData.map((d) => d[y]);
-    const total = valuesY.reduce((acc, val) => acc + val, 0);
-    const max = Math.max(...valuesY, 1);
-    const min = Math.min(...valuesY);
-    const avg = total / valuesY.length;
-
-    let maxX = 1;
-    let minX = 0;
-    if (currentType === 'scatter') {
-      const valuesX = sanitizedData.map((d) => d._numX ?? 0);
-      maxX = Math.max(...valuesX, 1);
-      minX = Math.min(...valuesX, 0);
+    if (sanitizedData.length === 0) {
+      return { max: 1, min: 0, avg: 0, total: 0, count: 0 };
     }
+    const valuesY = sanitizedData.map((d) => d[y]);
+    const count = valuesY.length;
+    const total = valuesY.reduce((acc, val) => acc + val, 0);
+    const max = Math.max(...valuesY, 0);
+    const min = Math.min(...valuesY);
+    const avg = total / (count || 1);
+    return { max, min, avg, total, count };
+  }, [sanitizedData, y]);
 
-    return { max, min, avg, total, maxX, minX };
-  }, [sanitizedData, y, currentType]);
+  // Estrutura de dados exigida pelo Graphy SDK (colunas e linhas)
+  const graphyData: Data = useMemo(() => {
+    return {
+      columns: [
+        { key: x, label: x },
+        { key: y, label: y },
+      ],
+      rows: sanitizedData.map((d) => ({
+        [x]: d[x],
+        [y]: d[y],
+      })),
+    };
+  }, [sanitizedData, x, y]);
+
+  // Geração do Spec declarativo do Graphy SDK conforme o tipo selecionado
+  const graphySpec = useMemo(() => {
+    try {
+      const baseMapping = createSpec({ x, y });
+      let specWithGeom: any = baseMapping;
+
+      if (currentType === 'bar') {
+        specWithGeom = pipe(
+          baseMapping,
+          geom.bar(),
+          scale.x({ nice: true }),
+          scale.y({ nice: true })
+        );
+      } else if (currentType === 'line') {
+        specWithGeom = pipe(
+          baseMapping,
+          geom.line(),
+          scale.x({ nice: true }),
+          scale.y({ nice: true })
+        );
+      } else if (currentType === 'area') {
+        specWithGeom = pipe(
+          baseMapping,
+          geom.area(),
+          scale.x({ nice: true }),
+          scale.y({ nice: true })
+        );
+      } else if (currentType === 'scatter') {
+        specWithGeom = pipe(
+          baseMapping,
+          geom.point(),
+          scale.x({ nice: true }),
+          scale.y({ nice: true })
+        );
+      } else if (currentType === 'pie') {
+        specWithGeom = pipe(
+          createSpec({ x: '', y, color: x }),
+          geom.bar({
+            position: 'fill',
+            dataLabels: { showDataLabels: true },
+          }),
+          coord.polar({ theta: 'y' }),
+          scale.x(),
+          scale.y(),
+          scale.color.discrete(),
+          config({
+            legend: { position: 'right' },
+          })
+        );
+      } else if (currentType === 'donut') {
+        specWithGeom = pipe(
+          createSpec({ x: '', y, color: x }),
+          geom.bar({
+            position: 'fill',
+            dataLabels: { showDataLabels: true },
+          }),
+          coord.polar({ theta: 'y', innerRadius: 0.55 }),
+          scale.x(),
+          scale.y(),
+          scale.color.discrete(),
+          config({
+            legend: { position: 'right' },
+            headline: { show: 'total', position: 'center' },
+          })
+        );
+      }
+
+      return pipe(
+        specWithGeom,
+        config({
+          content: {
+            graphyBadge: { visible: false },
+          },
+        })
+      );
+    } catch (err) {
+      console.error('Erro gerando spec do Graphy:', err);
+      return null;
+    }
+  }, [x, y, currentType]);
 
   if (!sanitizedData || sanitizedData.length === 0 || !x || !y) {
     return (
@@ -105,514 +265,9 @@ export function GraphyChart({
     );
   }
 
-  // Formatação amigável para números grandes e moedas
-  const formatValue = (val: number): string => {
-    if (Math.abs(val) >= 1_000_000) {
-      return `R$ ${(val / 1_000_000).toFixed(2)}M`;
-    }
-    if (Math.abs(val) >= 1_000) {
-      return `R$ ${(val / 1_000).toFixed(1)}k`;
-    }
-    return val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  };
-
-  const chartHeight = Math.max(height, 250);
-  const paddingX = 45;
-  const paddingY = 40;
-  const svgWidth = 800;
-  const svgHeight = chartHeight;
-  const innerWidth = svgWidth - paddingX * 2;
-  const innerHeight = svgHeight - paddingY * 2;
-
-  // 1. RENDERIZADOR BARRAS (BAR)
-  const renderBars = () => {
-    const barCount = sanitizedData.length;
-    const barWidth = Math.max(16, Math.min(48, innerWidth / (barCount * 1.5)));
-    const gap = (innerWidth - barWidth * barCount) / (barCount + 1);
-
-    return (
-      <svg
-        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        className="w-full h-full overflow-visible select-none"
-      >
-        <defs>
-          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" />
-            <stop offset="100%" stopColor="#1d4ed8" />
-          </linearGradient>
-          <linearGradient id="barGradientHover" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#60a5fa" />
-            <stop offset="100%" stopColor="#2563eb" />
-          </linearGradient>
-        </defs>
-
-        {/* Linhas de Grade Horizontais */}
-        {[0, 0.25, 0.5, 0.75, 1].map((pct, idx) => {
-          const lineY = paddingY + innerHeight * (1 - pct);
-          const val = stats.max * pct;
-          return (
-            <g key={idx}>
-              <line
-                x1={paddingX}
-                y1={lineY}
-                x2={svgWidth - paddingX}
-                y2={lineY}
-                stroke="#e2e8f0"
-                strokeDasharray="4 4"
-                strokeWidth="1"
-              />
-              <text
-                x={paddingX - 8}
-                y={lineY + 3}
-                textAnchor="end"
-                className="text-[10px] font-mono fill-slate-400"
-              >
-                {formatValue(val)}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Barras e Rótulos */}
-        {sanitizedData.map((d, idx) => {
-          const barHeight = Math.max(4, (d[y] / stats.max) * innerHeight);
-          const posX = paddingX + gap + idx * (barWidth + gap);
-          const posY = paddingY + innerHeight - barHeight;
-          const isHovered = hoveredIndex === idx;
-
-          return (
-            <g
-              key={idx}
-              className="cursor-pointer transition-all duration-150"
-              onMouseEnter={() => setHoveredIndex(idx)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              <rect
-                x={posX}
-                y={posY}
-                width={barWidth}
-                height={barHeight}
-                rx="6"
-                ry="6"
-                fill={isHovered ? 'url(#barGradientHover)' : 'url(#barGradient)'}
-                className="transition-all duration-200"
-              />
-
-              {/* Rótulo do Eixo X */}
-              <text
-                x={posX + barWidth / 2}
-                y={svgHeight - 12}
-                textAnchor="middle"
-                className={cn(
-                  'text-[10px] font-mono transition-colors',
-                  isHovered ? 'fill-blue-700 font-bold' : 'fill-slate-500'
-                )}
-              >
-                {d[x].length > 12 ? `${d[x].slice(0, 10)}…` : d[x]}
-              </text>
-
-              {/* Tooltip inline de Valor ao passar o mouse */}
-              {isHovered && (
-                <g>
-                  <rect
-                    x={posX + barWidth / 2 - 45}
-                    y={posY - 26}
-                    width="90"
-                    height="20"
-                    rx="4"
-                    fill="#0f172a"
-                    className="shadow-md"
-                  />
-                  <text
-                    x={posX + barWidth / 2}
-                    y={posY - 12}
-                    textAnchor="middle"
-                    className="text-[10px] font-mono font-bold fill-white"
-                  >
-                    {formatValue(d[y])}
-                  </text>
-                </g>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-    );
-  };
-
-  // 2. RENDERIZADOR LINHAS E ÁREAS (LINE / AREA)
-  const renderLines = (isArea = false) => {
-    const points = sanitizedData.map((d, idx) => {
-      const px = paddingX + (idx / Math.max(sanitizedData.length - 1, 1)) * innerWidth;
-      const py = paddingY + innerHeight - (d[y] / stats.max) * innerHeight;
-      return { x: px, y: py, data: d };
-    });
-
-    const pathD = points.reduce(
-      (acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`),
-      ''
-    );
-    const areaD = `${pathD} L ${points[points.length - 1].x} ${paddingY + innerHeight} L ${points[0].x} ${paddingY + innerHeight} Z`;
-
-    return (
-      <svg
-        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        className="w-full h-full overflow-visible select-none"
-      >
-        <defs>
-          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-          </linearGradient>
-        </defs>
-
-        {/* Linhas de Grade Horizontais */}
-        {[0, 0.25, 0.5, 0.75, 1].map((pct, idx) => {
-          const lineY = paddingY + innerHeight * (1 - pct);
-          const val = stats.max * pct;
-          return (
-            <g key={idx}>
-              <line
-                x1={paddingX}
-                y1={lineY}
-                x2={svgWidth - paddingX}
-                y2={lineY}
-                stroke="#e2e8f0"
-                strokeDasharray="4 4"
-                strokeWidth="1"
-              />
-              <text
-                x={paddingX - 8}
-                y={lineY + 3}
-                textAnchor="end"
-                className="text-[10px] font-mono fill-slate-400"
-              >
-                {formatValue(val)}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Área preenchida */}
-        {isArea && <path d={areaD} fill="url(#areaGradient)" />}
-
-        {/* Linha principal */}
-        <path
-          d={pathD}
-          fill="none"
-          stroke="#2563eb"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Pontos de dados */}
-        {points.map((p, idx) => {
-          const isHovered = hoveredIndex === idx;
-          return (
-            <g
-              key={idx}
-              className="cursor-pointer"
-              onMouseEnter={() => setHoveredIndex(idx)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={isHovered ? 6 : 4}
-                className={cn(
-                  'transition-all duration-150',
-                  isHovered ? 'fill-blue-600 stroke-white stroke-2' : 'fill-white stroke-blue-600 stroke-2'
-                )}
-              />
-              <text
-                x={p.x}
-                y={svgHeight - 12}
-                textAnchor="middle"
-                className={cn(
-                  'text-[10px] font-mono transition-colors',
-                  isHovered ? 'fill-blue-700 font-bold' : 'fill-slate-500'
-                )}
-              >
-                {p.data[x].length > 12 ? `${p.data[x].slice(0, 10)}…` : p.data[x]}
-              </text>
-
-              {isHovered && (
-                <g>
-                  <rect
-                    x={p.x - 45}
-                    y={p.y - 28}
-                    width="90"
-                    height="20"
-                    rx="4"
-                    fill="#0f172a"
-                    className="shadow-md"
-                  />
-                  <text
-                    x={p.x}
-                    y={p.y - 14}
-                    textAnchor="middle"
-                    className="text-[10px] font-mono font-bold fill-white"
-                  >
-                    {formatValue(p.data[y])}
-                  </text>
-                </g>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-    );
-  };
-
-  // 3. RENDERIZADOR PIE & DONUT (COMPOSIÇÃO / PROPORÇÃO)
-  const renderPie = (isDonut = false) => {
-    const total = stats.total || 1;
-    const cx = 260;
-    const cy = chartHeight / 2;
-    const outerR = Math.min(105, chartHeight / 2 - 16);
-    const innerR = isDonut ? outerR * 0.58 : 0;
-
-    let currentAngle = -Math.PI / 2; // começa no topo (12h)
-
-    const slices = sanitizedData.slice(0, 8).map((d, idx) => {
-      const val = Math.max(0, d[y]);
-      const angle = (val / total) * Math.PI * 2;
-      const startAngle = currentAngle;
-      const endAngle = currentAngle + angle;
-      currentAngle = endAngle;
-
-      const pct = ((val / total) * 100).toFixed(1);
-      const color = PALETTE[idx % PALETTE.length];
-
-      // Coordenadas externas
-      const x1 = cx + outerR * Math.cos(startAngle);
-      const y1 = cy + outerR * Math.sin(startAngle);
-      const x2 = cx + outerR * Math.cos(endAngle);
-      const y2 = cy + outerR * Math.sin(endAngle);
-
-      const largeArc = angle > Math.PI ? 1 : 0;
-
-      let pathD = '';
-      if (isDonut) {
-        const ix1 = cx + innerR * Math.cos(endAngle);
-        const iy1 = cy + innerR * Math.sin(endAngle);
-        const ix2 = cx + innerR * Math.cos(startAngle);
-        const iy2 = cy + innerR * Math.sin(startAngle);
-        pathD = `M ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} L ${ix1} ${iy1} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2} Z`;
-      } else {
-        pathD = `M ${cx} ${cy} L ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-      }
-
-      return {
-        pathD,
-        color,
-        label: d[x],
-        val,
-        pct,
-        idx,
-      };
-    });
-
-    const activeSlice = hoveredIndex !== null ? slices[hoveredIndex] : null;
-
-    return (
-      <div className="flex h-full w-full flex-col md:flex-row items-center justify-between gap-4 px-2">
-        <div className="relative flex-1 flex items-center justify-center">
-          <svg viewBox={`0 0 520 ${chartHeight}`} className="h-full w-full max-w-[420px] overflow-visible">
-            {slices.map((slice) => {
-              const isHov = hoveredIndex === slice.idx;
-              return (
-                <path
-                  key={slice.idx}
-                  d={slice.pathD}
-                  fill={slice.color}
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  className="cursor-pointer transition-all duration-200 hover:opacity-90"
-                  style={{
-                    transformOrigin: `${cx}px ${cy}px`,
-                    transform: isHov ? 'scale(1.04)' : 'scale(1)',
-                  }}
-                  onMouseEnter={() => setHoveredIndex(slice.idx)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                />
-              );
-            })}
-
-            {isDonut && (
-              <g className="pointer-events-none select-none">
-                <text x={cx} y={cy - 4} textAnchor="middle" className="text-[11px] font-medium fill-slate-400">
-                  {activeSlice ? activeSlice.label.slice(0, 10) : 'Total'}
-                </text>
-                <text x={cx} y={cy + 15} textAnchor="middle" className="text-[13px] font-bold font-mono fill-slate-800">
-                  {activeSlice ? `${activeSlice.pct}%` : formatValue(stats.total)}
-                </text>
-              </g>
-            )}
-          </svg>
-        </div>
-
-        {/* Legenda Interativa Lateral */}
-        <div className="w-full md:w-56 max-h-56 overflow-y-auto space-y-1.5 pr-2">
-          {slices.map((slice) => {
-            const isHov = hoveredIndex === slice.idx;
-            return (
-              <div
-                key={slice.idx}
-                onMouseEnter={() => setHoveredIndex(slice.idx)}
-                onMouseLeave={() => setHoveredIndex(null)}
-                className={cn(
-                  'flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-all cursor-pointer',
-                  isHov ? 'bg-blue-50/80 shadow-2xs' : 'hover:bg-slate-50'
-                )}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: slice.color }}
-                  />
-                  <span className={cn('truncate font-medium text-[11px]', isHov ? 'text-blue-900 font-bold' : 'text-slate-700')}>
-                    {slice.label}
-                  </span>
-                </div>
-                <div className="text-right shrink-0 font-mono text-[11px]">
-                  <span className="font-semibold text-slate-800">{slice.pct}%</span>
-                  <span className="ml-1 text-[10px] text-slate-400">({formatValue(slice.val)})</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // 4. RENDERIZADOR SCATTER (DISPERSÃO E CORRELAÇÃO)
-  const renderScatter = () => {
-    const minX = stats.minX;
-    const maxX = stats.maxX || 1;
-    const rangeX = maxX - minX || 1;
-    const minY = stats.min;
-    const maxY = stats.max || 1;
-    const rangeY = maxY - minY || 1;
-
-    const points = sanitizedData.map((d, idx) => {
-      const numX = d._numX ?? 0;
-      const numY = d[y] ?? 0;
-      const px = paddingX + ((numX - minX) / rangeX) * innerWidth;
-      const py = paddingY + innerHeight - ((numY - minY) / rangeY) * innerHeight;
-      return { px, py, xVal: numX, yVal: numY, label: d[x], idx };
-    });
-
-    return (
-      <svg
-        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        className="w-full h-full overflow-visible select-none"
-      >
-        {/* Linhas de Grade Verticais e Horizontais */}
-        {[0, 0.25, 0.5, 0.75, 1].map((pct, idx) => {
-          const lineY = paddingY + innerHeight * (1 - pct);
-          const valY = minY + rangeY * pct;
-          const lineX = paddingX + innerWidth * pct;
-          const valX = minX + rangeX * pct;
-
-          return (
-            <g key={idx}>
-              <line
-                x1={paddingX}
-                y1={lineY}
-                x2={svgWidth - paddingX}
-                y2={lineY}
-                stroke="#e2e8f0"
-                strokeDasharray="4 4"
-                strokeWidth="1"
-              />
-              <text
-                x={paddingX - 8}
-                y={lineY + 3}
-                textAnchor="end"
-                className="text-[10px] font-mono fill-slate-400"
-              >
-                {formatValue(valY)}
-              </text>
-
-              <line
-                x1={lineX}
-                y1={paddingY}
-                x2={lineX}
-                y2={svgHeight - paddingY}
-                stroke="#f1f5f9"
-                strokeDasharray="3 3"
-                strokeWidth="1"
-              />
-              <text
-                x={lineX}
-                y={svgHeight - 12}
-                textAnchor="middle"
-                className="text-[10px] font-mono fill-slate-400"
-              >
-                {formatValue(valX)}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Pontos de Dispersão */}
-        {points.map((p) => {
-          const isHov = hoveredIndex === p.idx;
-          return (
-            <g
-              key={p.idx}
-              className="cursor-pointer"
-              onMouseEnter={() => setHoveredIndex(p.idx)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              <circle
-                cx={p.px}
-                cy={p.py}
-                r={isHov ? 7 : 5}
-                fill={isHov ? '#2563eb' : '#60a5fa'}
-                stroke="#ffffff"
-                strokeWidth="2"
-                className="transition-all duration-150 shadow-xs"
-              />
-
-              {isHov && (
-                <g>
-                  <rect
-                    x={p.px - 60}
-                    y={p.py - 36}
-                    width="120"
-                    height="30"
-                    rx="5"
-                    fill="#0f172a"
-                    className="shadow-lg"
-                  />
-                  <text
-                    x={p.px}
-                    y={p.py - 22}
-                    textAnchor="middle"
-                    className="text-[10px] font-semibold fill-slate-200"
-                  >
-                    {p.label.slice(0, 15)}
-                  </text>
-                  <text
-                    x={p.px}
-                    y={p.py - 10}
-                    textAnchor="middle"
-                    className="text-[9.5px] font-mono font-bold fill-blue-300"
-                  >
-                    X: {formatValue(p.xVal)} · Y: {formatValue(p.yVal)}
-                  </text>
-                </g>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-    );
-  };
+  const isDark = colorScheme === 'dark';
+  const chartHeightPx = isExpanded ? 640 : Math.max(height, 380);
+  const activeGraphyTheme = THEMES[selectedTheme]?.theme;
 
   const getHeaderIcon = () => {
     switch (currentType) {
@@ -631,102 +286,185 @@ export function GraphyChart({
     }
   };
 
-  return (
+  const chartCard = (
     <div
       className={cn(
-        'my-3.5 w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition-all',
+        'my-3 w-full overflow-hidden rounded-2xl border transition-all shadow-xs',
+        isDark
+          ? 'bg-slate-900 border-slate-800 text-slate-100'
+          : 'bg-white border-slate-200 text-slate-800',
+        isExpanded ? 'h-full flex flex-col my-0 border-0 shadow-none' : '',
         className
       )}
     >
-      {/* Header do Card com Seletor Interativo de Tipo e Abas */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-3 select-none">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shadow-2xs border border-blue-100/80">
-            {getHeaderIcon()}
-          </div>
-          <div>
-            <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <span>{title || `Visualização: ${x} vs ${y}`}</span>
-              <span className="rounded-md bg-blue-100/70 px-1.5 py-0.5 text-[9.5px] font-mono font-semibold uppercase text-blue-800">
-                {currentType}
-              </span>
+      {/* Header do Card: Título + Botão Expandir alinhados no topo; Controles abaixo */}
+      <div
+        className={cn(
+          'flex flex-col gap-2.5 border-b px-4 py-3 select-none',
+          isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-100'
+        )}
+      >
+            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-2xs',
+                  isDark
+                    ? 'bg-slate-800 border-slate-700 text-cyan-400'
+                    : 'bg-blue-50 border-blue-100 text-blue-600'
+                )}
+              >
+                {getHeaderIcon()}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold flex items-center gap-2 flex-wrap">
+                  <span className={cn('truncate', isDark ? 'text-white' : 'text-slate-900')}>
+                    {title || `${x} vs ${y}`}
+                  </span>
+                  <span
+                    className={cn(
+                      'rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold uppercase shrink-0',
+                      isDark ? 'bg-slate-800 text-cyan-300' : 'bg-blue-100 text-blue-800'
+                    )}
+                  >
+                    {currentType}
+                  </span>
+                </div>
+                <div className={cn('text-[11px] truncate', isDark ? 'text-slate-400' : 'text-slate-500')}>
+                  {subtitle || `Total: ${formatCompactNumber(stats.total)} · Média: ${formatCompactNumber(stats.avg)}`}
+                </div>
+              </div>
             </div>
-            <div className="text-[11px] text-slate-500">
-              {subtitle || `Total: ${formatValue(stats.total)} · Média: ${formatValue(stats.avg)}`}
+
+            {/* Botão de Expandir alinhado ao título no final da div */}
+            <button
+              type="button"
+              onClick={() => setIsExpanded(!isExpanded)}
+              title={isExpanded ? 'Restaurar tamanho (ESC)' : 'Expandir gráfico em tela cheia'}
+              className={cn(
+                'shrink-0 rounded-xl border p-1.5 transition-colors cursor-pointer shadow-2xs',
+                isDark
+                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              )}
+            >
+          {isExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1.5">
+            {/* Seletor de Temas Oficiais do Graphy SDK */}
+            <select
+              value={selectedTheme}
+              onChange={(e) => setSelectedTheme(e.target.value as ThemeChoice)}
+              className={cn(
+                'rounded-xl border px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer shadow-2xs focus:outline-hidden',
+                isDark
+                  ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              )}
+              title="Escolher Tema oficial do Graphy SDK"
+            >
+              {Object.entries(THEMES).map(([key, item]) => (
+                <option key={key} value={key} className={isDark ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-800'}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Alternador de Modo Claro e Escuro (ColorScheme) */}
+            <button
+              type="button"
+              onClick={() => setColorScheme(colorScheme === 'light' ? 'dark' : 'light')}
+              title={colorScheme === 'light' ? 'Alternar para Modo Escuro (Dark)' : 'Alternar para Modo Claro (Light)'}
+              className={cn(
+                'flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer shadow-2xs',
+                isDark
+                  ? 'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+              )}
+            >
+              { colorScheme === 'light' ? (
+                  <>
+                    <Moon className="h-3.5 w-3.5 text-slate-600" />
+                    <span className="text-[11px] font-sans">Dark</span>
+                  </>
+                ) : (
+                  <>
+                    <Sun className="h-3.5 w-3.5 text-yellow-400" />
+                    <span className="text-[11px] font-sans text-slate-200">Light</span>
+                  </>
+                )}
+            </button>
+          </div>
+
+          <div className="flex items-center flex-wrap gap-2">
+              {/* Seletor Rápido de Tipo de Gráfico */}
+              <div
+                className={cn(
+                'hidden sm:flex items-center gap-0.5 rounded-xl p-0.5 border text-[10px]',
+                  isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-200/50 border-slate-200'
+                )}
+              >
+                {(
+                  [
+                    { id: 'bar', title: 'Barras (Bar)', icon: BarChart3, active: currentType === 'bar' },
+                    { id: 'line', title: 'Linhas (Line)', icon: LineChartIcon, active: currentType === 'line' },
+                    { id: 'area', title: 'Área (Area)', icon: TrendingUp, active: currentType === 'area' },
+                    {
+                      id: 'donut',
+                      title: 'Donut / Pizza',
+                      icon: PieChartIcon,
+                      active: currentType === 'donut' || currentType === 'pie',
+                      onClick: () => setCurrentType(currentType === 'donut' ? 'pie' : 'donut'),
+                    },
+                    { id: 'scatter', title: 'Dispersão (Scatter)', icon: ScatterChartIcon, active: currentType === 'scatter' },
+                  ] as const
+                ).map((btn) => {
+                  const Icon = btn.icon;
+                  return (
+                    <button
+                      key={btn.id}
+                      type="button"
+                      title={btn.title}
+                      onClick={'onClick' in btn ? btn.onClick : () => setCurrentType(btn.id)}
+                      className={cn(
+                        'rounded-lg p-1.5 transition-all cursor-pointer',
+                        btn.active
+                          ? isDark
+                            ? 'bg-slate-700 text-cyan-300 font-bold shadow-xs'
+                            : 'bg-white text-blue-700 shadow-2xs font-bold'
+                          : isDark
+                            ? 'text-slate-400 hover:text-slate-200'
+                            : 'text-slate-500 hover:text-slate-800'
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                    </button>
+                  );
+                })}
             </div>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          {/* Seletor Rápido de Tipo de Gráfico */}
-          <div className="hidden sm:flex items-center gap-0.5 rounded-xl bg-slate-200/50 p-0.5 text-[10px]">
-            <button
-              type="button"
-              title="Barras"
-              onClick={() => setCurrentType('bar')}
+            {/* Alternador Gráfico vs Dados */}
+            <div
               className={cn(
-                'rounded-lg p-1 transition-all cursor-pointer',
-                currentType === 'bar' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                'flex items-center gap-1 rounded-xl p-0.5 border text-[11px] font-semibold',
+                isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-200/60 border-slate-200'
               )}
             >
-              <BarChart3 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Linhas"
-              onClick={() => setCurrentType('line')}
-              className={cn(
-                'rounded-lg p-1 transition-all cursor-pointer',
-                currentType === 'line' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
-              )}
-            >
-              <LineChartIcon className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Área"
-              onClick={() => setCurrentType('area')}
-              className={cn(
-                'rounded-lg p-1 transition-all cursor-pointer',
-                currentType === 'area' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
-              )}
-            >
-              <TrendingUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Donut / Pizza"
-              onClick={() => setCurrentType(currentType === 'donut' ? 'pie' : 'donut')}
-              className={cn(
-                'rounded-lg p-1 transition-all cursor-pointer',
-                currentType === 'donut' || currentType === 'pie' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
-              )}
-            >
-              <PieChartIcon className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Dispersão (Scatter)"
-              onClick={() => setCurrentType('scatter')}
-              className={cn(
-                'rounded-lg p-1 transition-all cursor-pointer',
-                currentType === 'scatter' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
-              )}
-            >
-              <ScatterChartIcon className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* Alternador de Visualização (Gráfico vs Tabela) */}
-          <div className="flex items-center gap-1 rounded-xl bg-slate-200/60 p-0.5 text-[11px] font-semibold">
             <button
               type="button"
               onClick={() => setActiveTab('chart')}
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition-all cursor-pointer',
                 activeTab === 'chart'
-                  ? 'bg-white text-blue-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? isDark
+                    ? 'bg-slate-700 text-cyan-300 shadow-xs'
+                    : 'bg-white text-blue-700 shadow-2xs'
+                  : isDark
+                    ? 'text-slate-400 hover:text-white'
+                    : 'text-slate-600 hover:text-slate-900'
               )}
             >
               {getHeaderIcon()}
@@ -738,8 +476,12 @@ export function GraphyChart({
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition-all cursor-pointer',
                 activeTab === 'data'
-                  ? 'bg-white text-blue-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? isDark
+                    ? 'bg-slate-700 text-cyan-300 shadow-xs'
+                    : 'bg-white text-blue-700 shadow-2xs'
+                  : isDark
+                    ? 'text-slate-400 hover:text-white'
+                    : 'text-slate-600 hover:text-slate-900'
               )}
             >
               <TableIcon className="h-3 w-3" />
@@ -748,71 +490,174 @@ export function GraphyChart({
           </div>
         </div>
       </div>
-
-      {/* Conteúdo: Gráfico Vetorial Interativo ou Tabela */}
-      <div className="p-4" style={{ minHeight: chartHeight }}>
-        {activeTab === 'chart' ? (
-          sanitizedData.length > 0 && sanitizedData.every((d) => d[y] === 0) ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center" style={{ height: chartHeight }}>
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 mb-2.5 shadow-2xs">
-                <CheckCircle2 className="h-5 w-5" />
-              </div>
-              <span className="text-xs font-bold text-slate-800">
-                Nenhum registro diferente de zero identificado
-              </span>
-              <p className="mt-1 max-w-md text-[11px] text-slate-500">
-                Todos os {sanitizedData.length} registros avaliados na dimensão <span className="font-semibold text-slate-700 font-mono">"{x}"</span> apresentam métrica <span className="font-semibold text-slate-700 font-mono">"{y} = 0"</span> (ex.: ausência de outliers ou anomalias).
-              </p>
-              <button
-                type="button"
-                onClick={() => setActiveTab('data')}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 cursor-pointer"
-              >
-                <TableIcon className="h-3 w-3" />
-                <span>Inspecionar Valores na Tabela</span>
-              </button>
-            </div>
-          ) : (
-            <div className="h-full w-full flex items-center justify-center" style={{ height: chartHeight }}>
-              {currentType === 'line' && renderLines(false)}
-              {currentType === 'area' && renderLines(true)}
-              {currentType === 'donut' && renderPie(true)}
-              {currentType === 'pie' && renderPie(false)}
-              {currentType === 'scatter' && renderScatter()}
-              {currentType === 'bar' && renderBars()}
-            </div>
-          )
-        ) : (
-          <div className="max-h-72 overflow-auto rounded-xl border border-slate-100 font-mono text-[11px]">
-            <table className="w-full text-left">
-              <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-700">
-                <tr>
-                  <th className="px-3 py-2 font-semibold">{x}</th>
-                  <th className="px-3 py-2 font-semibold text-right">{y}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {sanitizedData.map((row, i) => (
-                  <tr key={i} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="px-3 py-1.5 text-slate-800">{row[x]}</td>
-                    <td className="px-3 py-1.5 text-right font-semibold text-blue-700">
-                      {formatValue(row[y])}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Footer com Metadados e Ações */}
-      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-[10px] text-slate-400 select-none font-mono">
-        <span>Dimensão: {x} · Métrica: {y} · Amostra: {sanitizedData.length} pontos</span>
-        <span className="font-semibold text-blue-600/80">Kraken Visuals · Multi-Chart SDK</span>
-      </div>
     </div>
+
+      {/* Área do Gráfico: Renderizado Exclusivamente pelo Graphy SDK */ }
+  <div
+    className={cn(
+      'p-3 sm:p-5 w-full flex-1 flex flex-col justify-center items-center',
+      isExpanded ? 'min-h-[calc(90vh-140px)]' : ''
+    )}
+  >
+    {activeTab === 'chart' ? (
+      sanitizedData.length > 0 && sanitizedData.every((d) => d[y] === 0) ? (
+        <div className="flex flex-col items-center justify-center p-8 text-center" style={{ height: chartHeightPx }}>
+          <div
+            className={cn(
+              'flex h-12 w-12 items-center justify-center rounded-2xl border mb-3 shadow-2xs',
+              isDark
+                ? 'bg-emerald-950/60 border-emerald-800 text-emerald-400'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+            )}
+          >
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <span className={cn('text-sm font-bold', isDark ? 'text-white' : 'text-slate-900')}>
+            Nenhum registro diferente de zero identificado
+          </span>
+          <p className={cn('mt-1 max-w-md text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>
+            Todos os {sanitizedData.length} registros avaliados na dimensão{' '}
+            <span className="font-semibold font-mono">"{x}"</span> apresentam métrica{' '}
+            <span className="font-semibold font-mono">"{y} = 0"</span>.
+          </p>
+          <button
+            type="button"
+            onClick={() => setActiveTab('data')}
+            className={cn(
+              'mt-4 inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-2xs cursor-pointer',
+              isDark
+                ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            )}
+          >
+            <TableIcon className="h-3.5 w-3.5" />
+            <span>Inspecionar Valores na Tabela</span>
+          </button>
+        </div>
+      ) : graphySpec ? (
+        /* Container com medição de largura e altura para pintura imediata pelo Graphy SDK */
+        <div
+          ref={containerRef}
+          className="w-full relative flex-1 flex flex-col overflow-hidden"
+          style={{
+            width: '100%',
+            height: isExpanded ? 'calc(90vh - 150px)' : `${chartHeightPx}px`,
+            minHeight: isExpanded ? '450px' : `${chartHeightPx}px`,
+          }}
+        >
+          <GraphProvider
+            key={`${currentType}-${colorScheme}-${selectedTheme}-${isExpanded}`}
+            data={graphyData}
+            spec={graphySpec}
+            colorScheme={colorScheme}
+            theme={activeGraphyTheme}
+            telemetry={false}
+          >
+            <GraphRenderer
+              sizing={
+                containerWidth > 0
+                  ? { mode: 'fixed', width: containerWidth, height: isExpanded ? Math.max(window.innerHeight * 0.72, 450) : chartHeightPx }
+                  : { mode: 'responsive' }
+              }
+            />
+          </GraphProvider>
+        </div>
+      ) : (
+        <div className="flex h-64 items-center justify-center text-xs text-slate-400">
+          Não foi possível gerar a especificação do gráfico.
+        </div>
+      )
+    ) : (
+      <div
+        className={cn(
+          'overflow-auto rounded-xl border font-mono text-[11px] w-full',
+          isDark ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-slate-50/50',
+          isExpanded ? 'max-h-[calc(85vh-120px)]' : 'max-h-80'
+        )}
+      >
+        <table className="w-full text-left">
+          <thead
+            className={cn(
+              'sticky top-0 border-b',
+              isDark ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+            )}
+          >
+            <tr>
+              <th className="px-4 py-2.5 font-semibold">#</th>
+              <th className="px-4 py-2.5 font-semibold">{x}</th>
+              <th className="px-4 py-2.5 font-semibold text-right">{y}</th>
+            </tr>
+          </thead>
+          <tbody className={cn('divide-y', isDark ? 'divide-slate-800/80' : 'divide-slate-100')}>
+            {sanitizedData.map((row, i) => (
+              <tr
+                key={i}
+                className={cn(
+                  'transition-colors',
+                  isDark ? 'hover:bg-slate-800/50' : 'hover:bg-blue-50/40'
+                )}
+              >
+                <td className={cn('px-4 py-2 text-[10px]', isDark ? 'text-slate-500' : 'text-slate-400')}>
+                  {i + 1}
+                </td>
+                <td className={cn('px-4 py-2 font-medium', isDark ? 'text-slate-200' : 'text-slate-800')}>
+                  {row[x]}
+                </td>
+                <td
+                  className={cn(
+                    'px-4 py-2 text-right font-semibold',
+                    isDark ? 'text-cyan-400' : 'text-blue-700'
+                  )}
+                >
+                  {formatCompactNumber(row[y])}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+
+  {/* Footer com Metadados Analíticos (sem menção desnecessária de marca no rodapé) */ }
+  <div
+    className={cn(
+      'flex flex-wrap items-center justify-between border-t px-4 py-2 text-[11px] select-none font-mono',
+      isDark ? 'bg-slate-950/70 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500'
+    )}
+  >
+    <div className="flex items-center gap-3 flex-wrap">
+      <span>Dimensão: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{x}</strong></span>
+      <span>·</span>
+      <span>Métrica: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{y}</strong></span>
+      <span>·</span>
+      <span>Amostra: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{sanitizedData.length} pontos</strong></span>
+    </div>
+  </div>
+    </div >
   );
+
+  // Modal Expandido em Tela Cheia
+  if (isExpanded) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-2 sm:p-4 md:p-6 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={() => setIsExpanded(false)}
+      >
+        <div
+          className={cn(
+            'w-[96vw] max-w-7xl h-[92vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl border transition-all',
+            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {chartCard}
+        </div>
+      </div>
+    );
+  }
+
+  return chartCard;
 }
 
 export default GraphyChart;

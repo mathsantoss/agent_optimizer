@@ -549,7 +549,10 @@ def create_feature_pipeline_plan(
                 if resolved_file.suffix.lower() == ".parquet":
                     sample_df = pd.read_parquet(resolved_file).head(200)
                 else:
-                    sample_df = pd.read_csv(resolved_file, nrows=200)
+                    try:
+                        sample_df = pd.read_csv(resolved_file, nrows=200, sep=None, engine="python", encoding="utf-8-sig")
+                    except Exception:
+                        sample_df = pd.read_csv(resolved_file, nrows=200, sep=None, engine="python", encoding="latin-1")
                 selected_features = infer_candidate_features_from_schema(sample_df, framework=fw)
             except Exception:
                 selected_features = []

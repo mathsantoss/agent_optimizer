@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Check } from 'lucide-react';
+import { BarChart3, Check, Database, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CodeBlock } from './CodeBlock';
 import { RecordsTable } from './RecordsTable';
@@ -10,10 +10,11 @@ import { StructuredResultCard } from './structured/StructuredResultCard';
 export interface StreamingTextProps {
   content: string;
   isStreaming?: boolean;
+  onSelectDataset?: (filename: string) => void;
   className?: string;
 }
 
-export function StreamingText({ content, isStreaming = false, className }: StreamingTextProps) {
+export function StreamingText({ content, isStreaming = false, onSelectDataset, className }: StreamingTextProps) {
   if (!content) {
     if (isStreaming) {
       return (
@@ -64,7 +65,7 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
 
             if (validCharts.length > 1) {
               return (
-                <div key={index} className="my-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div key={index} className="my-4 grid grid-cols-1 gap-4 lg:grid-cols-2 w-full">
                   {validCharts.map((chartItem: any, cIdx: number) => (
                     <GraphyChart
                       key={cIdx}
@@ -74,7 +75,8 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
                       data={chartItem.data}
                       x={chartItem.x}
                       y={chartItem.y}
-                      height={270}
+                      height={360}
+                      sizing={{ mode: 'responsive' }}
                     />
                   ))}
                 </div>
@@ -82,15 +84,18 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
             } else if (validCharts.length === 1) {
               const chartData = validCharts[0];
               return (
-                <GraphyChart
-                  key={index}
-                  type={chartData.type || 'bar'}
-                  title={chartData.title}
-                  subtitle={chartData.subtitle}
-                  data={chartData.data}
-                  x={chartData.x}
-                  y={chartData.y}
-                />
+                <div key={index} className="my-4 w-full">
+                  <GraphyChart
+                    type={chartData.type || 'bar'}
+                    title={chartData.title}
+                    subtitle={chartData.subtitle}
+                    data={chartData.data}
+                    x={chartData.x}
+                    y={chartData.y}
+                    height={400}
+                    sizing={{ mode: 'responsive' }}
+                  />
+                </div>
               );
             }
           } catch (e) {
@@ -444,20 +449,71 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
     });
   };
 
-  // Helper para formatar negrito **, inline code ` e links [texto](url)
+  // Helper para formatar negrito **, inline code `, menções @dataset e links [texto](url)
   const formatInline = (str: string): React.ReactNode => {
-    const tokens = str.split(/(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g);
+    const tokens = str.split(/(`[^`\n]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|@[a-zA-Z0-9_\-\.]+\.(?:csv|parquet|json|py|html))/g);
     return tokens.map((token, i) => {
+      if (!token) return null;
+
+      // Código inline entre crases (ex: `Status`, `Anomalia` ou `dados_vendas.csv`)
       if (token.startsWith('`') && token.endsWith('`')) {
+        const codeContent = token.slice(1, -1).trim();
+        if (!codeContent) return null;
+
+        // Se for menção a dataset com extensão, permite clique para preview
+        const isDatasetMention = /\.(?:csv|parquet|json)$/i.test(codeContent);
+        if (isDatasetMention && onSelectDataset) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onSelectDataset(codeContent)}
+              title={`Visualizar dados de ${codeContent}`}
+              className="inline-flex items-center gap-1 mx-1 my-0.5 rounded-md bg-blue-50/90 border border-blue-200/90 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors cursor-pointer align-baseline"
+            >
+              <Database className="h-2.5 w-2.5 text-blue-600 shrink-0" />
+              <span>{codeContent}</span>
+              <Eye className="h-2.5 w-2.5 text-blue-400 shrink-0" />
+            </button>
+          );
+        }
+
         return (
           <code
             key={i}
-            className="rounded-md bg-slate-100 border border-slate-200/80 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-800"
+            className="inline-block mx-0.5 my-0.5 rounded-md bg-slate-100/95 border border-slate-200/90 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-800 tracking-tight align-baseline select-text shadow-2xs"
           >
-            {token.slice(1, -1)}
+            {codeContent}
           </code>
         );
       }
+
+      // Menções diretas iniciadas por @arquivo.csv
+      if (token.startsWith('@') && /\.(?:csv|parquet|json|py|html)$/i.test(token)) {
+        const rawFileName = token.slice(1);
+        if (onSelectDataset) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onSelectDataset(rawFileName)}
+              title={`Abrir visualização de dados de ${rawFileName}`}
+              className="inline-flex items-center gap-1 mx-1 my-0.5 rounded-md bg-purple-50/90 border border-purple-200/90 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors cursor-pointer align-baseline"
+            >
+              <Database className="h-2.5 w-2.5 text-purple-600 shrink-0" />
+              <span>@{rawFileName}</span>
+              <Eye className="h-2.5 w-2.5 text-purple-400 shrink-0" />
+            </button>
+          );
+        }
+        return (
+          <span key={i} className="inline-flex items-center gap-1 mx-0.5 my-0.5 font-mono text-[11px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md border border-purple-200/80 align-baseline">
+            {token}
+          </span>
+        );
+      }
+
+      // Negrito **
       if (token.startsWith('**') && token.endsWith('**')) {
         return (
           <strong key={i} className="font-semibold text-slate-900">
@@ -465,6 +521,8 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
           </strong>
         );
       }
+
+      // Links markdown
       const linkMatch = token.match(/^\[(.*?)\]\((.*?)\)$/);
       if (linkMatch) {
         const linkText = linkMatch[1];
@@ -473,7 +531,9 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
           <a
             key={i}
             href={linkHref}
-            className="font-medium text-blue-600 underline hover:text-blue-800 transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-blue-600 underline hover:text-blue-800 transition-colors mx-0.5"
           >
             {linkText}
           </a>

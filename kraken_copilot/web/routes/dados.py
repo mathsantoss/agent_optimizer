@@ -199,6 +199,15 @@ async def obter_conteudo_arquivo(caminho: str, limite: int = 50):
         elif c2.exists() and c2.is_file():
             p = c2
 
+    # Se ainda não encontrou e foi passado apenas o nome do arquivo, busca nos diretórios do catálogo
+    if not p.exists() or not p.is_file():
+        file_name = Path(caminho).name
+        for d in _diretorios_permitidos():
+            matches = [f for f in d.rglob(file_name) if f.is_file()]
+            if matches:
+                p = matches[0].resolve()
+                break
+
     # Validação de segurança contra directory traversal
     permitido = any(p == d or d in p.parents for d in _diretorios_permitidos())
     if not permitido or not p.exists() or not p.is_file():
@@ -239,9 +248,17 @@ async def obter_conteudo_arquivo(caminho: str, limite: int = 50):
     if ext == ".csv":
         try:
             import pandas as pd
-            df = pd.read_csv(p, nrows=limite)
+            # Detecção inteligente de separador (vírgula, ponto-e-vírgula, tabulação) e encoding
+            try:
+                df = pd.read_csv(p, nrows=limite, sep=None, engine="python", encoding="utf-8-sig")
+            except Exception:
+                try:
+                    df = pd.read_csv(p, nrows=limite, sep=None, engine="python", encoding="latin-1")
+                except Exception:
+                    df = pd.read_csv(p, nrows=limite)
+
             total_linhas = sum(1 for _ in open(p, "r", encoding="utf-8", errors="ignore")) - 1
-            colunas = list(df.columns)
+            colunas = [str(c) for c in df.columns]
             linhas = df.fillna("").to_dict(orient="records")
             return {
                 "tipo": "csv",

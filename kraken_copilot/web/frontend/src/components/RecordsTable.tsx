@@ -27,6 +27,7 @@ export interface RecordsTableProps {
   data: Record<string, any>[];
   title?: string;
   maxHeight?: string;
+  fullHeight?: boolean;
   className?: string;
   showFilters?: boolean;
 }
@@ -155,6 +156,7 @@ export function RecordsTable({
   data,
   title,
   maxHeight = '420px',
+  fullHeight = false,
   className,
   showFilters = true,
 }: RecordsTableProps) {
@@ -436,161 +438,165 @@ export function RecordsTable({
   return (
     <div
       className={cn(
-        'my-3.5 flex flex-col overflow-hidden rounded-2xl border border-zinc-800/90 bg-[#16171a] text-zinc-200 shadow-2xl transition-all',
+        'flex flex-col overflow-hidden rounded-2xl border border-zinc-800/90 bg-[#16171a] text-zinc-200 shadow-2xl transition-all',
+        fullHeight ? 'my-0 h-full flex-1 min-h-0' : 'my-3.5',
         className
       )}
     >
       {/* Top Header / Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-2.5 text-xs">
-        <div className="flex items-center gap-2">
-          <TableIcon className="h-4 w-4 text-purple-400" />
-          <span className="font-semibold text-zinc-100">{title || 'Records Table'}</span>
-          <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-mono text-zinc-400">
-            {filteredData.length} {filteredData.length === 1 ? 'linha' : 'linhas'}
-          </span>
-        </div>
-
-        {/* Busca e Ações Rápidas */}
-        {data.length > 4 && (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2.5 border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-2.5 text-xs">
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
-              <input
-                type="text"
-                placeholder="Filtrar dados..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-7 w-36 sm:w-48 rounded-lg border border-zinc-700/70 bg-zinc-800/70 pl-8 pr-2 text-[11px] text-zinc-200 placeholder:text-zinc-500 focus:border-purple-500 focus:outline-none transition-colors"
-              />
-            </div>
+            <TableIcon className="h-4 w-4 text-purple-400" />
+            <span className="font-semibold text-zinc-100">{title || 'Records Table'}</span>
+            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-mono text-zinc-400">
+              {filteredData.length} {filteredData.length === 1 ? 'linha' : 'linhas'}
+            </span>
           </div>
-        )}
-      </div>
 
-      {/* Filter Table Bar (Imagem 13: Status chips that reorganize live data) */}
-      {showFilters && filterColumn && (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-zinc-800/60 bg-zinc-900/40 px-4 py-2">
-          <button
-            onClick={() => setSelectedStatusFilter('ALL')}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer',
-              selectedStatusFilter === 'ALL'
-                ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-2xs'
-                : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-            )}
-          >
-            <span>All</span>
-            <span className="rounded-full bg-zinc-700/60 px-1.5 py-0.2 text-[10px] text-zinc-300">
-              {data.length}
-            </span>
-          </button>
-
-          {filterColumn.unique.map((statusVal) => {
-            const isSelected = selectedStatusFilter.toLowerCase() === statusVal.toLowerCase();
-            const palette = getTagColor(statusVal);
-            const count = statusCounts[statusVal] || 0;
-
-            return (
-              <button
-                key={statusVal}
-                onClick={() => setSelectedStatusFilter(isSelected ? 'ALL' : statusVal)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all cursor-pointer border',
-                  isSelected
-                    ? cn(palette.bg, palette.text, palette.border, 'shadow-2xs font-semibold')
-                    : 'border-transparent text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-                )}
-              >
-                <span className={cn('h-1.5 w-1.5 rounded-full', palette.dot)} />
-                <span>{statusVal}</span>
-                <span className="text-[10px] opacity-70">({count})</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Grid Table Container */}
-      <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight }}>
-        <table className="w-full border-collapse text-left text-xs">
-          <thead className="sticky top-0 z-10 select-none bg-zinc-900/95 backdrop-blur-md">
-            <tr className="border-b border-zinc-800 text-zinc-400">
-              {/* Coluna de Numeração de Linha */}
-              <th className="w-10 px-3 py-2.5 text-center font-mono text-[11px] text-zinc-500 font-normal">
-                #
-              </th>
-
-              {normalizedCols.map((c) => {
-                const isSorted = sortConfig?.key === c.key;
-                return (
-                  <th
-                    key={c.key}
-                    onClick={() => handleSort(c.key)}
-                    className="group px-3 py-2.5 font-medium whitespace-nowrap cursor-pointer hover:bg-zinc-800/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      {renderHeaderIcon(c.type)}
-                      <span className="text-zinc-300 group-hover:text-zinc-100 transition-colors">
-                        {c.label || c.key}
-                      </span>
-                      <span className="text-zinc-600 group-hover:text-zinc-400">
-                        {isSorted ? (
-                          sortConfig?.direction === 'asc' ? (
-                            <ArrowUp className="h-3 w-3 text-purple-400" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3 text-purple-400" />
-                          )
-                        ) : (
-                          <ArrowUpDown className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        )}
-                      </span>
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-zinc-800/70 font-sans text-xs">
-            {filteredData.map((row, rIdx) => (
-              <tr
-                key={rIdx}
-                className="hover:bg-zinc-800/40 transition-colors group"
-              >
-                {/* Linha Numérica (1, 2, 3...) */}
-                <td className="px-3 py-2 text-center font-mono text-[11px] text-zinc-500 select-none group-hover:text-zinc-400">
-                  {rIdx + 1}
-                </td>
-
-                {normalizedCols.map((col, cIdx) => (
-                  <td
-                    key={col.key}
-                    className="px-3 py-2 whitespace-nowrap align-middle"
-                  >
-                    {renderCellContent(col, row[col.key], rIdx, cIdx)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Footer Row: contagem limpa de registros */}
-      <div className="flex items-center justify-between border-t border-zinc-800/80 bg-zinc-900/70 px-4 py-2 text-xs text-zinc-400 select-none">
-        <div className="flex items-center gap-3 font-mono text-[11px]">
-          <span className="text-zinc-300 font-semibold">
-            {filteredData.length} {filteredData.length === 1 ? 'registro' : 'registros'}
-          </span>
-          {searchTerm && (
-            <span className="text-zinc-500 text-[10px]">
-              (filtrado de {data.length})
-            </span>
+          {/* Busca e Ações Rápidas */}
+          {data.length > 4 && (
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Filtrar dados..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-7 w-36 sm:w-48 rounded-lg border border-zinc-700/70 bg-zinc-800/70 pl-8 pr-2 text-[11px] text-zinc-200 placeholder:text-zinc-500 focus:border-purple-500 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
           )}
         </div>
-      </div>
-    </div>
-  );
+
+        {/* Filter Table Bar (Imagem 13: Status chips that reorganize live data) */}
+        {showFilters && filterColumn && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-zinc-800/60 bg-zinc-900/40 px-4 py-2">
+            <button
+              onClick={() => setSelectedStatusFilter('ALL')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer',
+                selectedStatusFilter === 'ALL'
+                  ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-2xs'
+                  : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+              )}
+            >
+              <span>All</span>
+              <span className="rounded-full bg-zinc-700/60 px-1.5 py-0.2 text-[10px] text-zinc-300">
+                {data.length}
+              </span>
+            </button>
+
+            {filterColumn.unique.map((statusVal) => {
+              const isSelected = selectedStatusFilter.toLowerCase() === statusVal.toLowerCase();
+              const palette = getTagColor(statusVal);
+              const count = statusCounts[statusVal] || 0;
+
+              return (
+                <button
+                  key={statusVal}
+                  onClick={() => setSelectedStatusFilter(isSelected ? 'ALL' : statusVal)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all cursor-pointer border',
+                    isSelected
+                      ? cn(palette.bg, palette.text, palette.border, 'shadow-2xs font-semibold')
+                      : 'border-transparent text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+                  )}
+                >
+                  <span className={cn('h-1.5 w-1.5 rounded-full', palette.dot)} />
+                  <span>{statusVal}</span>
+                  <span className="text-[10px] opacity-70">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Grid Table Container */}
+          <div
+            className={cn('overflow-x-auto overflow-y-auto', fullHeight && 'flex-1 min-h-0')}
+            style={fullHeight ? undefined : { maxHeight }}
+          >
+            <table className="w-full border-collapse text-left text-xs">
+              <thead className="sticky top-0 z-10 select-none bg-zinc-900/95 backdrop-blur-md">
+                <tr className="border-b border-zinc-800 text-zinc-400">
+                  {/* Coluna de Numeração de Linha */}
+                  <th className="w-10 px-3 py-2.5 text-center font-mono text-[11px] text-zinc-500 font-normal">
+                    #
+                  </th>
+
+                  {normalizedCols.map((c) => {
+                    const isSorted = sortConfig?.key === c.key;
+                    return (
+                      <th
+                        key={c.key}
+                        onClick={() => handleSort(c.key)}
+                        className="group px-3 py-2.5 font-medium whitespace-nowrap cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          {renderHeaderIcon(c.type)}
+                          <span className="text-zinc-300 group-hover:text-zinc-100 transition-colors">
+                            {c.label || c.key}
+                          </span>
+                          <span className="text-zinc-600 group-hover:text-zinc-400">
+                            {isSorted ? (
+                              sortConfig?.direction === 'asc' ? (
+                                <ArrowUp className="h-3 w-3 text-purple-400" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3 text-purple-400" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </span>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-zinc-800/70 font-sans text-xs">
+                {filteredData.map((row, rIdx) => (
+                  <tr
+                    key={rIdx}
+                    className="hover:bg-zinc-800/40 transition-colors group"
+                  >
+                    {/* Linha Numérica (1, 2, 3...) */}
+                    <td className="px-3 py-2 text-center font-mono text-[11px] text-zinc-500 select-none group-hover:text-zinc-400">
+                      {rIdx + 1}
+                    </td>
+
+                    {normalizedCols.map((col, cIdx) => (
+                      <td
+                        key={col.key}
+                        className="px-3 py-2 whitespace-nowrap align-middle"
+                      >
+                        {renderCellContent(col, row[col.key], rIdx, cIdx)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer Row: contagem limpa de registros */}
+            <div className="flex shrink-0 items-center justify-between border-t border-zinc-800/80 bg-zinc-900/70 px-4 py-2 text-xs text-zinc-400 select-none">
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-zinc-300 font-semibold">
+                  {filteredData.length} {filteredData.length === 1 ? 'registro' : 'registros'}
+                </span>
+                {searchTerm && (
+                  <span className="text-zinc-500 text-[10px]">
+                    (filtrado de {data.length})
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          );
 }
 
-export default RecordsTable;
+          export default RecordsTable;
