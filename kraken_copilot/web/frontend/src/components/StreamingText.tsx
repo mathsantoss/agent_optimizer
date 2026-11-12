@@ -155,33 +155,22 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
               dataRows = tabLines.slice(1);
             }
 
+            const formattedData = dataRows.map((row) => {
+              const rowObj: Record<string, any> = {};
+              headerCells.forEach((h, hIdx) => {
+                rowObj[h] = row[hIdx] ?? '';
+              });
+              return rowObj;
+            });
+
             renderedElements.push(
-              <div key={`tabtbl-${index}-${i}`} className="my-3.5 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50/80 border-b border-slate-200/80">
-                        {headerCells.map((h, hIdx) => (
-                          <th key={hIdx} className="px-4 py-2.5 text-[11px] font-bold text-slate-700 tracking-tight">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {dataRows.map((row, rIdx) => (
-                        <tr key={rIdx} className="hover:bg-slate-50/50 transition-colors">
-                          {headerCells.map((_, cIdx) => (
-                            <td key={cIdx} className={cn('px-4 py-2 text-xs leading-normal', cIdx === 0 ? 'font-medium text-slate-900' : 'font-mono text-[11.5px]')}>
-                              {row[cIdx] ?? '—'}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <RecordsTable
+                key={`tabtbl-${index}-${i}`}
+                columns={headerCells}
+                data={formattedData}
+                title={isStatRow ? 'Estatísticas Descritivas do Dataset' : 'Amostra de Registros'}
+                maxHeight="440px"
+              />
             );
             continue;
           }
@@ -194,10 +183,18 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
         const nextIsPipe = nextTrimmed.startsWith('|') && nextTrimmed.endsWith('|');
 
         if (isPipeLine && (hasSepNext || nextIsPipe)) {
-          const headerCells = trimmed
+          let headerCells = trimmed
             .split('|')
             .map((c) => c.trim())
             .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+
+          // Normaliza cabeçalhos vazios (ex: tabelas do pandas onde o index não tem nome)
+          headerCells = headerCells.map((h, idx) => {
+            if (!h) {
+              return idx === 0 ? 'Métrica' : `col_${idx + 1}`;
+            }
+            return h;
+          });
 
           i += hasSepNext ? 2 : 1; // pula header e separador se presente
           const tableRows: Record<string, any>[] = [];
@@ -217,30 +214,32 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
 
             const rowObj: Record<string, any> = {};
             headerCells.forEach((h, hIdx) => {
-              rowObj[h || `col_${hIdx + 1}`] = cells[hIdx] ?? '';
+              rowObj[h] = cells[hIdx] ?? '';
             });
             tableRows.push(rowObj);
             i++;
           }
 
           if (headerCells.length > 0) {
-            const isBenchmark =
-              headerCells.some((h) => /métrica|baseline|depois|variação|speedup/i.test(h)) ||
-              tableRows.some((r) =>
-                Object.values(r).some((v) =>
-                  /tempo de execução|pico de memória|equivalência/i.test(String(v))
-                )
-              );
+            // Benchmark é ESTRITAMENTE para otimização de pipeline (Baseline vs Otimizado)
+            const hasBaselineAndOptimized =
+              headerCells.some((h) => /baseline/i.test(h)) &&
+              headerCells.some((h) => /depois|otimizad|speedup|variação/i.test(h));
 
-            renderedElements.push(
-              <div
-                key={`tbl-${index}-${i}`}
-                className={cn(
-                  'my-3.5 overflow-hidden rounded-2xl border shadow-2xs',
-                  isBenchmark ? 'border-blue-200/90 bg-white' : 'border-slate-200/90 bg-white'
-                )}
-              >
-                {isBenchmark && (
+            const hasBenchmarkMetrics = tableRows.some((r) =>
+              Object.values(r).some((v) =>
+                /tempo de execução|pico de memória|equivalência dos resultados/i.test(String(v))
+              )
+            );
+
+            const isBenchmark = hasBaselineAndOptimized || hasBenchmarkMetrics;
+
+            if (isBenchmark) {
+              renderedElements.push(
+                <div
+                  key={`tbl-${index}-${i}`}
+                  className="my-3.5 overflow-hidden rounded-2xl border border-blue-200/90 bg-white shadow-2xs"
+                >
                   <div className="flex items-center justify-between border-b border-blue-100 bg-gradient-to-r from-blue-50/80 via-white to-blue-50/40 px-4 py-2.5 text-xs font-bold text-blue-950">
                     <span className="flex items-center gap-1.5">
                       <BarChart3 className="h-4 w-4 text-blue-600 shrink-0" />
@@ -250,75 +249,102 @@ export function StreamingText({ content, isStreaming = false, className }: Strea
                       Vetorizado
                     </span>
                   </div>
-                )}
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className={isBenchmark ? 'bg-slate-50/80 border-b border-slate-100' : 'bg-slate-50/70 border-b border-slate-200/80'}>
-                        {headerCells.map((h, hIdx) => (
-                          <th
-                            key={hIdx}
-                            className="px-4 py-2.5 text-[11px] font-bold text-slate-700 tracking-tight select-none"
-                          >
-                            {formatInline(h)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {tableRows.map((row, rIdx) => (
-                        <tr
-                          key={rIdx}
-                          className="hover:bg-slate-50/50 transition-colors"
-                        >
-                          {headerCells.map((h, cIdx) => {
-                            const val = String(row[h] ?? '');
-                            const isSpeedup =
-                              val.includes('%') ||
-                              val.toLowerCase().includes('aprovada') ||
-                              val.toLowerCase().includes('aprovado');
-                            const isPositiveGain =
-                              val.includes('+') || val.toLowerCase().includes('aprovad');
-
-                            return (
-                              <td
-                                key={cIdx}
-                                className={cn(
-                                  'px-4 py-2.5 text-xs leading-normal',
-                                  cIdx === 0 && headerCells.length > 3
-                                    ? 'font-medium text-slate-900'
-                                    : '',
-                                  cIdx >= 1 && cIdx <= 3 && isBenchmark
-                                    ? 'font-mono text-[11.5px]'
-                                    : ''
-                                )}
-                              >
-                                {isBenchmark && isSpeedup ? (
-                                  <span
-                                    className={cn(
-                                      'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold font-mono',
-                                      isPositiveGain
-                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                        : 'bg-slate-100 text-slate-700'
-                                    )}
-                                  >
-                                    {isPositiveGain && <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 inline" />}
-                                    {val.replace(/\*\*/g, '')}
-                                  </span>
-                                ) : (
-                                  formatInline(val)
-                                )}
-                              </td>
-                            );
-                          })}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-100">
+                          {headerCells.map((h, hIdx) => (
+                            <th
+                              key={hIdx}
+                              className="px-4 py-2.5 text-[11px] font-bold text-slate-700 tracking-tight select-none"
+                            >
+                              {formatInline(h)}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {tableRows.map((row, rIdx) => (
+                          <tr
+                            key={rIdx}
+                            className="hover:bg-slate-50/50 transition-colors"
+                          >
+                            {headerCells.map((h, cIdx) => {
+                              const val = String(row[h] ?? '');
+                              const isSpeedup =
+                                val.includes('%') ||
+                                val.toLowerCase().includes('aprovada') ||
+                                val.toLowerCase().includes('aprovado');
+                              const isPositiveGain =
+                                val.includes('+') || val.toLowerCase().includes('aprovad');
+
+                              return (
+                                <td
+                                  key={cIdx}
+                                  className={cn(
+                                    'px-4 py-2.5 text-xs leading-normal',
+                                    cIdx === 0 && headerCells.length > 3
+                                      ? 'font-medium text-slate-900'
+                                      : '',
+                                    cIdx >= 1 && cIdx <= 3
+                                      ? 'font-mono text-[11.5px]'
+                                      : ''
+                                  )}
+                                >
+                                  {isSpeedup ? (
+                                    <span
+                                      className={cn(
+                                        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold font-mono',
+                                        isPositiveGain
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-slate-100 text-slate-700'
+                                      )}
+                                    >
+                                      {isPositiveGain && <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 inline" />}
+                                      {val.replace(/\*\*/g, '')}
+                                    </span>
+                                  ) : (
+                                    formatInline(val)
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            );
+              );
+            } else {
+              // Inferência de título contextual para o RecordsTable
+              let inferredTitle = 'Tabela de Registros';
+              const colStr = headerCells.join(' ').toLowerCase();
+              const isDescribeTable =
+                headerCells[0]?.toLowerCase() === 'métrica' ||
+                tableRows.some((r) => /count|mean|std|min|max|25%|50%|75%/i.test(String(r['Métrica'] || r['metrica'] || '')));
+
+              if (isDescribeTable) {
+                inferredTitle = 'Estatísticas Descritivas das Colunas Numéricas';
+              } else if (colStr.includes('feature') || colStr.includes('fórmula') || colStr.includes('categoria')) {
+                inferredTitle = 'Proposta de Features (Feature Store)';
+              } else if (colStr.includes('sale_id') || colStr.includes('product') || colStr.includes('cliente') || colStr.includes('email')) {
+                inferredTitle = 'Amostra de Dados do Dataset';
+              } else if (colStr.includes('mean') || colStr.includes('std') || colStr.includes('outliers')) {
+                inferredTitle = 'Estatísticas e Distribuição dos Dados';
+              }
+
+              renderedElements.push(
+                <RecordsTable
+                  key={`tbl-${index}-${i}`}
+                  columns={headerCells}
+                  data={tableRows}
+                  title={inferredTitle}
+                  maxHeight="440px"
+                />
+              );
+            }
           }
           continue;
         }

@@ -158,6 +158,17 @@ class Storage:
             "mensagens": [],
         }
 
+    def update_session_title(self, session_id: str, novo_titulo: str) -> bool:
+        """Atualiza o título de uma conversa existente."""
+        agora = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE sessions SET titulo = ?, atualizado_em = ? WHERE id = ?",
+                (novo_titulo.strip() or "Conversa sem título", agora, session_id),
+            )
+            return cur.rowcount > 0
+
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         with self._get_connection() as conn:
             cur = conn.cursor()

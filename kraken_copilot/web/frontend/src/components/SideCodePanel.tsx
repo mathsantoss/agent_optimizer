@@ -9,6 +9,10 @@ import {
   RefreshCw,
   Copy,
   GitCompare,
+  ExternalLink,
+  Globe,
+  Code2,
+  Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CodeBlock, DiffRow } from './CodeBlock';
@@ -36,11 +40,14 @@ export function SideCodePanel({
   const [copied, setCopied] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [fetchedDiff, setFetchedDiff] = useState<DiffInfo | undefined>(undefined);
+  const isHtml = filename.toLowerCase().endsWith('.html');
+  const [htmlViewMode, setHtmlViewMode] = useState<'preview' | 'code'>('preview');
 
   // Limpa diff cacheado ao alternar de arquivo
   useEffect(() => {
     setFetchedDiff(undefined);
-  }, [filename]);
+    if (isHtml) setHtmlViewMode('preview');
+  }, [filename, isHtml]);
 
   // Busca diff sob demanda se não tiver sido injetado via prop
   useEffect(() => {
@@ -115,8 +122,11 @@ export function SideCodePanel({
       {/* Top Header */}
       <div className="flex h-14 items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 text-xs select-none shrink-0">
         <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-700 shadow-2xs">
-            <FileCode2 className="h-4 w-4" />
+          <div className={cn(
+            'flex h-7 w-7 items-center justify-center rounded-lg shadow-2xs',
+            isHtml ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+          )}>
+            {isHtml ? <Globe className="h-4 w-4" /> : <FileCode2 className="h-4 w-4" />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 truncate">
@@ -124,6 +134,10 @@ export function SideCodePanel({
               {isOptimizing ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 animate-pulse">
                   <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Otimizando...
+                </span>
+              ) : isHtml ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-800">
+                  Relatório HTML
                 </span>
               ) : effectiveDiff && (effectiveDiff.adicoes > 0 || effectiveDiff.remocoes > 0) ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
@@ -142,6 +156,53 @@ export function SideCodePanel({
         </div>
 
         <div className="flex items-center gap-1 text-slate-500">
+          {/* Alternador de visualização para arquivos HTML (Dashboard vs Código) */}
+          {isHtml && (
+            <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 mr-1 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setHtmlViewMode('preview')}
+                className={cn(
+                  'flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer',
+                  htmlViewMode === 'preview'
+                    ? 'bg-purple-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                )}
+                title="Visualizar Dashboard Interativo"
+              >
+                <Eye className="h-3 w-3" />
+                <span>Dashboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHtmlViewMode('code')}
+                className={cn(
+                  'flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer',
+                  htmlViewMode === 'code'
+                    ? 'bg-purple-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                )}
+                title="Ver Código HTML"
+              >
+                <Code2 className="h-3 w-3" />
+                <span>Código</span>
+              </button>
+            </div>
+          )}
+
+          {/* Abrir em nova aba caso seja HTML */}
+          {isHtml && (
+            <a
+              href={`/api/dados/documento?caminho=krakenlake/workspace/${filename}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-slate-200/60 hover:text-slate-800 transition-colors cursor-pointer"
+              title="Abrir Dashboard em Nova Aba"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
+
           <button
             type="button"
             onClick={handleCopy}
@@ -184,15 +245,25 @@ export function SideCodePanel({
         </div>
       )}
 
-      {/* Code / Diff Body — Ocupa 100% da altura e largura sem margens inúteis */}
+      {/* Code / Diff / HTML Body */}
       <div className="flex-1 overflow-hidden bg-[#0c1222] flex flex-col min-h-0">
-        {code.trim().length > 0 || (effectiveDiff && (effectiveDiff.adicoes > 0 || effectiveDiff.remocoes > 0 || (effectiveDiff.raw_diff && effectiveDiff.raw_diff.trim().length > 0))) ? (
+        {isHtml && htmlViewMode === 'preview' ? (
+          <div className="flex-1 w-full h-full bg-white relative flex flex-col min-h-0">
+            <iframe
+              srcDoc={code && code.trim().length > 0 ? code : undefined}
+              src={!code || code.trim().length === 0 ? `/api/dados/documento?caminho=${encodeURIComponent(filename.startsWith('krakenlake/') ? filename : 'krakenlake/workspace/' + filename)}` : undefined}
+              title={filename}
+              className="w-full h-full flex-1 border-none bg-white"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            />
+          </div>
+        ) : code.trim().length > 0 || (effectiveDiff && (effectiveDiff.adicoes > 0 || effectiveDiff.remocoes > 0 || (effectiveDiff.raw_diff && effectiveDiff.raw_diff.trim().length > 0))) ? (
           <CodeBlock
             code={code || effectiveDiff?.proposed_code}
             oldCode={effectiveDiff?.original_code}
             rawDiff={effectiveDiff?.raw_diff}
             diffInfo={effectiveDiff}
-            language="python"
+            language={isHtml ? 'html' : 'python'}
             filename={filename}
             isDiff={Boolean(effectiveDiff && (effectiveDiff.adicoes > 0 || effectiveDiff.remocoes > 0 || (effectiveDiff.raw_diff && effectiveDiff.raw_diff.trim().length > 0)))}
             fullHeight={true}

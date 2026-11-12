@@ -6,6 +6,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from pydantic import BaseModel
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -63,6 +64,20 @@ async def apagar_conversa(session_id: str):
     if not removido:
         raise HTTPException(status_code=404, detail="Conversa não encontrada.")
     return {"status": "ok", "removido": True, "id": session_id}
+
+
+class RenomearConversaPayload(BaseModel):
+    titulo: str
+
+
+@router.patch("/{session_id}/titulo")
+@router.put("/{session_id}/titulo")
+async def renomear_conversa(session_id: str, payload: RenomearConversaPayload):
+    """Renomeia uma sessão de conversa do histórico."""
+    sucesso = storage.update_session_title(session_id, payload.titulo)
+    if not sucesso:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    return {"status": "ok", "id": session_id, "novo_titulo": payload.titulo}
 
 
 def _deep_parse_json(val: Any) -> Any:
@@ -298,6 +313,14 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
                         resp_name = getattr(fn_resp, "name", "desconhecida")
                         resp_out = getattr(fn_resp, "response", {})
                         resp_out = _deep_parse_json(resp_out)
+
+                        # Associa o resultado real da ferramenta na lista de ferramentas_executadas
+                        for f_item in reversed(ferramentas_executadas):
+                            if f_item.get("ferramenta") == resp_name and "resultado" not in f_item:
+                                f_item["resultado"] = resp_out
+                                f_item["status"] = "sucesso"
+                                break
+
                         etapas.append({
                             "tipo": "tool_response",
                             "titulo": f"Retorno de Ferramenta: {resp_name}",
@@ -569,6 +592,52 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
     # 5. Extração de sugestões de ações clicáveis
     sugestoes_acoes = extrair_sugestoes_acoes(resposta_final, ferramentas_executadas)
 
+    # 6. Extração de resultado estruturado Pydantic para os Cards Visuais do Frontend
+    structured_result = None
+    for f in reversed(ferramentas_executadas):
+        res = f.get("resultado")
+        if isinstance(res, dict):
+            target = res.get("data") if isinstance(res.get("data"), dict) else res
+            if any(k in target for k in ("kraken_data_profile", "kraken_statistical_report", "kraken_benchmark", "kraken_code_diff")):
+                structured_result = target
+                break
+            if target.get("dataset_nome") and target.get("colunas") and target.get("tamanho_kb") is not None:
+                structured_result = target
+                break
+            if target.get("total_linhas_analisadas") and target.get("metricas_colunas"):
+                structured_result = target
+                break
+            if target.get("speedup") is not None and target.get("duracao_baseline_s") is not None:
+                structured_result = target
+                break
+
+    # 7. Detecção e execução de ações autônomas de navegação da interface (CopilotKit Frontend Tools)
+    navigate_to = None
+    open_file = None
+    import re
+
+    nav_match = re.search(r"\[ACTION:NAVIGATE_VIEW:(\w+)\]", resposta_final)
+    if nav_match:
+        navigate_to = nav_match.group(1).lower()
+        resposta_final = re.sub(r"\[ACTION:NAVIGATE_VIEW:\w+\]", "", resposta_final).strip()
+
+    file_match = re.search(r"\[ACTION:OPEN_FILE:([^\]]+)\]", resposta_final)
+    if file_match:
+        open_file = file_match.group(1).strip()
+        resposta_final = re.sub(r"\[ACTION:OPEN_FILE:[^\]]+\]", "", resposta_final).strip()
+
+    # Fallback contextual de navegação baseado no comando do usuário
+    user_lower = (msg.texto or "").lower()
+    if not navigate_to:
+        if re.search(r"(navegue|ir|abrir|abra|mostre|acesse).*(aba|tela|painel|seção|guia)?.*(dados|documentos|tabela|datalake)", user_lower):
+            navigate_to = "dados"
+            if "como um modelo de linguagem" in resposta_final.lower() or "não tenho uma \"aba de dados\"" in resposta_final.lower() or "não tenho uma 'aba de dados'" in resposta_final.lower():
+                resposta_final = "Alternando para o **Explorador de Dados & Documentos** para você inspecionar as tabelas brutas, schemas e metadados cadastrados no catálogo."
+        elif re.search(r"(navegue|ir|abrir|abra|mostre|acesse).*(aba|tela|painel|seção|guia)?.*(observabilidade|auditoria|logs|investigação|telemetria)", user_lower):
+            navigate_to = "observabilidade"
+            if "como um modelo de linguagem" in resposta_final.lower() or "não tenho" in resposta_final.lower():
+                resposta_final = "Alternando para o painel de **Observabilidade e Auditoria** para análise de telemetria, rastreabilidade e guardrails."
+
     # Salva resposta do assistente no storage
     assistant_msg = storage.append_message(
         session_id=session_id,
@@ -582,6 +651,8 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
             "especialista": especialista_ativo,
             "modelo": modelo_utilizado,
             "sugestoes_acoes": sugestoes_acoes,
+            "ferramentas_executadas": ferramentas_executadas,
+            "structured_result": structured_result,
         },
     )
 
@@ -709,5 +780,8 @@ async def enviar_mensagem(session_id: str, msg: MensagemInput, request: Request)
         "proposed_code": proposed_code,
         "diff_info": diff_info,
         "ferramentas_executadas": ferramentas_executadas,
+        "structured_result": structured_result,
         "sugestoes_acoes": sugestoes_acoes,
+        "navigate_to": navigate_to,
+        "open_file": open_file,
     }

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 router = APIRouter(prefix="/api/dados", tags=["dados"])
 
@@ -35,7 +35,7 @@ async def listar_arquivos_dados():
     arquivos = []
     diretorios = _diretorios_permitidos()
 
-    extensoes_permitidas = (".csv", ".pdf", ".json", ".parquet", ".md", ".markdown", ".txt", ".py")
+    extensoes_permitidas = (".csv", ".pdf", ".json", ".parquet", ".md", ".markdown", ".txt", ".py", ".html")
 
     for d in diretorios:
         if not d.exists():
@@ -154,7 +154,7 @@ async def listar_skills_instaladas():
 
 @router.get("/workspace/arquivos")
 async def listar_arquivos_workspace():
-    """Lista todos os arquivos python disponíveis no workspace do krakenlake."""
+    """Lista todos os arquivos python e relatórios HTML disponíveis no workspace do krakenlake."""
     from kraken_copilot.config import REPOSITORY_ROOT
     ws_dir = (REPOSITORY_ROOT / "krakenlake" / "workspace").resolve()
     if not ws_dir.exists():
@@ -162,25 +162,42 @@ async def listar_arquivos_workspace():
 
     arquivos = []
     if ws_dir.exists():
-        for p in sorted(ws_dir.glob("*.py")):
-            if not p.name.startswith((".", "_")) and not p.name.endswith(".bak"):
-                try:
-                    lines = len(p.read_text(encoding="utf-8", errors="ignore").splitlines())
-                except Exception:
-                    lines = 0
-                arquivos.append({
-                    "nome": p.name,
-                    "caminho": p.relative_to(REPOSITORY_ROOT).as_posix(),
-                    "linhas": lines,
-                })
+        # Busca scripts Python e relatórios HTML (inclusive em subpastas como reports/)
+        for p in sorted(ws_dir.rglob("*")):
+            if p.is_file() and p.suffix.lower() in (".py", ".html"):
+                if not p.name.startswith((".", "_")) and not p.name.endswith(".bak"):
+                    try:
+                        lines = len(p.read_text(encoding="utf-8", errors="ignore").splitlines())
+                    except Exception:
+                        lines = 0
+                    rel_name = p.relative_to(ws_dir).as_posix()
+                    arquivos.append({
+                        "nome": rel_name,
+                        "caminho": p.relative_to(REPOSITORY_ROOT).as_posix(),
+                        "linhas": lines,
+                        "tipo": "html" if p.suffix.lower() == ".html" else "python",
+                    })
+
+    # Ordena com prioridade: arquivos .py da raiz primeiro, depois outros
+    arquivos.sort(key=lambda x: (x["tipo"] != "python", "/" in x["nome"], x["nome"]))
     return {"arquivos": arquivos, "padrao": arquivos[0]["nome"] if arquivos else ""}
 
 
 @router.get("/arquivo")
 async def obter_conteudo_arquivo(caminho: str, limite: int = 50):
-    """Retorna o conteúdo estruturado de um arquivo CSV, PARQUET, JSON ou MARKDOWN."""
+    """Retorna o conteúdo estruturado de um arquivo CSV, PARQUET, JSON, MARKDOWN, PYTHON ou HTML."""
     from kraken_copilot.config import REPOSITORY_ROOT
     p = (REPOSITORY_ROOT / caminho).resolve()
+
+    # Fallback inteligente se o arquivo estiver no workspace (ex: raiz vs pasta reports/)
+    if not p.exists() and "workspace" in caminho:
+        file_name = Path(caminho).name
+        c1 = (REPOSITORY_ROOT / "krakenlake" / "workspace" / file_name).resolve()
+        c2 = (REPOSITORY_ROOT / "krakenlake" / "workspace" / "reports" / file_name).resolve()
+        if c1.exists() and c1.is_file():
+            p = c1
+        elif c2.exists() and c2.is_file():
+            p = c2
 
     # Validação de segurança contra directory traversal
     permitido = any(p == d or d in p.parents for d in _diretorios_permitidos())
@@ -286,29 +303,61 @@ async def obter_conteudo_arquivo(caminho: str, limite: int = 50):
 
             return {
                 "tipo": "python",
-                "caminho": caminho,
+                "caminho": p.relative_to(REPOSITORY_ROOT).as_posix(),
                 "nome": p.name,
                 "conteudo": conteudo,
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Erro ao ler script Python: {e}")
 
+    # 7. Arquivo HTML (relatórios do Evidently AI, dashboards interativos)
+    if ext == ".html":
+        try:
+            with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                conteudo = f.read()
+            return {
+                "tipo": "html",
+                "caminho": p.relative_to(REPOSITORY_ROOT).as_posix(),
+                "nome": p.name,
+                "conteudo": conteudo,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao ler arquivo HTML: {e}")
+
     raise HTTPException(status_code=400, detail="Formato de arquivo não suportado para visualização.")
 
 
 @router.get("/documento")
 async def visualizar_documento(caminho: str):
-    """Retorna o documento diretamente para visualização/leitura no navegador (ex: application/pdf)."""
+    """Retorna o documento diretamente para visualização/leitura no navegador (ex: application/pdf ou text/html)."""
     from kraken_copilot.config import REPOSITORY_ROOT
     p = (REPOSITORY_ROOT / caminho).resolve()
+
+    # Fallback inteligente para arquivos do workspace
+    if not p.exists() and "workspace" in caminho:
+        file_name = Path(caminho).name
+        c1 = (REPOSITORY_ROOT / "krakenlake" / "workspace" / file_name).resolve()
+        c2 = (REPOSITORY_ROOT / "krakenlake" / "workspace" / "reports" / file_name).resolve()
+        if c1.exists() and c1.is_file():
+            p = c1
+        elif c2.exists() and c2.is_file():
+            p = c2
+
     permitido = any(p == d or d in p.parents for d in _diretorios_permitidos())
     if not permitido or not p.exists() or not p.is_file():
         raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
 
-    if p.suffix.lower() == ".pdf":
+    ext = p.suffix.lower()
+    if ext == ".pdf":
         return FileResponse(
             p,
             media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{p.name}"'},
+        )
+    if ext == ".html":
+        return FileResponse(
+            p,
+            media_type="text/html",
             headers={"Content-Disposition": f'inline; filename="{p.name}"'},
         )
     return FileResponse(

@@ -52,6 +52,8 @@ export interface Mensagem {
   ferramentas_executadas?: ToolCallItem[];
   sugestoes_acoes?: string[];
   benchmark_metrics?: BenchmarkMetrics;
+  structured_result?: any;
+  metadados?: Record<string, any>;
   timestamp?: string;
 }
 
@@ -225,7 +227,18 @@ export function App() {
     try {
       setSideCodeDiff(undefined);
       setSideCodeHasApproval(false);
-      const res = await fetch(`/api/dados/arquivo?caminho=krakenlake/workspace/${filename}`);
+      const cleanFile = filename.trim();
+      const path1 = cleanFile.startsWith('krakenlake/') ? cleanFile : `krakenlake/workspace/${cleanFile}`;
+      let res = await fetch(`/api/dados/arquivo?caminho=${encodeURIComponent(path1)}`);
+      if (!res.ok) {
+        // Fallback para subpasta reports/ se for HTML
+        const path2 = cleanFile.includes('/') ? cleanFile : `krakenlake/workspace/reports/${cleanFile}`;
+        res = await fetch(`/api/dados/arquivo?caminho=${encodeURIComponent(path2)}`);
+      }
+      if (!res.ok) {
+        res = await fetch(`/api/dados/arquivo?caminho=${encodeURIComponent(cleanFile)}`);
+      }
+
       if (res.ok) {
         const data = await res.json();
         setSideCodeContent(typeof data.conteudo === 'string' ? data.conteudo : '');
@@ -434,6 +447,24 @@ export function App() {
     }
   };
 
+  const handleRenameConversa = async (id: string, novoTitulo: string) => {
+    if (!novoTitulo.trim()) return;
+    try {
+      const res = await fetch(`/api/conversas/${id}/titulo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo: novoTitulo.trim() }),
+      });
+      if (res.ok) {
+        setConversas((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, titulo: novoTitulo.trim() } : c))
+        );
+      }
+    } catch (err) {
+      console.error('Erro ao renomear conversa:', err);
+    }
+  };
+
   const handleSelectModel = async (modelId: string) => {
     setCurrentModel(modelId);
     try {
@@ -550,6 +581,14 @@ export function App() {
           ferramentas_executadas: data.ferramentas_executadas || [],
           sugestoes_acoes: data.sugestoes_acoes || [],
           benchmark_metrics: data.benchmark_metrics,
+          structured_result: data.structured_result,
+          metadados: {
+            structured_result: data.structured_result,
+            has_approval_request: data.has_approval_request,
+            proposed_code: data.proposed_code,
+            diff_info: data.diff_info,
+            ferramentas_executadas: data.ferramentas_executadas,
+          },
           timestamp: new Date().toLocaleTimeString(),
         };
 
@@ -565,6 +604,33 @@ export function App() {
         } else if (selectedWorkspaceFile) {
           carregarWorkspaceCode(selectedWorkspaceFile);
           carregarWorkspaceFiles(true);
+        }
+
+        // Navegação autônoma inteligente (CopilotKit Frontend Action)
+        const promptLower = cleanUserText.toLowerCase();
+        if (
+          (data as any).navigate_to === 'dados' ||
+          /(navegue|ir|abrir|abra|mostre|acesse).*(aba|tela|painel|seção|guia)?.*(dados|documentos|tabela)/i.test(promptLower)
+        ) {
+          setActiveView('dados');
+        } else if (
+          (data as any).navigate_to === 'observabilidade' ||
+          /(navegue|ir|abrir|abra|mostre|acesse).*(aba|tela|painel|seção|guia)?.*(observabilidade|auditoria|logs|investigação)/i.test(promptLower)
+        ) {
+          setActiveView('observabilidade');
+        } else if (
+          (data as any).navigate_to === 'chat' ||
+          /(voltar|ir|navegue).*(para o)?.*chat/i.test(promptLower)
+        ) {
+          setActiveView('chat');
+        }
+
+        if ((data as any).open_file) {
+          setSelectedWorkspaceFile((data as any).open_file);
+          carregarWorkspaceCode((data as any).open_file);
+          setSideCodeOpen(true);
+        } else if (/(abra|abrir|mostre|ver).*(código|script|painel)/i.test(promptLower)) {
+          setSideCodeOpen(true);
         }
 
         setMensagens((prev) => [...prev, assistantMsg]);
@@ -672,6 +738,7 @@ export function App() {
             setMobileMenuOpen(false);
           }}
           onDeleteConversa={deletarConversa}
+          onRenameConversa={handleRenameConversa}
           onNavigate={(view) => {
             setActiveView(view);
             setMobileMenuOpen(false);
@@ -768,6 +835,14 @@ export function App() {
             </div>
 
             <div className="flex items-center gap-2">
+              <div
+                className="hidden lg:flex items-center gap-1.5 rounded-full bg-slate-50 border border-slate-200/80 px-2 py-0.5 text-[10px] font-medium text-slate-600 select-none shadow-2xs"
+                title="CopilotKit v2 Runtime conectado e operacional em /api/copilotkit"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span>CopilotKit</span>
+              </div>
+
               {activeView === 'chat' && (
                 <button
                   type="button"

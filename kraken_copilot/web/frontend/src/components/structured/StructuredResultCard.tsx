@@ -19,21 +19,33 @@ export function StructuredResultCard({
 }: StructuredResultCardProps) {
   if (!data || typeof data !== 'object') return null;
 
-  // Unwrap ToolResult wrapper if present ({ sucesso: true, data: {...}, schema_name: ... })
-  const target = (data.data && typeof data.data === 'object') ? data.data : data;
+  // Desempacota recursivamente wrappers comuns (ToolResult.data, function_response.resultado, etc.)
+  let target = data;
+  if (target?.resultado && typeof target.resultado === 'object') {
+    target = target.resultado;
+  }
+  if (target?.data && typeof target.data === 'object') {
+    target = target.data;
+  }
+  if (target?.resultado && typeof target.resultado === 'object') {
+    target = target.resultado;
+  }
+  if (target?.data && typeof target.data === 'object') {
+    target = target.data;
+  }
 
   // 1. KrakenBenchmark
-  if (target.kraken_benchmark || (target.tempo_execucao_otimizado !== undefined && target.speedup !== undefined)) {
-    const benchData = (target.kraken_benchmark || target) as KrakenBenchmarkData;
-    return <KrakenBenchmarkCard benchmark={benchData} className={className} />;
+  const benchCandidate = target.kraken_benchmark || target.benchmark || target;
+  if (benchCandidate && (benchCandidate.speedup !== undefined || (benchCandidate.duracao_otimizado_s !== undefined && benchCandidate.duracao_baseline_s !== undefined))) {
+    return <KrakenBenchmarkCard benchmark={benchCandidate as KrakenBenchmarkData} className={className} />;
   }
 
   // 2. KrakenCodeDiff
-  if (target.kraken_code_diff || (target.proposed_code && target.raw_diff !== undefined)) {
-    const diffData = (target.kraken_code_diff || target) as KrakenCodeDiffData;
+  const diffCandidate = target.kraken_code_diff || target.diff_info || target;
+  if (diffCandidate && (diffCandidate.raw_diff !== undefined || (diffCandidate.proposed_code && (diffCandidate.adicoes !== undefined || diffCandidate.linhas)))) {
     return (
       <KrakenCodeDiffCard
-        diff={diffData}
+        diff={diffCandidate as KrakenCodeDiffData}
         onApprove={onApprove}
         onReject={onReject}
         className={className}
@@ -42,15 +54,15 @@ export function StructuredResultCard({
   }
 
   // 3. KrakenDataProfile
-  if (target.kraken_data_profile || (target.dataset_nome && target.colunas && target.tamanho_kb !== undefined)) {
-    const profileData = (target.kraken_data_profile || target) as KrakenDataProfileData;
-    return <KrakenDataProfileCard profile={profileData} className={className} />;
+  const profileCandidate = target.kraken_data_profile || target.estrutura?.kraken_data_profile || target;
+  if (profileCandidate && profileCandidate.colunas && (profileCandidate.dataset_nome || profileCandidate.total_linhas !== undefined || profileCandidate.tamanho_kb !== undefined)) {
+    return <KrakenDataProfileCard profile={profileCandidate as KrakenDataProfileData} className={className} />;
   }
 
   // 4. KrakenStatisticalReport
-  if (target.kraken_statistical_report || (target.total_linhas_analisadas && target.metricas_colunas)) {
-    const statData = (target.kraken_statistical_report || target) as KrakenStatisticalReportData;
-    return <KrakenStatisticalReportCard report={statData} className={className} />;
+  const statCandidate = target.kraken_statistical_report || target.estatisticas?.kraken_statistical_report || target;
+  if (statCandidate && statCandidate.metricas_colunas && (statCandidate.total_linhas_analisadas !== undefined || statCandidate.total_linhas_avaliadas !== undefined)) {
+    return <KrakenStatisticalReportCard report={statCandidate as KrakenStatisticalReportData} className={className} />;
   }
 
   return null;

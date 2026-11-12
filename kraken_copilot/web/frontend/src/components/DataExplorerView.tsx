@@ -25,6 +25,7 @@ import {
   FolderOpen,
   Package,
   FileCode2,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RecordsTable } from './RecordsTable';
@@ -54,6 +55,7 @@ const SUBCAT_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   PDF: FileText,
   PYTHON: FileCode2,
   PY: FileCode2,
+  HTML: Globe,
 };
 
 // Helper para parsear JSON profundo (evita JSONs escapados com \n e \")
@@ -478,6 +480,41 @@ export function DataExplorerView({
                     src={`/api/dados/documento?caminho=${encodeURIComponent(arquivoAtivo.caminho)}`}
                     className="h-full w-full border-0 min-h-[580px]"
                     title="PDF Viewer"
+                  />
+                </div>
+              </div>
+            ) : conteudo?.tipo === 'html' ? (
+              <div className="flex flex-col h-full rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-200 text-xs shrink-0">
+                  <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Globe className="h-4 w-4 text-purple-600" />
+                    <span>Relatório / Dashboard HTML ({arquivoAtivo.nome})</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`/api/dados/documento?caminho=${encodeURIComponent(arquivoAtivo.caminho)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span>Abrir em Nova Aba</span>
+                    </a>
+                    <a
+                      href={`/api/dados/download?caminho=${encodeURIComponent(arquivoAtivo.caminho)}`}
+                      className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-2.5 py-1 text-white font-medium hover:bg-purple-700 shadow-2xs transition-colors"
+                    >
+                      <Download className="h-3 w-3" />
+                      <span>Download</span>
+                    </a>
+                  </div>
+                </div>
+                <div className="flex-1 min-h-[580px] bg-white">
+                  <iframe
+                    src={`/api/dados/documento?caminho=${encodeURIComponent(arquivoAtivo.caminho)}`}
+                    className="h-full w-full border-0 min-h-[580px]"
+                    title="HTML Viewer"
+                    sandbox="allow-scripts allow-same-origin allow-popups"
                   />
                 </div>
               </div>

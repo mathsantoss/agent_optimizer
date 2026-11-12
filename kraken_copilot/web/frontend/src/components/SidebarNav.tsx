@@ -18,6 +18,8 @@ import {
   AtSign,
   Eye,
   FileText,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CatalogDataSource, WorkspaceFile } from './PromptBar';
@@ -38,6 +40,7 @@ export interface SidebarNavProps {
   onSelectConversa: (id: string) => void;
   onNovaConversa: () => void;
   onDeleteConversa: (id: string) => void;
+  onRenameConversa?: (id: string, novoTitulo: string) => void;
   onNavigate: (view: 'chat' | 'dados' | 'observabilidade') => void;
   onOpenObservability: () => void;
   catalogSources?: CatalogDataSource[];
@@ -57,6 +60,7 @@ export function SidebarNav({
   onSelectConversa,
   onNovaConversa,
   onDeleteConversa,
+  onRenameConversa,
   onNavigate,
   onOpenObservability,
   catalogSources = [],
@@ -71,7 +75,36 @@ export function SidebarNav({
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [fileQuery, setFileQuery] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingId) {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }
+  }, [editingId]);
+
+  const handleStartRename = (c: ConversaItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(c.id);
+    setEditingTitle(c.titulo);
+  };
+
+  const handleConfirmRename = (id: string, e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.stopPropagation();
+    if (editingTitle.trim() && onRenameConversa) {
+      onRenameConversa(id, editingTitle.trim());
+    }
+    setEditingId(null);
+  };
+
+  const handleCancelRename = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.stopPropagation();
+    setEditingId(null);
+  };
 
   useEffect(() => {
     if (searchOpen) {
@@ -196,7 +229,7 @@ export function SidebarNav({
             <button
               type="button"
               onClick={() => setCollapsed(false)}
-              className="group relative flex h-9 w-9 items-center justify-center rounded-xl transition-all cursor-pointer hover:ring-2 hover:ring-blue-400 p-0.5"
+              className="group relative flex h-10 w-10 mx-auto items-center justify-center rounded-xl transition-all cursor-pointer hover:ring-2 hover:ring-blue-400 p-0"
               title="Expandir menu lateral"
             >
               <img
@@ -236,32 +269,32 @@ export function SidebarNav({
         </div>
 
         {/* Ação Primária: New Chat */}
-        <div className="p-2.5">
+        <div className={cn(collapsed ? 'p-2 flex justify-center' : 'p-2.5')}>
           <button
             type="button"
             onClick={onNovaConversa}
             className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 shadow-2xs transition-all cursor-pointer active:scale-98',
-              collapsed && 'px-0'
+              'flex items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50/80 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 shadow-2xs transition-all cursor-pointer active:scale-98',
+              collapsed ? 'h-10 w-10 p-0 mx-auto' : 'w-full gap-2 px-3 py-2'
             )}
             title="Iniciar Nova Conversa (Ctrl+N)"
           >
-            <Plus className="h-4 w-4 text-blue-600" />
+            <Plus className="h-4 w-4 text-blue-600 shrink-0" />
             {!collapsed && <span>Nova Conversa</span>}
           </button>
         </div>
 
         {/* Menu de Navegação Primária */}
-        <nav className="px-2 space-y-0.5 border-b border-slate-100 pb-2">
+        <nav className={cn('border-b border-slate-100 pb-2 space-y-1', collapsed ? 'px-2 flex flex-col items-center' : 'px-2 space-y-0.5')}>
           <button
             type="button"
             onClick={() => onNavigate('chat')}
             className={cn(
-              'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer',
+              'flex items-center rounded-xl text-xs font-medium transition-colors cursor-pointer',
+              collapsed ? 'h-10 w-10 p-0 justify-center mx-auto' : 'w-full gap-2.5 px-2.5 py-2',
               activeView === 'chat'
                 ? 'bg-blue-50 text-blue-700 font-semibold'
-                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
-              collapsed && 'justify-center px-0'
+                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
             )}
             title="Chat Principal"
           >
@@ -273,11 +306,11 @@ export function SidebarNav({
             type="button"
             onClick={() => onNavigate('dados')}
             className={cn(
-              'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer',
+              'flex items-center rounded-xl text-xs font-medium transition-colors cursor-pointer',
+              collapsed ? 'h-10 w-10 p-0 justify-center mx-auto' : 'w-full gap-2.5 px-2.5 py-2',
               activeView === 'dados'
                 ? 'bg-purple-50 text-purple-700 font-semibold'
-                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
-              collapsed && 'justify-center px-0'
+                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
             )}
             title="Explorador de Dados e Documentos"
           >
@@ -289,11 +322,11 @@ export function SidebarNav({
             type="button"
             onClick={() => onNavigate('observabilidade')}
             className={cn(
-              'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer',
+              'flex items-center rounded-xl text-xs font-medium transition-colors cursor-pointer',
+              collapsed ? 'h-10 w-10 p-0 justify-center mx-auto' : 'w-full gap-2.5 px-2.5 py-2',
               activeView === 'observabilidade'
                 ? 'bg-emerald-50 text-emerald-700 font-semibold'
-                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
-              collapsed && 'justify-center px-0'
+                : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
             )}
             title="Painel de Observabilidade"
           >
@@ -389,7 +422,7 @@ export function SidebarNav({
               )}
 
               {/* Lista de Sessões Recentes */}
-              <div className="space-y-0.5">
+              <div className={cn(collapsed ? 'space-y-1 flex flex-col items-center' : 'space-y-0.5')}>
                 {visibleConversas.length === 0 ? (
                   !collapsed && (
                     <div className="px-2 py-4 text-center text-xs text-slate-400">
@@ -399,6 +432,71 @@ export function SidebarNav({
                 ) : (
                   (collapsed ? visibleConversas.slice(0, 3) : visibleConversas).map((c) => {
                     const isSelected = c.id === conversaAtivaId;
+                    const isEditing = editingId === c.id;
+
+                    if (isEditing && !collapsed) {
+                      return (
+                        <div
+                          key={c.id}
+                          className="flex items-center gap-1.5 rounded-xl border border-blue-400 bg-white px-2 py-1 shadow-xs"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MessageSquare className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                          <input
+                            ref={renameInputRef}
+                            type="text"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleConfirmRename(c.id, e);
+                              if (e.key === 'Escape') handleCancelRename(e);
+                            }}
+                            className="flex-1 bg-transparent text-xs text-slate-900 outline-none font-medium min-w-0"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => handleConfirmRename(c.id, e)}
+                            className="p-0.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded"
+                            title="Salvar nome"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCancelRename(e)}
+                            className="p-0.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+                            title="Cancelar"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    if (collapsed) {
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={cn(
+                            'group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer mx-auto p-0',
+                            isSelected
+                              ? 'bg-blue-50/90 text-blue-700 font-semibold border border-blue-200/80 shadow-2xs'
+                              : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'
+                          )}
+                          onClick={() => onSelectConversa(c.id)}
+                          title={c.titulo}
+                        >
+                          <MessageSquare
+                            className={cn(
+                              'h-4 w-4 shrink-0 transition-colors',
+                              isSelected ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'
+                            )}
+                          />
+                        </button>
+                      );
+                    }
+
                     return (
                       <div
                         key={c.id}
@@ -406,37 +504,43 @@ export function SidebarNav({
                           'group relative flex items-center justify-between rounded-xl px-2.5 py-1.5 text-xs transition-colors cursor-pointer',
                           isSelected
                             ? 'bg-blue-50/80 font-semibold text-blue-900 border border-blue-200/60 shadow-2xs'
-                            : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900',
-                          collapsed && 'justify-center px-0'
+                            : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'
                         )}
                         onClick={() => onSelectConversa(c.id)}
+                        onDoubleClick={(e) => handleStartRename(c, e)}
                         title={c.titulo}
                       >
-                        <div className="flex items-center gap-2 overflow-hidden">
+                        <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
                           <MessageSquare
                             className={cn(
                               'h-3.5 w-3.5 shrink-0',
                               isSelected ? 'text-blue-600' : 'text-slate-400'
                             )}
                           />
-                          {!collapsed && (
-                            <span className="truncate text-[12px]">{c.titulo}</span>
-                          )}
+                          <span className="truncate text-[12px]">{c.titulo}</span>
                         </div>
 
-                        {!collapsed && (
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => handleStartRename(c, e)}
+                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50/80 rounded transition-colors"
+                            title="Renomear conversa"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               onDeleteConversa(c.id);
                             }}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition-opacity"
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 rounded transition-colors"
                             title="Excluir conversa"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                        )}
+                        </div>
                       </div>
                     );
                   })
